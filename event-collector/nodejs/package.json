@@ -1,0 +1,29 @@
+{
+  "name": "event-collector",
+  "version": "1.0.0",
+  "description": "Client that will receive single geospatial events, aggregate them and publish them as aggregates.",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "tsc",
+    "clean": "rm -rf dist && rm -rf output",
+    "start": "tsc && node dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/latlon-geohash": "^2.0.3",
+    "@types/node": "^20.14.2",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "apache-arrow": "^16.1.0",
+    "core-lib": "file:../../shared/javascript/core-lib",
+    "duckdb-async": "^1.0.0",
+    "latlon-geohash": "^2.0.0",
+    "messaging-lib": "file:../../shared/javascript/messaging-lib",
+    "yaml": "^2.4.5"
+  }
+}

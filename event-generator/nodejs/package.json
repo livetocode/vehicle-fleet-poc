@@ -1,0 +1,25 @@
+{
+  "name": "event-generator",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "tsc",
+    "clean": "rm -rf dist",
+    "start": "tsc && node dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "core-lib": "file:../../shared/javascript/core-lib",
+    "messaging-lib": "file:../../shared/javascript/messaging-lib",
+    "yaml": "^2.4.5"
+  }
+}

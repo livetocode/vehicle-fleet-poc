@@ -1,0 +1,35 @@
+hub:
+  type: nats
+  protocols:
+    nats:
+      servers:
+      - localhost:4222
+    websockets:
+      servers:
+      - ws://localhost:4243
+
+generator:
+  verbose: false
+  vehicleCount: 100
+  maxNumberOfEvents: 10000
+  refreshIntervalInSecs: 5
+  realtime: false
+  sendFlush: true
+  terminateCollector: true
+
+collector:
+  verbose: false
+  collectorCount: 1
+  aggregationWindowInMin: 10
+  geohashLength: 5
+  splitByGeohash: false
+  eventStore:
+    type: noop # noop, memory, duckdb
+  output:
+    type: file
+    folder: ./output/data
+    formats:
+    - parquet
+
+viewer:
+  verbose: false
