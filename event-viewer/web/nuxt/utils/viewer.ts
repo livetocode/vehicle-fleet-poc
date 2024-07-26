@@ -1,6 +1,6 @@
 import { Application, Assets, Container, Graphics, Sprite, type UnresolvedAsset } from 'pixi.js';
-import { JSONCodec, connect, type NatsConnection } from "nats.ws";
-import { Rect, ViewPort, type Config, type MoveCommand } from 'core-lib';
+import { Rect, ViewPort, type AggregateFileStats, type Config, type MoveCommand } from 'core-lib';
+import { EventHandler, LambdaEventHandler } from './messaging';
 
 export interface AssetRef {
     alias: string;
@@ -20,7 +20,6 @@ export interface Zone {
 }
 
 export class Viewer {
-    private _connection?: NatsConnection;
     private _app?: Application;
     private _container?: Container;
     private _zoneContainer?: Container;
@@ -28,8 +27,12 @@ export class Viewer {
     private _vehicles = new Map<string, Vehicle>();
     private _zones = new Map<string, Zone>();
     private _assets: AssetRef[] = [];
+    private _moveHandler?: EventHandler;
     
-    constructor (private config: Config) {
+    constructor (private config: Config, private _messageBus: MessageBus) {
+        if (!_messageBus) {
+            throw new Error('Expected to receive a messageBus!');
+        }
         console.log('Received config', config);
     }
 
@@ -58,46 +61,24 @@ export class Viewer {
         app.ticker.add((time: any) => {
             this.animate(time);
         });
-
-        await this.connect();
+        this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
+        this._messageBus.registerHandlers(this._moveHandler);
     }
 
     async dispose() {
-        if (this._connection && !this._connection.isClosed() && !this._connection.isDraining()) {
-            await this._connection.drain();
+        if (this._moveHandler) {
+            this._messageBus?.unregisterHandler(this._moveHandler);
+            this._moveHandler = undefined;
         }
-        this._app?.destroy();
-    }
-
-    private async connect() {
-        try {
-            this._connection = await connect(
-                {
-                    servers: this.config.hub.protocols.websockets.servers,
-                },
-            );
-            console.log('NATS connection is ready.');
-            // create a codec
-            const codec = JSONCodec();
-            // create a simple subscriber and iterate over messages
-            // matching the subscription
-            const sub = this._connection.subscribe("commands");
-            (async () => {
-                for await (const m of sub) {
-                    // console.log(`[${sub.getProcessed()}]: ${sc.decode(m.data)}`);
-                    const data: any = codec.decode(m.data);
-                    if (data.type === 'move') {
-                        this.onProcessCommand(data);
-                    }
-                }
-                console.log("subscription closed");
-            })().catch(console.error);
-        } catch(err) {
-            console.error(err);
-        }
+        const app = this._app;
+        this._app = undefined;
+        app?.destroy();
     }
 
     private onProcessCommand(cmd: MoveCommand) {
+        if (!this._app) {
+            return;
+        }
         this.updateViewPort(cmd);
         this.updateZone(cmd);
         this.onMoveVehicle(cmd);
@@ -168,7 +149,9 @@ export class Viewer {
         for (const cmd of this._vehicles.values()) {
             if (cmd.isDirty) {
                 cmd.isDirty = false;
-                cmd.sprite.scale.set(0.1 + (0.3 - 0.3 * (cmd.lastCommand.speed / Math.max(cmd.lastCommand.speed, 40000))) );
+                const speedFactor = Math.min(cmd.lastCommand.speed, 40000) / 40000;
+                const vehicleCountFactor = Math.min(this._vehicles.size, 10000) / 10000;
+                cmd.sprite.scale.set(0.1 + 0.3 * (1 - speedFactor) * (1 - 0.9 * vehicleCountFactor) );
                 switch(cmd.lastCommand.direction) {
                 case 'north':
                     cmd.sprite.angle = 180;
