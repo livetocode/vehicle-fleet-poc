@@ -83,6 +83,7 @@ async function main() {
         aggregateStore, 
         collectorIndex, 
     );
+    await moveCommandHandler.init();
     messageBus.registerHandlers(moveCommandHandler);
 
     await messageBus.run('commands');

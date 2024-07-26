@@ -36,16 +36,6 @@ export class NatsMessageBus implements MessageBus {
             throw new Error('Expected MessageBus to have registered event handlers');
         }
 
-        const initializedHandlers = new Set();
-        for (const handlers of this.handlers.values()) {
-            for (const handler of handlers) {
-                if (!initializedHandlers.has(handler)) {
-                    initializedHandlers.add(handler);
-                    await handler.init();
-                }
-            }
-        }
-
         this.logger.info(`Listening to '${subject}' messages...`);
         const sub = this.connection.subscribe(subject);
         const watch = new Stopwatch();
