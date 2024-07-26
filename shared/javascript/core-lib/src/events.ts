@@ -32,9 +32,11 @@ export interface FileWriteStats {
     format: string;
     itemCount: number;
     partitionKey: string;
+    elapsedTimeInMS: number;
 }  
 
 export interface AggregateFileStats {
+    type: 'aggregate-file-stats',
     collectorCount: number;
     collectorIndex: number;
     fromTime: string;
@@ -42,4 +44,6 @@ export interface AggregateFileStats {
     partitionKey: string;
     eventCount: number;
     files: FileWriteStats[];
+    formats: string[];
+    elapsedTimeInMS: number;
 }

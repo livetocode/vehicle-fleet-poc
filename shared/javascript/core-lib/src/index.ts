@@ -5,3 +5,4 @@ export * from './dates.js';
 export * from './math.js';
 export * from './config.js';
 export * from './logger.js';
+export * from './stopwatch.js';

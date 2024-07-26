@@ -72,7 +72,7 @@ Event Generator ==> Event Hub -------------+         + PowerBI
 ```
                                            +-----> Event Viewer
                                            |         + NuxtJS
-Event Generator ==> Event Hub -------------+         + PowerBI
+Event Generator ==> Event Hub -------------+         
                      + AWS Eventbridge     |
                                            +----> Event Collector -------> Event Aggregate Store <------ Event query
                                                   + Amazon Data Firehose       + AWS S3                     + Amazon Athena
@@ -185,3 +185,5 @@ https://deepak6446.medium.com/why-did-we-move-from-mongodb-to-athena-with-parque
 
 https://learn.microsoft.com/en-us/azure/stream-analytics/stream-analytics-real-time-fraud-detection
 https://www.red-gate.com/simple-talk/cloud/azure/query-blob-storage-sql-using-azure-synapse/
+
+https://hivekit.io/blog/how-weve-saved-98-percent-in-cloud-costs-by-writing-our-own-database/

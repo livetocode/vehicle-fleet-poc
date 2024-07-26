@@ -1,6 +1,6 @@
 import { JSONCodec, NatsConnection, connect } from "nats";
 import { MessageBus } from "./MessageBus.js";
-import { NatsHubConfig } from "core-lib";
+import { NatsHubConfig, Stopwatch } from "core-lib";
 import { Logger } from "core-lib";
 import { EventHandler } from "./EventHandler.js";
 
@@ -46,8 +46,10 @@ export class NatsMessageBus implements MessageBus {
             }
         }
 
-        this.logger.info("Listening to command messages...");
+        this.logger.info(`Listening to '${subject}' messages...`);
         const sub = this.connection.subscribe(subject);
+        const watch = new Stopwatch();
+        watch.start();
         let messageCount = 0;
         for await (const m of sub) {
             messageCount++;
@@ -63,7 +65,8 @@ export class NatsMessageBus implements MessageBus {
                 }                
             }
         }
-        this.logger.info("Subscription closed after processing ", messageCount, " messages");
+        watch.stop();
+        this.logger.info(`Subscription for '${subject}' closed after processing `, messageCount, " messages in ", watch.elapsedTimeAsString());
     }
     
     registerHandlers(...handlers: EventHandler[]) {

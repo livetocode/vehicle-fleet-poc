@@ -1,5 +1,5 @@
 import { Engine } from "./engine.js";
-import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates } from 'core-lib';
+import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
@@ -56,6 +56,8 @@ async function main() {
         lon: -74.0651269,
         alt: 11.76,
     };
+    const watch = new Stopwatch();
+    watch.start();
     let eventCount = 0;
     while (eventCount < maxNumberOfEvents) {
         const commands = engine.execute();
@@ -89,11 +91,12 @@ async function main() {
             await sleep(10);
         }
     }
+    watch.stop();
     const flushCmd: FlushCommand = {
         type: 'flush',
         exitProcess: terminateCollector,
     }
-    logger.info(`Done generating ${eventCount} events.`);
+    logger.info(`Done generating ${eventCount} events in ${watch.elapsedTimeAsString()}`);
     messageBus.publish('commands', flushCmd);
     await messageBus.drain();
 }

@@ -63,6 +63,7 @@ export type OutputConfig =
 export interface CollectorConfig {
     verbose: boolean;
     collectorCount: number;
+    // TODO: add timePartition and dataPartition sections
     aggregationWindowInMin: number;
     geohashLength: number;
     splitByGeohash: boolean;

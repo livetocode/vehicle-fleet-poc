@@ -1,6 +1,6 @@
 import { AggregateStore } from "./AggregateStore.js";
 import fs from 'fs/promises';
-import { FileWriteStats, Logger, TimeRange, dateToUtcParts } from "core-lib";
+import { FileWriteStats, Logger, Stopwatch, TimeRange, dateToUtcParts } from "core-lib";
 import path from 'path';
 import { FileWriter } from "./formats/FileWriter.js";
 
@@ -30,7 +30,10 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
                 await fs.access(filename);
                 this.logger.warn(`file ${filename} already exists!`);
             } catch {
+                const watch = new Stopwatch();
+                watch.start();
                 await format.write(filename, events);
+                watch.stop();
                 const fstats = await fs.stat(filename);
                 stats.push({
                     filename,
@@ -38,6 +41,7 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
                     size: fstats.size,
                     itemCount: events.length,
                     partitionKey: partitionKey,
+                    elapsedTimeInMS: watch.elapsedTimeInMS(),
                 });
             }    
         }

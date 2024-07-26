@@ -8,3 +8,9 @@ export function computeHashNumber(value: string, digits: number = 6): number {
     }
     return n;
 }
+
+export function roundDecimals(value: number, decimals: number) {
+    const pow = Math.pow(10, decimals)
+    return Math.round(value * pow) / pow
+}
+  

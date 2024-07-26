@@ -1,5 +1,5 @@
 import { GenericEventHandler } from "messaging-lib";
-import { AggregateFileStats, CollectorConfig, Command, FileWriteStats, FlushCommand, Logger, MoveCommand, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { AggregateFileStats, CollectorConfig, Command, FileWriteStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import Geohash from 'latlon-geohash';
 import { Accumulator } from "../core/data/Accumulator.js";
@@ -50,6 +50,8 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
 
     process(event: Command): Promise<void> {
         if (event.type === 'flush') {
+            // TODO: review how we flush when we have multiple collectors!
+            // This way is ok with a pub/sub but would not work with a queue and competing consumers.
             return this.processFlushEvent(event);
         }
         return super.process(event);
@@ -117,6 +119,10 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
     }
 
     protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange): Promise<void> {
+        // TODO: measure CPU and RAM
+        const formats = new Set<string>();
+        const watch = new Stopwatch();
+        watch.start();
         let writeStats: FileWriteStats[] = [];
         if (this.config.splitByGeohash) {
             const splitter = new Splitter<StoredEvent<PersistedMoveCommand>>((ev) => ev.partitionKey);
@@ -127,13 +133,22 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
                 const groupWriteStats = await this.aggregateStore.write(partitionKey, groupKey, sortedItems);
                 writeStats.push(...groupWriteStats);
                 subPartitionCount++;
+                for (const file of groupWriteStats) {
+                    formats.add(file.format);
+                }
             }
             this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
         } else {
             const sortedItems = objects.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-            writeStats = await this.aggregateStore.write(partitionKey, randomUUID(), sortedItems);
-        }
+            const dataPartitionKey = this.collectorIndex.toString(); // randomUUID();
+            writeStats = await this.aggregateStore.write(partitionKey, dataPartitionKey, sortedItems);
+            for (const file of writeStats) {
+                formats.add(file.format);
+            }
+    }
+        watch.stop();
         const statsEvent: AggregateFileStats = {
+            type: 'aggregate-file-stats',
             collectorCount: this.config.collectorCount,
             collectorIndex: this.collectorIndex,
             fromTime: partitionKey.fromTime.toUTCString(),
@@ -141,6 +156,8 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             partitionKey: partitionKey.toString(),
             eventCount: objects.length,
             files: writeStats,
+            formats: [...formats],
+            elapsedTimeInMS: watch.elapsedTimeInMS(),
         }
         this.messageBus.publish('stats', statsEvent);
     }

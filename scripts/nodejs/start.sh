@@ -1,3 +1,4 @@
+set -e
 echo "Compile shared libraries"
 (cd shared/javascript/core-lib && npm run compile)
 (cd shared/javascript/messaging-lib && npm run compile)
