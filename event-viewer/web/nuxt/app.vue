@@ -16,8 +16,8 @@
 
 <template>
   <div class="root-panel">
-    <VehiclesViewer class="viewer" :messageBus="messageBus" />
-    <VehiclesStats :messageBus="messageBus" />  
+    <VehicleViewer class="viewer" :messageBus="messageBus" />
+    <VehicleStats :messageBus="messageBus" />  
   </div>
 </template>
 

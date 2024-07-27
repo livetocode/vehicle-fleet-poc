@@ -1,6 +1,6 @@
 import { Application, Assets, Container, Graphics, Sprite, type UnresolvedAsset } from 'pixi.js';
 import { Rect, ViewPort, type AggregateFileStats, type Config, type MoveCommand } from 'core-lib';
-import { EventHandler, LambdaEventHandler } from './messaging';
+import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 
 export interface AssetRef {
     alias: string;
@@ -19,7 +19,7 @@ export interface Zone {
     shape: Graphics;
 }
 
-export class Viewer {
+export class VehicleViewerViewModel {
     private _app?: Application;
     private _container?: Container;
     private _zoneContainer?: Container;

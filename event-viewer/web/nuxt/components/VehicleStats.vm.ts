@@ -1,8 +1,8 @@
 import type { AggregateFileStats } from "core-lib";
-import { LambdaEventHandler, type EventHandler, type MessageBus } from "./messaging";
+import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import { ref } from 'vue';
 
-export class Stats {
+export class VehicleStatsViewModel {
     public events = ref<AggregateFileStats[]>([]);
     public totalEventCount = ref<number>(0);
     public totalFileCount = ref<number>(0);
