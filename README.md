@@ -149,6 +149,17 @@ TODO
 
 # Local development
 
+## Scripts
+
+### Requirements
+
+Python3 for running some scripts.
+
+### install
+
+`python3 -m venv .venv`
+`.venv/bin/pip3 install -r scripts/requirements.txt`
+
 ## NodeJS
 
 ### Requirements
@@ -173,7 +184,7 @@ npm run dev
 
 ### generate events
 
-`bash scripts/nodejs/start.sh`
+`.venv/bin/python3 scripts/nodejs/start.py`
 
 # References
 

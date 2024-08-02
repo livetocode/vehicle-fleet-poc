@@ -22,10 +22,10 @@ export class LambdaEventHandler implements EventHandler {
 }
 
 export interface MessageBus {
-    init(): Promise<void>;
+    start(): Promise<void>;
     publish(subject: string, message: any): void;
-    run(subject: string): Promise<void>;
-    drain(): Promise<void>;
+    watch(subject: string): Promise<void>;
+    stop(): Promise<void>;
     registerHandlers(...handlers: EventHandler[]): void;
     unregisterHandler(handler: EventHandler): void;
 }
@@ -38,7 +38,7 @@ export class NatsMessageBus implements MessageBus {
     constructor(private hub: NatsHubConfig, private logger: Logger) {
     }
 
-    async init(): Promise<void> {
+    async start(): Promise<void> {
         this.logger.info('NATS connecting...');
         this.connection = await connect({ servers: this.hub.protocols.websockets.servers });
         this.logger.info('NATS connection is ready.');
@@ -48,14 +48,14 @@ export class NatsMessageBus implements MessageBus {
         this.connection?.publish(subject, this.codec.encode(message));
     }
 
-    async drain(): Promise<void> {
+    async stop(): Promise<void> {
         if (this.connection) {
             await this.connection.drain();
             this.connection = undefined;
         }
     }
     
-    async run(subject: string): Promise<void> {
+    async watch(subject: string): Promise<void> {
         if (!this.connection) {
             throw new Error('Expected MessageBus to be initialized');
         }

@@ -19,6 +19,7 @@ export interface EngineOptions {
     refreshIntervalInSecs: number;
     timeOffsetInMS: number;
     enableOscillation: boolean;
+    onAcceptsVehicle: (id: string) => boolean;
 }
 
 export class Engine {
@@ -88,16 +89,19 @@ export class Engine {
                 for (let i = 0; i < vehiclesPerZone; i++) {
                     if (vehicleIdx < options.vehicleCount) {
                         vehicleIdx++;
-                    const location = zone.bounds.getRandomPosition();
-                    const direction = getRandomDirection();
-                    const vehicle = new Vehicle(vehicleIdx.toString(), {
-                            location,
-                            direction,
-                            speed: getRandomRangeValue(options.speed),
-                            offset: { x: 0, y: 0},
-                            localBounds: getRandomBounds(location, zone.bounds, direction),
-                        });
-                        zone.add(vehicle);    
+                        const id = vehicleIdx.toString();
+                        if (options.onAcceptsVehicle(id)) {
+                            const location = zone.bounds.getRandomPosition();
+                            const direction = getRandomDirection();
+                            const vehicle = new Vehicle(id, {
+                                location,
+                                direction,
+                                speed: getRandomRangeValue(options.speed),
+                                offset: { x: 0, y: 0},
+                                localBounds: getRandomBounds(location, zone.bounds, direction),
+                            });
+                            zone.add(vehicle);        
+                        }
                     }
                 }
                 region.add(zone);

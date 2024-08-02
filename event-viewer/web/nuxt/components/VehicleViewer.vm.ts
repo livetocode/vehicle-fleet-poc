@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite, type UnresolvedAsset } from 'pixi.js';
-import { Rect, ViewPort, type AggregateFileStats, type Config, type MoveCommand } from 'core-lib';
+import { Rect, ViewPort, type AggregatePeriodStats, type Config, type MoveCommand } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 
 export interface AssetRef {

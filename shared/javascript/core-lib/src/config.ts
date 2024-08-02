@@ -34,20 +34,51 @@ export type EventStoreConfig =
   | InMemoryEventStoreConfig
   | DuckDbEventStoreConfig;
 
+
+export interface GeohashDataPartitionStrategyConfig {
+    type: 'geohash';
+    hashLength: number;
+}
+
+export interface IdDataPartitionStrategyConfig {
+    type: 'id';
+}
+
+export interface IdGroupDataPartitionStrategyConfig {
+    type: 'idGroup';
+    groupSize: number;
+}
+
+export interface CollectorIndexDataPartitionStrategyConfig {
+    type: 'collectorIndex';
+}
+
+export type DataPartitionStrategyConfig =
+  | GeohashDataPartitionStrategyConfig
+  | IdDataPartitionStrategyConfig
+  | IdGroupDataPartitionStrategyConfig
+  | CollectorIndexDataPartitionStrategyConfig;
+
 export interface GeneratorConfig {
     verbose: boolean;
+    generatorCount: number;
     vehicleCount: number;
     maxNumberOfEvents: number;
     refreshIntervalInSecs: number;
     realtime: boolean;
     sendFlush: boolean;
     terminateCollector: boolean;
+    dataPartition: DataPartitionStrategyConfig;
 }
 
 export interface FileOutputConfig {
     type: 'file';
     folder: string;
     formats: string[];
+}
+
+export interface NoOpOutputConfig {
+    type: 'noop';
 }
 
 export interface S3OutputConfig {
@@ -58,17 +89,18 @@ export interface S3OutputConfig {
 
 export type OutputConfig = 
     | FileOutputConfig 
+    | NoOpOutputConfig
     | S3OutputConfig;
 
 export interface CollectorConfig {
     verbose: boolean;
     collectorCount: number;
-    // TODO: add timePartition and dataPartition sections
-    aggregationWindowInMin: number;
+    // TODO: replace with timePartition section?
+    aggregationPeriodInMin: number;
     geohashLength: number;
-    splitByGeohash: boolean;
     eventStore: EventStoreConfig;
     output: OutputConfig;
+    dataPartition: DataPartitionStrategyConfig;
 }  
 
 export interface ViewerConfig {

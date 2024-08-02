@@ -14,11 +14,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/latlon-geohash": "^2.0.3",
     "@types/node": "^20.14.2",
     "typescript": "^5.4.5"
   },
   "dependencies": {
     "core-lib": "file:../../shared/javascript/core-lib",
+    "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",
     "yaml": "^2.4.5"
   }

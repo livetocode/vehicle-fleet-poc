@@ -1,8 +1,9 @@
 import { AggregateStore } from "./AggregateStore.js";
 import fs from 'fs/promises';
-import { FileWriteStats, Logger, Stopwatch, TimeRange, dateToUtcParts } from "core-lib";
+import { DataPartitionStats, Logger, Stopwatch, TimeRange, dateToUtcParts } from "core-lib";
 import path from 'path';
 import { FileWriter } from "./formats/FileWriter.js";
+import { pathToFileURL } from 'node:url';
 
 export class FileAggregateStore<T> implements AggregateStore<T> {
     constructor(
@@ -15,8 +16,8 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
         await fs.mkdir(this.folder, { recursive: true });
     }
 
-    async write(range: TimeRange, partitionKey: string, events: T[]): Promise<FileWriteStats[]> {
-        const stats: FileWriteStats[] = [];
+    async write(range: TimeRange, partitionKey: string, events: T[]): Promise<DataPartitionStats[]> {
+        const stats: DataPartitionStats[] = [];
         for (const format of this.formats) {
             const ext = format.extension;
             const fromParts = dateToUtcParts(range.fromTime);
@@ -36,7 +37,7 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
                 watch.stop();
                 const fstats = await fs.stat(filename);
                 stats.push({
-                    filename,
+                    url: pathToFileURL(filename).toString(),
                     format: ext,
                     size: fstats.size,
                     itemCount: events.length,

@@ -7,11 +7,26 @@
     throw new Error('Expected a NATS hub');
   }
   const messageBus = new NatsMessageBus(appConfig.hub, logger);
-  window._messageBus = messageBus;
-  await messageBus.init();
-  messageBus.run('commands').catch(console.error);
-  messageBus.run('stats').catch(console.error);
-  console.info('App is initialized');
+  // await messageBus.start();
+  // messageBus.watch('commands.move.*').catch(console.error);
+  // messageBus.watch('stats').catch(console.error);
+  // console.info('App is initialized');
+
+onMounted(() => {
+  console.info('App is mounting...');
+  messageBus.start().then(async () => {
+    messageBus.watch('commands.move.*').catch(console.error);
+    messageBus.watch('stats').catch(console.error);
+  }).catch(console.error);
+  console.info('App is mounted');
+});
+
+onUnmounted(() => {
+  console.info('App is unmounting...');
+  messageBus.stop().catch(console.error);
+  console.info('App is unmounted');
+});
+
 </script>
 
 <template>

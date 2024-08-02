@@ -1,9 +1,9 @@
 import { EventHandler } from "./EventHandler.js";
 
 export interface MessageBus {
-    init(): Promise<void>;
+    start(): Promise<void>;
     publish(subject: string, message: any): void;
-    run(subject: string): Promise<void>;
-    drain(): Promise<void>;
+    watch(subject: string): Promise<void>;
+    stop(): Promise<void>;
     registerHandlers(...handlers: EventHandler[]): void;
 }

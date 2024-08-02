@@ -26,8 +26,8 @@ export type Command =
   | FlushCommand;
 
 
-export interface FileWriteStats {
-    filename: string;
+export interface DataPartitionStats {
+    url: string;
     size: number;
     format: string;
     itemCount: number;
@@ -35,15 +35,19 @@ export interface FileWriteStats {
     elapsedTimeInMS: number;
 }  
 
-export interface AggregateFileStats {
-    type: 'aggregate-file-stats',
+export interface AggregatePeriodStats {
+    type: 'aggregate-period-stats',
     collectorCount: number;
     collectorIndex: number;
     fromTime: string;
     toTime: string;
     partitionKey: string;
     eventCount: number;
-    files: FileWriteStats[];
+    partitions: DataPartitionStats[];
     formats: string[];
     elapsedTimeInMS: number;
+}
+
+export interface ResetAggregatePeriodStats {
+    type: 'reset-aggregate-period-stats',
 }

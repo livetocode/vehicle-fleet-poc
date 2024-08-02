@@ -10,12 +10,12 @@ const root = ref(null);
 const _vm = new VehicleViewerViewModel(appConfig, props.messageBus);
 
 onMounted(() => {
-  console.log('mounted', root);
+  console.log('VehicleViewer mounted', root);
   _vm.init(root.value).catch(console.error);
 });
 
 onUnmounted(() => {
-  console.log('unmounted', root);
+  console.log('VehicleViewer unmounted', root);
   _vm.dispose().catch(console.error);
 });
 

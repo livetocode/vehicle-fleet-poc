@@ -1,17 +1,22 @@
-import type { AggregateFileStats } from "core-lib";
+import type { AggregatePeriodStats } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import { ref } from 'vue';
 
 export class VehicleStatsViewModel {
-    public events = ref<AggregateFileStats[]>([]);
+    public events = ref<AggregatePeriodStats[]>([]);
     public totalEventCount = ref<number>(0);
-    public totalFileCount = ref<number>(0);
+    public totalTimePartitionCount = ref<number>(0);
+    public totalDataPartitionCount = ref<number>(0);
     public totalSize = ref<number>(0);
     private _statsHandler?: EventHandler;
+    private _timePartitions = new Set();
     constructor(private _messageBus: MessageBus) {}
 
     async init(): Promise<void> {
-        this._statsHandler = new LambdaEventHandler(['aggregate-file-stats'], async (ev: any) => { this.onProcessStats(ev); });
+        this._statsHandler = new LambdaEventHandler(
+            ['aggregate-period-stats', 'reset-aggregate-period-stats'], 
+            async (ev: any) => { this.onProcessStats(ev); },
+        );
         this._messageBus.registerHandlers(this._statsHandler);
     }
 
@@ -22,13 +27,23 @@ export class VehicleStatsViewModel {
         }
     }
 
-    private onProcessStats(ev: AggregateFileStats): void {
+    private onProcessStats(ev: AggregatePeriodStats): void {
         console.log(ev);
+        if ((ev as any).type === 'reset-aggregate-period-stats') {
+            this.totalEventCount.value = 0;
+            this.totalTimePartitionCount.value = 0;
+            this.totalDataPartitionCount.value = 0;
+            this.totalSize.value = 0;
+            this.events.value = [];
+            this._timePartitions.clear();
+            return;
+        }
+        this._timePartitions.add(ev.partitionKey);
         this.events.value = [...this.events.value, ev];
-        // this.events.push(ev);
         this.totalEventCount.value += ev.eventCount;
-        this.totalFileCount.value += ev.files.length;
-        this.totalSize.value += ev.files.map(x => x.size).reduce((a, b) => a + b, 0);
+        this.totalTimePartitionCount.value = this._timePartitions.size;
+        this.totalDataPartitionCount.value += ev.partitions.length;
+        this.totalSize.value += ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
     }
 
 }

@@ -1,12 +1,12 @@
 import { GenericEventHandler } from "messaging-lib";
-import { AggregateFileStats, CollectorConfig, Command, FileWriteStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { AggregatePeriodStats, CollectorConfig, Command, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
-import Geohash from 'latlon-geohash';
 import { Accumulator } from "../core/data/Accumulator.js";
 import { Splitter } from "../core/data/Splitter.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
-import { randomUUID } from "crypto";
 import { MessageBus } from "messaging-lib";
+import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
+import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
 
 export interface PersistedMoveCommand {
     timestamp: string;
@@ -21,6 +21,7 @@ export interface PersistedMoveCommand {
 
 export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
     private accumulator: MoveCommandAccumulator;
+    private geohashPartitioner: GeohashDataPartitionStrategy;
 
     constructor(
         private config: CollectorConfig,
@@ -28,9 +29,11 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
         private messageBus: MessageBus,
         private eventStore: EventStore<PersistedMoveCommand>,
         aggregateStore: AggregateStore<PersistedMoveCommand>,
+        private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
         private collectorIndex: number,
     ) {
         super();
+        this.geohashPartitioner = new GeohashDataPartitionStrategy(config.geohashLength);
         this.accumulator = new MoveCommandAccumulator(
             config,
             logger,
@@ -41,7 +44,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
     }
 
     get eventTypes(): string[] {
-        return ['move', 'flush'];
+        return ['move', 'flush']; 
     }
 
     async init(): Promise<void> {
@@ -61,19 +64,22 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
         this.logger.warn('Trigger flush');
         await this.accumulator.flush();
         if (event.exitProcess) {
-            await this.messageBus.drain();
+            await this.messageBus.stop();
         }
     }
 
     protected async processTypedEvent(event: MoveCommand): Promise<void> {
-        const geoHash = (Geohash as any).encode(event.gps.lat, event.gps.lon, this.config.geohashLength); 
-        const collectorIndex = this.config.collectorCount > 1 ? computeHashNumber(geoHash) % this.config.collectorCount : 0;
+        const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(event);
+        const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collectorCount;
         if (this.collectorIndex !== collectorIndex) {
+            this.logger.warn(`Received event for wrong collector index #${collectorIndex}`);
             return;
         }
+        const geoHash = this.dataPartitionStrategy instanceof GeohashDataPartitionStrategy ? 
+            dataPartitionKey : this.geohashPartitioner.getPartitionKey(event);
         const storedEvent: StoredEvent<PersistedMoveCommand> = { 
             timestamp: new Date(event.timestamp), 
-            partitionKey: geoHash, 
+            partitionKey: dataPartitionKey, 
             collectorIndex,
             event: {
                 timestamp: event.timestamp,
@@ -115,7 +121,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
     }
     
     protected getPartitionKey(obj: StoredEvent<PersistedMoveCommand>): TimeRange {
-        return calcTimeWindow(obj.timestamp, this.config.aggregationWindowInMin);
+        return calcTimeWindow(obj.timestamp, this.config.aggregationPeriodInMin);
     }
 
     protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange): Promise<void> {
@@ -123,39 +129,30 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         const formats = new Set<string>();
         const watch = new Stopwatch();
         watch.start();
-        let writeStats: FileWriteStats[] = [];
-        if (this.config.splitByGeohash) {
-            const splitter = new Splitter<StoredEvent<PersistedMoveCommand>>((ev) => ev.partitionKey);
-            splitter.addObjects(objects);
-            let subPartitionCount = 0;
-            for (const { groupKey, groupItems } of splitter.enumerate()) {
-                const sortedItems = groupItems.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-                const groupWriteStats = await this.aggregateStore.write(partitionKey, groupKey, sortedItems);
-                writeStats.push(...groupWriteStats);
-                subPartitionCount++;
-                for (const file of groupWriteStats) {
-                    formats.add(file.format);
-                }
-            }
-            this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
-        } else {
-            const sortedItems = objects.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-            const dataPartitionKey = this.collectorIndex.toString(); // randomUUID();
-            writeStats = await this.aggregateStore.write(partitionKey, dataPartitionKey, sortedItems);
-            for (const file of writeStats) {
+        let partitionStats: DataPartitionStats[] = [];
+        const splitter = new Splitter<StoredEvent<PersistedMoveCommand>>((ev) => ev.partitionKey);
+        splitter.addObjects(objects);
+        let subPartitionCount = 0;
+        for (const { groupKey, groupItems } of splitter.enumerate()) {
+            const sortedItems = groupItems.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            const groupWriteStats = await this.aggregateStore.write(partitionKey, groupKey, sortedItems);
+            partitionStats.push(...groupWriteStats);
+            subPartitionCount++;
+            for (const file of groupWriteStats) {
                 formats.add(file.format);
             }
-    }
+        }
         watch.stop();
-        const statsEvent: AggregateFileStats = {
-            type: 'aggregate-file-stats',
+        this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
+        const statsEvent: AggregatePeriodStats = {
+            type: 'aggregate-period-stats',
             collectorCount: this.config.collectorCount,
             collectorIndex: this.collectorIndex,
             fromTime: partitionKey.fromTime.toUTCString(),
             toTime: partitionKey.untilTime.toUTCString(),
             partitionKey: partitionKey.toString(),
             eventCount: objects.length,
-            files: writeStats,
+            partitions: partitionStats,
             formats: [...formats],
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         }
