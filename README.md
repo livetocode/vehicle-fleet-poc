@@ -12,6 +12,10 @@ This includes different programming languages, as well as cloud services.
 - The data should be archived for 7 years
 - The data should be queryable in order to find which cars where moving in a specific period, within a specific area of the city.
 
+# Estimates
+
+Execute the `estimate.py` script to compute the estimates in the [event-estimator](./event-estimator/) folder.
+
 # Architecture
 
 ## Local dev
