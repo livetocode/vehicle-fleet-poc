@@ -10,7 +10,7 @@ hub:
 
 generator:
   verbose: false
-  generatorCount: 2
+  generatorCount: 1
   vehicleCount: 100
   maxNumberOfEvents: 100000
   refreshIntervalInSecs: 5
@@ -19,23 +19,23 @@ generator:
   terminateCollector: true
   dataPartition:
     # type: id
-    type: idGroup
-    groupSize: 10
-    # type: geohash
-    # hashLength: 5
+    # type: idGroup
+    # groupSize: 10
+    type: geohash
+    hashLength: 5
 
 collector:
   verbose: false
   collectorCount: 2
-  aggregationPeriodInMin: 10
+  aggregationPeriodInMin: 1
   geohashLength: 5
   dataPartition:
     # type: collectorIndex
     # type: id
-    type: idGroup
-    groupSize: 10
-    # type: geohash
-    # hashLength: 5
+    # type: idGroup
+    # groupSize: 10
+    type: geohash
+    hashLength: 5
   eventStore:
     type: noop # noop, memory, duckdb
   output:

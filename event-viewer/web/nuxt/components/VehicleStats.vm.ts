@@ -39,7 +39,11 @@ export class VehicleStatsViewModel {
             return;
         }
         this._timePartitions.add(ev.partitionKey);
-        this.events.value = [...this.events.value, ev];
+        const events = [...this.events.value, ev];
+        if (events.length > 20) {
+            events.shift();
+        }
+        this.events.value = events;
         this.totalEventCount.value += ev.eventCount;
         this.totalTimePartitionCount.value = this._timePartitions.size;
         this.totalDataPartitionCount.value += ev.partitions.length;

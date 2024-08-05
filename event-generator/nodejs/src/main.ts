@@ -32,14 +32,10 @@ async function main() {
     const logger = new ConsoleLogger(`Generator #${generatorIndex}`);
     const messageBus = createMessageBus(config.hub, logger);
     const vehicleCount = config.generator.vehicleCount;
-    // TODO: should I compute the number of iterations instead of the number of events?
-    // This would allow me to not move vehicles that are not published,
-    // but it would be hard to generate the exact number of events when we have multiple generators.
-    const maxNumberOfEvents = config.generator.maxNumberOfEvents;
-    // let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.generatorCount);
-    // if (generatorIndex === 0) {
-    //     maxNumberOfEvents += config.generator.maxNumberOfEvents % config.generator.generatorCount;
-    // }
+    let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.generatorCount);
+    if (generatorIndex === 0) {
+        maxNumberOfEvents += config.generator.maxNumberOfEvents % config.generator.generatorCount;
+    }
     const refreshIntervalInSecs = config.generator.refreshIntervalInSecs;
     const realtime = config.generator.realtime;
     const terminateCollector = config.generator.terminateCollector;
@@ -77,8 +73,6 @@ async function main() {
         refreshIntervalInSecs,
         timeOffsetInMS,
         enableOscillation: true,
-        // TODO: should I remove onAcceptsVehicle?
-        onAcceptsVehicle: (id) => true, //computeHashNumber(id) % config.generator.generatorCount === generatorIndex,
     });
 
     const anchor: GpsCoordinates = {
@@ -87,12 +81,28 @@ async function main() {
         lon: -74.0651269,
         alt: 11.76,
     };
+    const refreshIntervalInMS = refreshIntervalInSecs * 1000;
+    let distributedRefreshIntervalInMS;
+    let distributedRefreshFrequency;
+    if (vehicleCount < refreshIntervalInMS) {
+        distributedRefreshIntervalInMS = Math.trunc(refreshIntervalInMS / vehicleCount);
+        distributedRefreshFrequency = 1;
+    } else {
+        distributedRefreshFrequency = Math.trunc(vehicleCount / refreshIntervalInMS);
+        distributedRefreshIntervalInMS = Math.trunc(refreshIntervalInMS / distributedRefreshFrequency);
+    }
+    if (realtime) {
+        logger.debug(`Realtime wait: ${distributedRefreshIntervalInMS} ms every ${distributedRefreshFrequency} vehicles`)
+    }
     const watch = new Stopwatch();
     watch.start();
     let eventCount = 0;
     let publishedEvents = 0;
-    while (eventCount < maxNumberOfEvents) {
+    let done = false;
+    while (!done) {
+        let accumulatedWaitInMS = 0;
         const commands = engine.execute();
+        let idx = 0;
         for (const cmd of commands) {
             if (verbose) {
                 logger.debug(cmd.timestamp, `Vehicle #${cmd.vehicle.id} ${cmd.newState.direction} ${formatPoint(cmd.vehicle.location)} speed=${cmd.newState.speed} localBounds=${cmd.newState.localBounds.toString()}, offset=${formatPoint(cmd.newState.offset)}`);
@@ -120,10 +130,24 @@ async function main() {
                 publishedEvents += 1;
             }
             eventCount++;
+            idx++;
+            if (publishedEvents >= maxNumberOfEvents) {
+                done = true;
+                break;
+            }
+            if (realtime) {
+                if (idx % distributedRefreshFrequency === 0) {
+                    await sleep(distributedRefreshIntervalInMS);
+                    accumulatedWaitInMS += distributedRefreshIntervalInMS;
+                }
+            }
         }
         if (realtime) {
-            // TODO: distribute the events in the refresh interval period instead of waiting for n secs and sending a big batch of events
-            await sleep(refreshIntervalInSecs * 1000);
+            const delta = refreshIntervalInMS - accumulatedWaitInMS;
+            if (delta > 0) {
+                console.log('delta', delta)
+                await sleep(delta);
+            }
         } else {
             await sleep(1);
         }
