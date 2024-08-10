@@ -8,15 +8,10 @@ hub:
       servers:
       - ws://localhost:4243
 
-generator:
-  verbose: false
-  generatorCount: 1
-  vehicleCount: 100
-  maxNumberOfEvents: 100000
-  refreshIntervalInSecs: 5
-  realtime: false
-  sendFlush: true
-  terminateCollector: true
+partitioning:
+  timePartition:
+    aggregationPeriodInMin: 10
+    maxCapacity: 200000
   dataPartition:
     # type: id
     # type: idGroup
@@ -24,26 +19,36 @@ generator:
     type: geohash
     hashLength: 5
 
+generator:
+  logging:
+    enabled: true
+    level: debug
+  generatorCount: 1
+  vehicleCount: 10000
+  maxNumberOfEvents: 1000000
+  refreshIntervalInSecs: 5
+  realtime: false
+  sendFlush: true
+  terminateCollector: true
+
 collector:
   verbose: false
-  collectorCount: 2
-  aggregationPeriodInMin: 1
-  geohashLength: 5
-  dataPartition:
-    # type: collectorIndex
-    # type: id
-    # type: idGroup
-    # groupSize: 10
-    type: geohash
-    hashLength: 5
+  logging:
+    enabled: true
+    level: debug
+  collectorCount: 1
+  geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb
   output:
     # type: noop
     type: file
     folder: ./output/data
+    flatLayout: true
     formats:
     - parquet
 
 viewer:
-  verbose: false
+  logging:
+    enabled: true
+    level: debug

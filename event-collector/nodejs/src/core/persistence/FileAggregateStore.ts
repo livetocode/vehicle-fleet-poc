@@ -9,6 +9,7 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
     constructor(
         private logger: Logger,
         private folder: string, 
+        private flatLayout: boolean,
         private formats: FileWriter[]
     ) {}
 
@@ -21,11 +22,18 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
         for (const format of this.formats) {
             const ext = format.extension;
             const fromParts = dateToUtcParts(range.fromTime);
-            const filename = path.join(
-                this.folder, 
-                ext,
-                ...fromParts,
-                `${partitionKey}.${ext}`);
+            let filename: string;
+            if (this.flatLayout) {
+                filename = path.join(
+                    this.folder,
+                    `${fromParts.join('-')}-${partitionKey}.${ext}`);
+            } else {
+                filename = path.join(
+                    this.folder, 
+                    ext,
+                    ...fromParts,
+                    `${partitionKey}.${ext}`);    
+            }
             await fs.mkdir(path.dirname(filename), { recursive: true });
             try {
                 await fs.access(filename);

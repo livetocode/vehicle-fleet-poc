@@ -25,6 +25,17 @@ export type Command =
   | MoveCommand
   | FlushCommand;
 
+export type ProcessMemory = {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+}
+
+export type ProcessStats = {
+    memory: ProcessMemory;
+    loadAverage: number[];
+}
 
 export interface DataPartitionStats {
     url: string;
@@ -46,6 +57,7 @@ export interface AggregatePeriodStats {
     partitions: DataPartitionStats[];
     formats: string[];
     elapsedTimeInMS: number;
+    processStats: ProcessStats;
 }
 
 export interface ResetAggregatePeriodStats {

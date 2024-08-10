@@ -8,7 +8,7 @@ import { JsonFileWriter } from "./core/persistence/formats/JsonFileWriter.js";
 import { CsvFileWriter } from "./core/persistence/formats/CsvFileWriter.js";
 import { ArrowFileWriter } from "./core/persistence/formats/ArrowFileWriter.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
-import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig } from 'core-lib';
+import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { FileWriter } from './core/persistence/formats/FileWriter.js';
@@ -16,7 +16,6 @@ import { AggregateStore } from './core/persistence/AggregateStore.js';
 import { NoOpAggregateStore } from './core/persistence/NoOpAggregateStore.js';
 import { IdDataPartitionStrategy } from './core/data/IdDataPartitionStrategy.js';
 import { GeohashDataPartitionStrategy } from './core/data/GeohashDataPartitionStrategy.js';
-import { CollectorIndexDataPartitionStrategy } from './core/data/CollectorIndexDataPartitionStrategy.js';
 import { IdGroupDataPartitionStrategy } from './core/data/IdGroupDataPartitionStrategy.js';
 
 function loadConfig(filename: string): Config {
@@ -63,7 +62,7 @@ async function createAndInitializeAggregator(config: CollectorConfig, logger: Lo
     }
     let aggregateStore: AggregateStore<PersistedMoveCommand>;
     if (config.output.type === 'file') {
-        aggregateStore = new FileAggregateStore<PersistedMoveCommand>(logger, config.output.folder, formats);    
+        aggregateStore = new FileAggregateStore<PersistedMoveCommand>(logger, config.output.folder, config.output.flatLayout, formats);
      } else {
         throw new Error(`Unknown output type '${(config.output as any).type}'`);
      }
@@ -81,16 +80,21 @@ function createDataPartitionStrategy(config: DataPartitionStrategyConfig, collec
     if (config.type === 'geohash') {
         return new GeohashDataPartitionStrategy(config.hashLength);
     }
-    if (config.type === 'collectorIndex') {
-        return new CollectorIndexDataPartitionStrategy(collectorIndex);
-    }
     throw new Error('Unknown data partition strategy');
+}
+
+function createLogger(logging: LoggingConfig, name: string): Logger {
+    if (!logging.enabled) {
+        return new NoopLogger();
+    }
+    return new ConsoleLogger(name, logging.level);
 }
 
 async function main() {
     const config = loadConfig('../../config.yaml');    
     const collectorIndex = parseInt(process.env.COLLECTOR_INDEX || '0');
-    const logger = new ConsoleLogger(`Collector #${collectorIndex}`);
+    const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
+    logger.debug('test');
     
     const messageBus = createMessageBus(config.hub, logger);
     await messageBus.start();
@@ -98,10 +102,10 @@ async function main() {
     await eventStore.init();
 
     const aggregateStore = await createAndInitializeAggregator(config.collector, logger);
-    const dataPartitionStrategy = createDataPartitionStrategy(config.collector.dataPartition, collectorIndex);
+    const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition, collectorIndex);
     
     const moveCommandHandler = new MoveCommandHandler(
-        config.collector,
+        config,
         logger,
         messageBus, 
         eventStore, 

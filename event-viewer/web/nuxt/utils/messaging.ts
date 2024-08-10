@@ -1,8 +1,7 @@
 import { JSONCodec, connect, type NatsConnection } from "nats.ws";
-import type { HubConfig, NatsHubConfig } from "core-lib";
+import type {NatsHubConfig } from "core-lib";
 import { Stopwatch } from "core-lib";
 import type { Logger } from "core-lib";
-import { ConsoleLogger } from "core-lib";
 
 export abstract class EventHandler {
     abstract get eventTypes(): string[];

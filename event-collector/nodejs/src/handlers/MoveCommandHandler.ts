@@ -1,5 +1,5 @@
 import { GenericEventHandler } from "messaging-lib";
-import { AggregatePeriodStats, CollectorConfig, Command, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { AggregatePeriodStats, CollectorConfig, Command, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { Accumulator } from "../core/data/Accumulator.js";
 import { Splitter } from "../core/data/Splitter.js";
@@ -7,6 +7,7 @@ import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
+import { getProcessStats } from "../core/diagnostics/processStats.js";
 
 export interface PersistedMoveCommand {
     timestamp: string;
@@ -24,7 +25,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
     constructor(
-        private config: CollectorConfig,
+        private config: Config,
         private logger: Logger,
         private messageBus: MessageBus,
         private eventStore: EventStore<PersistedMoveCommand>,
@@ -33,7 +34,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
         private collectorIndex: number,
     ) {
         super();
-        this.geohashPartitioner = new GeohashDataPartitionStrategy(config.geohashLength);
+        this.geohashPartitioner = new GeohashDataPartitionStrategy(config.collector.geohashLength);
         this.accumulator = new MoveCommandAccumulator(
             config,
             logger,
@@ -53,8 +54,6 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
 
     process(event: Command): Promise<void> {
         if (event.type === 'flush') {
-            // TODO: review how we flush when we have multiple collectors!
-            // This way is ok with a pub/sub but would not work with a queue and competing consumers.
             return this.processFlushEvent(event);
         }
         return super.process(event);
@@ -70,13 +69,12 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
 
     protected async processTypedEvent(event: MoveCommand): Promise<void> {
         const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(event);
-        const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collectorCount;
+        const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.collectorCount;
         if (this.collectorIndex !== collectorIndex) {
             this.logger.warn(`Received event for wrong collector index #${collectorIndex}`);
             return;
         }
-        const geoHash = this.dataPartitionStrategy instanceof GeohashDataPartitionStrategy ? 
-            dataPartitionKey : this.geohashPartitioner.getPartitionKey(event);
+        const geoHash = this.geohashPartitioner.getPartitionKey(event);
         const storedEvent: StoredEvent<PersistedMoveCommand> = { 
             timestamp: new Date(event.timestamp), 
             partitionKey: dataPartitionKey, 
@@ -111,21 +109,20 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
 
 export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMoveCommand>, TimeRange> {
     constructor(
-        private config: CollectorConfig,
+        private config: Config,
         protected logger: Logger,
         private messageBus: MessageBus,
         private aggregateStore: AggregateStore<PersistedMoveCommand>,
         private collectorIndex: number,
     ) {
-        super(logger);
+        super(logger, config.partitioning.timePartition.maxCapacity);
     }
     
     protected getPartitionKey(obj: StoredEvent<PersistedMoveCommand>): TimeRange {
-        return calcTimeWindow(obj.timestamp, this.config.aggregationPeriodInMin);
+        return calcTimeWindow(obj.timestamp, this.config.partitioning.timePartition.aggregationPeriodInMin);
     }
 
-    protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange): Promise<void> {
-        // TODO: measure CPU and RAM
+    protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange, partialFlushSequence: number): Promise<void> {
         const formats = new Set<string>();
         const watch = new Stopwatch();
         watch.start();
@@ -135,7 +132,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         let subPartitionCount = 0;
         for (const { groupKey, groupItems } of splitter.enumerate()) {
             const sortedItems = groupItems.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-            const groupWriteStats = await this.aggregateStore.write(partitionKey, groupKey, sortedItems);
+            const groupWriteStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
             partitionStats.push(...groupWriteStats);
             subPartitionCount++;
             for (const file of groupWriteStats) {
@@ -146,7 +143,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
         const statsEvent: AggregatePeriodStats = {
             type: 'aggregate-period-stats',
-            collectorCount: this.config.collectorCount,
+            collectorCount: this.config.collector.collectorCount,
             collectorIndex: this.collectorIndex,
             fromTime: partitionKey.fromTime.toUTCString(),
             toTime: partitionKey.untilTime.toUTCString(),
@@ -155,6 +152,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             partitions: partitionStats,
             formats: [...formats],
             elapsedTimeInMS: watch.elapsedTimeInMS(),
+            processStats: getProcessStats(),
         }
         this.messageBus.publish('stats', statsEvent);
     }

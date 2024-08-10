@@ -1,5 +1,5 @@
 import { Engine } from "./engine.js";
-import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber } from 'core-lib';
+import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber, LoggingConfig, Logger, NoopLogger } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
@@ -25,11 +25,22 @@ function createDataPartitionStrategy(config: DataPartitionStrategyConfig) {
     throw new Error('Unknown data partition strategy');
 }
 
+function createLogger(logging: LoggingConfig, name: string): Logger {
+    if (!logging.enabled) {
+        return new NoopLogger();
+    }
+    return new ConsoleLogger(name, logging.level);
+}
+
 async function main() {
     const config = loadConfig('../../config.yaml');
-    const verbose = config.generator.verbose ;
+    if (config.partitioning.dataPartition.type === 'collectorIndex') {
+        if (config.collector.collectorCount !== config.generator.generatorCount) {
+            throw new Error('When you use the collectorIndex data partitioning strategy, you must have the same number of generators and collectors');
+        }
+    }
     const generatorIndex = parseInt(process.env.GENERATOR_INDEX || '0');
-    const logger = new ConsoleLogger(`Generator #${generatorIndex}`);
+    const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
     const messageBus = createMessageBus(config.hub, logger);
     const vehicleCount = config.generator.vehicleCount;
     let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.generatorCount);
@@ -48,7 +59,7 @@ async function main() {
         messageBus.publish(`stats`, { type: 'reset-aggregate-period-stats' });
     }
     
-    const dataPartitionStrategy = createDataPartitionStrategy(config.generator.dataPartition);
+    const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
     const timeOffsetInMS = realtime ? 0 : (maxNumberOfEvents / vehicleCount) * refreshIntervalInSecs * 1000;
     const engine = new Engine({
         vehicleCount,
@@ -104,9 +115,7 @@ async function main() {
         const commands = engine.execute();
         let idx = 0;
         for (const cmd of commands) {
-            if (verbose) {
-                logger.debug(cmd.timestamp, `Vehicle #${cmd.vehicle.id} ${cmd.newState.direction} ${formatPoint(cmd.vehicle.location)} speed=${cmd.newState.speed} localBounds=${cmd.newState.localBounds.toString()}, offset=${formatPoint(cmd.newState.offset)}`);
-            }
+            logger.trace(cmd.timestamp, `Vehicle #${cmd.vehicle.id} ${cmd.newState.direction} ${formatPoint(cmd.vehicle.location)} speed=${cmd.newState.speed} localBounds=${cmd.newState.localBounds.toString()}, offset=${formatPoint(cmd.newState.offset)}`);
             const loc = cmd.vehicle.location;
             const gpsPos = addOffsetToCoordinates(anchor, loc.x, loc.y);
             const msg: MoveCommand = {

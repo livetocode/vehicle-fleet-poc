@@ -1,5 +1,5 @@
-import { Application, Assets, Container, Graphics, Sprite, type UnresolvedAsset } from 'pixi.js';
-import { Rect, ViewPort, type AggregatePeriodStats, type Config, type MoveCommand } from 'core-lib';
+import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
+import { Rect, ViewPort, type Config, type Logger, type MoveCommand } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 
 export interface AssetRef {
@@ -29,11 +29,11 @@ export class VehicleViewerViewModel {
     private _assets: AssetRef[] = [];
     private _moveHandler?: EventHandler;
     
-    constructor (private config: Config, private _messageBus: MessageBus) {
+    constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         if (!_messageBus) {
             throw new Error('Expected to receive a messageBus!');
         }
-        console.log('Received config', config);
+        logger.debug('Received config', config);
     }
 
     private get app(): Application {

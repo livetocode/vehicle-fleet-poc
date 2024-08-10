@@ -1,3 +1,10 @@
+export type LogLevel = 'info' | 'warn' | 'debug' | 'trace' | 'error';
+
+export interface LoggingConfig {
+    enabled: boolean;
+    level: LogLevel;
+}
+
 export interface NatsHubConfig {
     type: 'nats';
     protocols: {
@@ -59,8 +66,18 @@ export type DataPartitionStrategyConfig =
   | IdGroupDataPartitionStrategyConfig
   | CollectorIndexDataPartitionStrategyConfig;
 
+export type TimePartitioningConfig = {
+    aggregationPeriodInMin: number; 
+    maxCapacity: number;
+}
+
+export type PartitioningConfig = {
+    timePartition: TimePartitioningConfig;
+    dataPartition: DataPartitionStrategyConfig;
+}
+
 export interface GeneratorConfig {
-    verbose: boolean;
+    logging: LoggingConfig;
     generatorCount: number;
     vehicleCount: number;
     maxNumberOfEvents: number;
@@ -68,12 +85,12 @@ export interface GeneratorConfig {
     realtime: boolean;
     sendFlush: boolean;
     terminateCollector: boolean;
-    dataPartition: DataPartitionStrategyConfig;
 }
 
 export interface FileOutputConfig {
     type: 'file';
     folder: string;
+    flatLayout: boolean;
     formats: string[];
 }
 
@@ -93,22 +110,20 @@ export type OutputConfig =
     | S3OutputConfig;
 
 export interface CollectorConfig {
-    verbose: boolean;
+    logging: LoggingConfig;
     collectorCount: number;
-    // TODO: replace with timePartition section?
-    aggregationPeriodInMin: number;
     geohashLength: number;
     eventStore: EventStoreConfig;
     output: OutputConfig;
-    dataPartition: DataPartitionStrategyConfig;
 }  
 
 export interface ViewerConfig {
-    verbose: boolean;
+    logging: LoggingConfig;
 }
 
 export interface Config {
     hub: HubConfig;
+    partitioning: PartitioningConfig;
     generator: GeneratorConfig;
     collector: CollectorConfig;  
     viewer: ViewerConfig;
