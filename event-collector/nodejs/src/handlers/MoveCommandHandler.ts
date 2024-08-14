@@ -122,7 +122,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         return calcTimeWindow(obj.timestamp, this.config.partitioning.timePartition.aggregationPeriodInMin);
     }
 
-    protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange, partialFlushSequence: number): Promise<void> {
+    protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange, isPartial: boolean, partialFlushSequence: number): Promise<void> {
         const formats = new Set<string>();
         const watch = new Stopwatch();
         watch.start();
@@ -131,7 +131,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         splitter.addObjects(objects);
         let subPartitionCount = 0;
         for (const { groupKey, groupItems } of splitter.enumerate()) {
-            const sortedItems = groupItems.map(x => x.event).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            const sortedItems = groupItems.map(x => x.event).sort(compareVehicles);
             const groupWriteStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
             partitionStats.push(...groupWriteStats);
             subPartitionCount++;
@@ -148,6 +148,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             fromTime: partitionKey.fromTime.toUTCString(),
             toTime: partitionKey.untilTime.toUTCString(),
             partitionKey: partitionKey.toString(),
+            isPartial,
             eventCount: objects.length,
             partitions: partitionStats,
             formats: [...formats],
@@ -157,4 +158,12 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         this.messageBus.publish('stats', statsEvent);
     }
 
+}
+
+function compareVehicles(a: PersistedMoveCommand, b: PersistedMoveCommand): number {
+    const delta = a.vehicleId.localeCompare(b.vehicleId);
+    if (delta === 0) {
+        return a.timestamp.localeCompare(b.timestamp);
+    }
+    return delta;
 }

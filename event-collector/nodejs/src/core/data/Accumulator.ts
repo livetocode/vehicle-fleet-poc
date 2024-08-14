@@ -30,7 +30,7 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
             this.totalPartitions += 1;
             const partitionKeyName = this.activePartitionKey.toString();
             this.logger.debug(`Flushing partition '${partitionKeyName}' containing ${this.objects.length} entries.`);
-            await this.persistObjects(this.objects, this.activePartitionKey, this.partialFlushCounter);
+            await this.persistObjects(this.objects, this.activePartitionKey, false, this.partialFlushCounter);
             this.logger.debug(`Flush complete. ${this.totalAccumulated} entries accumulated in ${this.totalPartitions} partitions.`);
         }
         this.objects = [];
@@ -44,7 +44,7 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
             this.totalPartialPartitions += 1;
             const partitionKeyName = this.activePartitionKey.toString();
             this.logger.debug(`Partial flushing partition '${partitionKeyName}' containing ${this.objects.length} entries.`);
-            await this.persistObjects(this.objects, this.activePartitionKey, this.partialFlushCounter);
+            await this.persistObjects(this.objects, this.activePartitionKey, true, this.partialFlushCounter);
             this.logger.debug(`Partial flush complete. ${this.totalPartialPartitions} partial partitions.`);
             this.partialFlushCounter += 1;
         }
@@ -52,5 +52,5 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
     }
 
     protected abstract getPartitionKey(obj: TObject): TPartitionKey;
-    protected abstract persistObjects(objects: TObject[], partitionKey: TPartitionKey, partialFlushSequence: number): Promise<void>;
+    protected abstract persistObjects(objects: TObject[], partitionKey: TPartitionKey, isPartial: boolean, partialFlushSequence: number): Promise<void>;
 }

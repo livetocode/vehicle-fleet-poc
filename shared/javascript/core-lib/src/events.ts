@@ -53,6 +53,7 @@ export interface AggregatePeriodStats {
     fromTime: string;
     toTime: string;
     partitionKey: string;
+    isPartial: boolean;
     eventCount: number;
     partitions: DataPartitionStats[];
     formats: string[];

@@ -1,4 +1,4 @@
-import { roundDecimals, type AggregatePeriodStats, type Logger } from "core-lib";
+import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Logger } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import { ref } from 'vue';
 
@@ -61,6 +61,14 @@ export class VehicleStatsViewModel {
             this._statsHandler = undefined;
         }
     }
+
+    formatStats(ev: AggregatePeriodStats) {
+        const eventCountAsStr = formatCounts(ev.eventCount, 1);
+        const totalBytes = ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
+        const totalBytesAsStr = formatBytes(totalBytes, 1);
+        return `${eventCountAsStr.value} ${eventCountAsStr.units} == ${totalBytesAsStr.value} ${totalBytesAsStr.units}`;
+    }
+
 
     private onProcessStats(ev: AggregatePeriodStats): void {
         this.logger.debug(ev);

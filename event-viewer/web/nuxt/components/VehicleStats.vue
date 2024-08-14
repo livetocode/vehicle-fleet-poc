@@ -46,7 +46,7 @@ onUnmounted(() => {
     </ul>
     <span>Events:</span>
     <ul>
-      <li v-for="(ev, i) in _vm.events.value" :key="i" >{{ev.partitionKey}}: {{ev.eventCount}} #{{ev.collectorIndex}}</li>
+      <li v-for="(ev, i) in _vm.events.value" :key="i" >{{ev.partitionKey}} #{{ev.collectorIndex}}: {{_vm.formatStats(ev)}}</li>
     </ul>    
   </div>
 </template>
