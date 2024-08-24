@@ -36,7 +36,7 @@ function createEventStore(config: EventStoreConfig) {
     }
 }
 
-async function createAndInitializeAggregator(config: CollectorConfig, logger: Logger): Promise<AggregateStore<PersistedMoveCommand>> {
+function createAggregateStore(config: CollectorConfig, logger: Logger): AggregateStore<PersistedMoveCommand> {
     if (config.output.type === 'noop') {
         return new NoOpAggregateStore();
     }
@@ -57,16 +57,12 @@ async function createAndInitializeAggregator(config: CollectorConfig, logger: Lo
     } else {
         throw new Error(`Unknown output type '${config.output.type}'`);
     }
-    for (const format of formats) {
-        await format.init();
-    }
     let aggregateStore: AggregateStore<PersistedMoveCommand>;
     if (config.output.type === 'file') {
         aggregateStore = new FileAggregateStore<PersistedMoveCommand>(logger, config.output.folder, config.output.flatLayout, formats);
      } else {
         throw new Error(`Unknown output type '${(config.output as any).type}'`);
      }
-    await aggregateStore.init();
     return aggregateStore;
 }
 
@@ -101,7 +97,8 @@ async function main() {
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
 
-    const aggregateStore = await createAndInitializeAggregator(config.collector, logger);
+    const aggregateStore = createAggregateStore(config.collector, logger);
+    await aggregateStore.init();
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition, collectorIndex);
     
     const moveCommandHandler = new MoveCommandHandler(

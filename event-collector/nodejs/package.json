@@ -24,6 +24,7 @@
     "duckdb-async": "^1.0.0",
     "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",
+    "nodejs-polars": "^0.14.0",
     "yaml": "^2.4.5"
   }
 }
