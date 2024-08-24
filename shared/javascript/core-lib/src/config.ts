@@ -85,6 +85,7 @@ export interface GeneratorConfig {
     realtime: boolean;
     sendFlush: boolean;
     terminateCollector: boolean;
+    startDate?: string;
 }
 
 export interface FileOutputConfig {

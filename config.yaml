@@ -11,7 +11,7 @@ hub:
 partitioning:
   timePartition:
     aggregationPeriodInMin: 10
-    maxCapacity: 200000
+    maxCapacity: 20000000
   dataPartition:
     # type: id
     # type: idGroup
@@ -24,12 +24,13 @@ generator:
     enabled: true
     level: debug
   generatorCount: 1
-  vehicleCount: 10000
+  vehicleCount: 100
   maxNumberOfEvents: 1000000
   refreshIntervalInSecs: 5
   realtime: false
   sendFlush: true
   terminateCollector: true
+  startDate: '2024-01-01'
 
 collector:
   verbose: false
@@ -47,6 +48,8 @@ collector:
     flatLayout: true
     formats:
     - parquet
+    # - csv
+    # - arrow
 
 viewer:
   logging:

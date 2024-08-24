@@ -1,5 +1,5 @@
 import { Engine } from "./engine.js";
-import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber, LoggingConfig, Logger, NoopLogger } from 'core-lib';
+import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber, LoggingConfig, Logger, NoopLogger, GeneratorConfig } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
@@ -32,6 +32,19 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
     return new ConsoleLogger(name, logging.level);
 }
 
+function getTimeOffset(config: GeneratorConfig) {
+    if (config.realtime) {
+        return 0;
+    }
+    if (config.startDate) {
+        const start = new Date(config.startDate);
+        const now = new Date();
+        return now.getTime() - start.getTime();
+    }
+    return (config.maxNumberOfEvents / config.vehicleCount) * config.refreshIntervalInSecs * 1000;
+}
+
+
 async function main() {
     const config = loadConfig('../../config.yaml');
     if (config.partitioning.dataPartition.type === 'collectorIndex') {
@@ -60,7 +73,7 @@ async function main() {
     }
     
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
-    const timeOffsetInMS = realtime ? 0 : (maxNumberOfEvents / vehicleCount) * refreshIntervalInSecs * 1000;
+    const timeOffsetInMS = getTimeOffset(config.generator);
     const engine = new Engine({
         vehicleCount,
         regionBounds: new Rect(
