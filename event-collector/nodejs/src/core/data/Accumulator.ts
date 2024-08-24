@@ -13,6 +13,11 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
 
     async write(obj: TObject): Promise<void> {
         const partitionKey = this.getPartitionKey(obj);
+        if (this.activePartitionKey && partitionKey.compareTo(this.activePartitionKey) < 0) {
+            // Ignore events that arrive too late
+            this.logger.debug(`Object is out of order: ${partitionKey} < ${this.activePartitionKey}`);
+            return;
+        }
         const didPartitionKeyChange = this.activePartitionKey && this.activePartitionKey.compareTo(partitionKey) !== 0;
         const didWeExceedCapacity = this.maxCapacity > 0 && this.objects.length >= this.maxCapacity;
         if (didPartitionKeyChange) {
