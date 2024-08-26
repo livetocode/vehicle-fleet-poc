@@ -32,16 +32,16 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
     return new ConsoleLogger(name, logging.level);
 }
 
-function getTimeOffset(config: GeneratorConfig) {
+function getStartDate(config: GeneratorConfig): string {
     if (config.realtime) {
-        return 0;
+        return new Date().toISOString();
     }
     if (config.startDate) {
-        const start = new Date(config.startDate);
-        const now = new Date();
-        return now.getTime() - start.getTime();
+        return config.startDate;
     }
-    return (config.maxNumberOfEvents / config.vehicleCount) * config.refreshIntervalInSecs * 1000;
+    const offsetInMS = (config.maxNumberOfEvents / config.vehicleCount) * config.refreshIntervalInSecs * 1000;
+    const now = new Date();
+    return new Date(now.getTime() - offsetInMS).toISOString();
 }
 
 
@@ -73,7 +73,7 @@ async function main() {
     }
     
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
-    const timeOffsetInMS = getTimeOffset(config.generator);
+    const startDate = getStartDate(config.generator);
     const engine = new Engine({
         vehicleCount,
         regionBounds: new Rect(
@@ -95,7 +95,7 @@ async function main() {
             max: 40 * KM,
         },
         refreshIntervalInSecs,
-        timeOffsetInMS,
+        startDate,
         enableOscillation: true,
     });
 

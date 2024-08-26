@@ -17,7 +17,7 @@ export interface EngineOptions {
     zoneSize: Size;
     speed: Range;
     refreshIntervalInSecs: number;
-    timeOffsetInMS: number;
+    startDate: string;
     enableOscillation: boolean;
 }
 
@@ -27,8 +27,7 @@ export class Engine {
 
     constructor(public readonly options: Readonly<EngineOptions>) {
         this.region = this.createRegion(options);
-        this.timestamp = new Date();
-        this.timestamp = new Date(this.timestamp.getTime() - options.timeOffsetInMS);
+        this.timestamp = new Date(options.startDate);
     }
 
     execute(): MoveCommand[] {
