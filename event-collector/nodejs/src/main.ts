@@ -90,7 +90,6 @@ async function main() {
     const config = loadConfig('../../config.yaml');    
     const collectorIndex = parseInt(process.env.COLLECTOR_INDEX || '0');
     const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
-    logger.debug('test');
     
     const messageBus = createMessageBus(config.hub, logger);
     await messageBus.start();

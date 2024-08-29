@@ -14,9 +14,10 @@
 
 onMounted(() => {
   logger.debug('App is mounting...');
-  messageBus.start().then(async () => {
+  messageBus.start().then(() => {
     messageBus.watch('commands.move.*').catch(console.error);
     messageBus.watch('stats').catch(console.error);
+    messageBus.watch('query.vehicles.results').catch(console.error);
   }).catch(console.error);
   logger.debug('App is mounted');
 });
@@ -32,7 +33,10 @@ onUnmounted(() => {
 <template>
   <div class="root-panel">
     <VehicleViewer class="viewer" :messageBus="messageBus" />
-    <VehicleStats :messageBus="messageBus" />  
+    <div>
+      <VehicleStats :messageBus="messageBus" />  
+      <VehicleQuerier :messageBus="messageBus" />  
+    </div>
   </div>
 </template>
 

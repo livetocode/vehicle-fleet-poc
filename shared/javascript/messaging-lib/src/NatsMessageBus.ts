@@ -28,7 +28,7 @@ export class NatsMessageBus implements MessageBus {
         }
     }
     
-    async watch(subject: string): Promise<void> {
+    async watch(subject: string, consumerGroupName?: string): Promise<void> {
         if (!this.connection) {
             throw new Error('Expected MessageBus to be started');
         }
@@ -36,8 +36,8 @@ export class NatsMessageBus implements MessageBus {
             throw new Error('Expected MessageBus to have registered event handlers');
         }
 
-        this.logger.info(`Listening to '${subject}' messages...`);
-        const sub = this.connection.subscribe(subject);
+        this.logger.info(`Listening to '${subject}' messages${ consumerGroupName ? ` for group '${consumerGroupName}'` : ''}...`);
+        const sub = this.connection.subscribe(subject, { queue: consumerGroupName });
         const watch = new Stopwatch();
         watch.start();
         let messageCount = 0;

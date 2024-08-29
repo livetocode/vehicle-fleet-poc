@@ -24,13 +24,21 @@ generator:
     enabled: true
     level: debug
   generatorCount: 1
-  vehicleCount: 100
+  vehicleCount: 150
   maxNumberOfEvents: 1000000
   refreshIntervalInSecs: 5
   realtime: false
   sendFlush: true
   terminateCollector: true
-  startDate: '2024-01-01'
+  startDate: '2024-01-01T00:00:00-05:00'
+  map:
+    topLeftOrigin:
+        # https://www.google.ca/maps/@45.6656598,-74.0651269,11.76z?entry=ttu
+        lat: 45.6656598
+        lon: -74.0651269
+        alt: 11.76
+    widthInKm: 40
+    heightInKm: 20
 
 collector:
   verbose: false
@@ -44,7 +52,7 @@ collector:
   output:
     # type: noop
     type: file
-    folder: ./output/data
+    folder: ../../output/data
     flatLayout: true
     formats:
     - parquet

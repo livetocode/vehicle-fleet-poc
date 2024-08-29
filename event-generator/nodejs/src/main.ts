@@ -37,7 +37,7 @@ function getStartDate(config: GeneratorConfig): string {
         return new Date().toISOString();
     }
     if (config.startDate) {
-        return config.startDate;
+        return new Date(config.startDate).toISOString();
     }
     const offsetInMS = (config.maxNumberOfEvents / config.vehicleCount) * config.refreshIntervalInSecs * 1000;
     const now = new Date();
@@ -82,8 +82,8 @@ async function main() {
                 y: 0,
             },
             {
-                width:  40 * KM,
-                height: 20 * KM,    
+                width:  config.generator.map.widthInKm * KM,
+                height: config.generator.map.heightInKm * KM,    
             }
         ),
         zoneSize: {
@@ -99,12 +99,11 @@ async function main() {
         enableOscillation: true,
     });
 
-    const anchor: GpsCoordinates = {
-        // https://www.google.ca/maps/@45.6656598,-74.0651269,11.76z?entry=ttu
-        lat: 45.6656598, 
-        lon: -74.0651269,
-        alt: 11.76,
-    };
+    const anchor: GpsCoordinates = config.generator.map.topLeftOrigin;
+    console.log(addOffsetToCoordinates(anchor, 5 * KM, 5 * KM));
+    console.log(addOffsetToCoordinates(anchor, 10 * KM, 5 * KM));
+    console.log(addOffsetToCoordinates(anchor, 10 * KM, 8 * KM));
+    console.log(addOffsetToCoordinates(anchor, 5 * KM, 8 * KM));
     const refreshIntervalInMS = refreshIntervalInSecs * 1000;
     let distributedRefreshIntervalInMS;
     let distributedRefreshFrequency;

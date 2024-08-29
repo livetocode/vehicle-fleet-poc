@@ -10,7 +10,7 @@ import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionS
 import { getProcessStats } from "../core/diagnostics/processStats.js";
 
 export interface PersistedMoveCommand {
-    timestamp: string;
+    timestamp: Date;
     vehicleId: string;
     gps_lat: number;
     gps_lon: number;
@@ -80,7 +80,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
             partitionKey: dataPartitionKey, 
             collectorIndex,
             event: {
-                timestamp: event.timestamp,
+                timestamp: new Date(event.timestamp),
                 vehicleId: event.vehicleId,
                 gps_lat: event.gps.lat,
                 gps_lon: event.gps.lon,
@@ -163,7 +163,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
 function compareVehicles(a: PersistedMoveCommand, b: PersistedMoveCommand): number {
     const delta = a.vehicleId.localeCompare(b.vehicleId);
     if (delta === 0) {
-        return a.timestamp.localeCompare(b.timestamp);
+        return a.timestamp.getTime() - b.timestamp.getTime();
     }
     return delta;
 }

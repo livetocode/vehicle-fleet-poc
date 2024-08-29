@@ -1,3 +1,5 @@
+import { GpsCoordinates } from "./geometry";
+
 export type LogLevel = 'info' | 'warn' | 'debug' | 'trace' | 'error';
 
 export interface LoggingConfig {
@@ -76,6 +78,12 @@ export type PartitioningConfig = {
     dataPartition: DataPartitionStrategyConfig;
 }
 
+export type MapConfig = {
+    topLeftOrigin: GpsCoordinates;
+    widthInKm: number;
+    heightInKm: number;
+}
+
 export interface GeneratorConfig {
     logging: LoggingConfig;
     generatorCount: number;
@@ -86,6 +94,7 @@ export interface GeneratorConfig {
     sendFlush: boolean;
     terminateCollector: boolean;
     startDate?: string;
+    map: MapConfig;
 }
 
 export interface FileOutputConfig {

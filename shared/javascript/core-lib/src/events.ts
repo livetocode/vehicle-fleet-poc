@@ -64,3 +64,32 @@ export interface AggregatePeriodStats {
 export interface ResetAggregatePeriodStats {
     type: 'reset-aggregate-period-stats',
 }
+
+export interface VehicleQuery {
+    type: 'vehicle-query';
+    id: string;
+    fromDate: string;
+    toDate: string;
+    polygon: GpsCoordinates[];
+    limit?: number;
+}
+
+export interface VehicleQueryResult {
+    type: 'vehicle-query-result';
+    queryId: string;
+    timestamp: string;
+    vehicleId: string;
+    gps: GpsCoordinates;
+    direction: string;
+    speed: number;
+    geoHash: string;
+}
+
+export interface VehicleQueryResultStats {
+    type: 'vehicle-query-result-stats';
+    queryId: string;
+    processedFilesCount: number;
+    processedRecordCount: number;
+    selectedRecordCount: number;
+    elapsedTimeInMS: number;
+}

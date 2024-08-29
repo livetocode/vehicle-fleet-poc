@@ -1,5 +1,4 @@
 import { FileWriter } from "./FileWriter.js";
-import { Database } from "duckdb-async";
 import pl from 'nodejs-polars';
 
 export class ParquetFileWriter extends FileWriter {

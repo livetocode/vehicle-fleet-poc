@@ -34,7 +34,7 @@ compile_nodejs_lib("shared/javascript/core-lib")
 compile_nodejs_lib("shared/javascript/messaging-lib")
 
 step("Cleanup data")
-delete_folder("event-collector/nodejs/output")
+delete_folder("output")
 
 processes = []
 
