@@ -1,4 +1,4 @@
-import { roundDecimals, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats } from "core-lib";
+import { roundDecimals, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import { ref } from 'vue';
 
@@ -11,7 +11,7 @@ export class VehicleQuerierViewModel {
     private _vehicleIds = new Set<number>();
     private _currentQuery?: VehicleQuery;
     
-    constructor(private _messageBus: MessageBus, private logger: Logger) {}
+    constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {}
 
     async init(): Promise<void> {
         this._queryResultHandler = new LambdaEventHandler(
@@ -38,17 +38,58 @@ export class VehicleQuerierViewModel {
 
     simpleQuery() {
         this.logger.info('Start simple query');
+        const anchor = this.config.generator.map.topLeftOrigin;
         this.query({
             type: 'vehicle-query',
             id: crypto.randomUUID(),
             fromDate: '2024-01-01T00:05:00-05:00',
             toDate:   '2024-01-01T00:15:00-05:00',
             polygon: [
-                { lat: 45.710575564205975, lon: -74.0008553928673, alt: 11.76 },
-                { lat: 45.710575564205975, lon: -73.93658388573459, alt: 11.76 },
-                { lat: 45.737525022729564, lon: -73.93658388573459, alt: 11.76 },
-                { lat: 45.737525022729564, lon: -74.0008553928673, alt: 11.76 },
-                { lat: 45.710575564205975, lon: -74.0008553928673, alt: 11.76 },
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 10 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 10 * KM, 8 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 8 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+            ],
+            limit: 1000000,
+        })
+    }
+
+    mediumQuery() {
+        this.logger.info('Start medium query');
+        const anchor = this.config.generator.map.topLeftOrigin;
+        this.query({
+            type: 'vehicle-query',
+            id: crypto.randomUUID(),
+            fromDate: '2024-01-01T00:05:00-05:00',
+            toDate:   '2024-01-01T01:05:00-05:00',
+            polygon: [
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 20 * KM, 10 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+            ],
+            limit: 1000000,
+        })
+    }
+
+    lshapeQuery() {
+        this.logger.info('Start L-shape query');
+        const anchor = this.config.generator.map.topLeftOrigin;
+        this.query({
+            type: 'vehicle-query',
+            id: crypto.randomUUID(),
+            fromDate: '2024-01-01T00:05:00-05:00',
+            toDate:   '2024-01-01T01:05:00-05:00',
+            polygon: [
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
+                addOffsetToCoordinates(anchor, 20 * KM, 15 * KM),
+                addOffsetToCoordinates(anchor, 14 * KM, 15 * KM),
+                addOffsetToCoordinates(anchor, 14 * KM, 10 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
+                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
             ],
             limit: 1000000,
         })

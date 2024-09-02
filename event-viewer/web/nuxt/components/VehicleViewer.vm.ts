@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand } from 'core-lib';
+import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type VehicleQueryResult } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 
 export interface AssetRef {
@@ -28,6 +28,7 @@ export class VehicleViewerViewModel {
     private _zones = new Map<string, Zone>();
     private _assets: AssetRef[] = [];
     private _moveHandler?: EventHandler;
+    private _queryResultHandler?: EventHandler;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         if (!_messageBus) {
@@ -63,13 +64,18 @@ export class VehicleViewerViewModel {
             this.animate(time);
         });
         this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-        this._messageBus.registerHandlers(this._moveHandler);
+        this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
+        this._messageBus.registerHandlers(this._moveHandler, this._queryResultHandler);
     }
 
     async dispose() {
         if (this._moveHandler) {
             this._messageBus?.unregisterHandler(this._moveHandler);
             this._moveHandler = undefined;
+        }
+        if (this._queryResultHandler) {
+            this._messageBus?.unregisterHandler(this._queryResultHandler);
+            this._queryResultHandler = undefined;
         }
         const app = this._app;
         this._app = undefined;
@@ -81,6 +87,23 @@ export class VehicleViewerViewModel {
             return;
         }
         this.updateZone(cmd);
+        this.onMoveVehicle(cmd);
+    }
+
+    private onProcessQueryResult(res: VehicleQueryResult) {
+        if (!this._app) {
+            return;
+        }
+        const cmd: MoveCommand = {
+            type: 'move',
+            vehicleId: res.vehicleId,
+            vehicleType: res.vehicleType,
+            location: gpsToPoint(res.gps),
+            direction: res.direction,
+            speed: res.speed,
+            gps: res.gps,
+            timestamp: res.timestamp,        
+        };
         this.onMoveVehicle(cmd);
     }
 
@@ -100,6 +123,9 @@ export class VehicleViewerViewModel {
     }
 
     private updateZone(cmd: MoveCommand) {
+        if (!cmd.zone) {
+            return;
+        }
         let zone = this._zones.get(cmd.zone.id);
         if (!zone && this._viewPort) {
             const bounds = new Rect(cmd.zone.bounds.origin, cmd.zone.bounds.size);

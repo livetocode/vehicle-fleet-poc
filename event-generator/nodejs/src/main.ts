@@ -111,10 +111,6 @@ async function main() {
     });
 
     const anchor: GpsCoordinates = config.generator.map.topLeftOrigin;
-    console.log(addOffsetToCoordinates(anchor, 5 * KM, 5 * KM));
-    console.log(addOffsetToCoordinates(anchor, 10 * KM, 5 * KM));
-    console.log(addOffsetToCoordinates(anchor, 10 * KM, 8 * KM));
-    console.log(addOffsetToCoordinates(anchor, 5 * KM, 8 * KM));
     const refreshIntervalInMS = refreshIntervalInSecs * 1000;
     let distributedRefreshIntervalInMS;
     let distributedRefreshFrequency;

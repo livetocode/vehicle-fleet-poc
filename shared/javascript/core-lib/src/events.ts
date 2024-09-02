@@ -5,11 +5,11 @@ export interface MoveCommand {
     type: 'move';
     vehicleId: string;
     vehicleType: string;
-    zone: {
+    zone?: {
         id: string;
         bounds: IRect;
     }
-    regionBounds: IRect;
+    regionBounds?: IRect;
     location: Point;
     direction: string;
     speed: number;

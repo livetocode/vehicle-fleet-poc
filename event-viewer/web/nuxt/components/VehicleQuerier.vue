@@ -9,7 +9,7 @@ const logger = createLogger(appConfig.viewer.logging, 'querier');
 const props = defineProps({
   messageBus: Object,
 });
-const _vm = new VehicleQuerierViewModel(props.messageBus, logger);
+const _vm = new VehicleQuerierViewModel(appConfig, props.messageBus, logger);
 
 onMounted(() => {
   _vm.init().catch(console.error);
@@ -25,7 +25,8 @@ onUnmounted(() => {
   <div style="padding: 10px;">
     <p>Queries:</p>
     <button @click="_vm.simpleQuery()">Small</button>
-    <button>Medium</button>
+    <button @click="_vm.mediumQuery()">Medium</button>
+    <button @click="_vm.lshapeQuery()">L shape</button>
     <p>Results: {{_vm.resultCount}}</p>
     <p>{{_vm.stats}}</p>
     <p>Found {{_vm.vehicleIds.value.length}} vehicles:</p>
