@@ -159,8 +159,8 @@ export class ViewPort {
     
     translatePoint(location: Point): Point {
         return {
-            x: this.innerBounds.minX + this.innerBounds.width * (location.x / this.outerBound.maxX),
-            y: this.innerBounds.minY + this.innerBounds.height * (location.y / this.outerBound.maxY),
+            x: this.innerBounds.minX + this.innerBounds.width * ((location.x - this.outerBound.minX) / this.outerBound.width),
+            y: this.innerBounds.minY + this.innerBounds.height * ((location.y - this.outerBound.minY) / this.outerBound.height),
         };
     }
 
@@ -188,6 +188,13 @@ export function pointToSize(p: Point): Size {
         width: p.x,
         height: p.y,
     }
+}
+
+export function gpsToPoint(gps: GpsCoordinates): Point {
+    return {
+        x: gps.lon,
+        y: gps.lat,
+    };
 }
 
 export function rad2deg(rad: number): number {

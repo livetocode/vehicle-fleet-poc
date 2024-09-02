@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { Rect, ViewPort, type Config, type Logger, type MoveCommand } from 'core-lib';
+import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 
 export interface AssetRef {
@@ -57,6 +57,7 @@ export class VehicleViewerViewModel {
         host.appendChild(app.canvas);    
 
         await this.preload();
+        this._viewPort = this.createViewPort();
         
         app.ticker.add((time: any) => {
             this.animate(time);
@@ -79,25 +80,31 @@ export class VehicleViewerViewModel {
         if (!this._app) {
             return;
         }
-        this.updateViewPort(cmd);
         this.updateZone(cmd);
         this.onMoveVehicle(cmd);
     }
 
-    private updateViewPort(cmd: MoveCommand) {
-        if (!this._viewPort) {
-            this._viewPort = new ViewPort(
-                Rect.fromCoordinates(0, 0, this.app.screen.width, this.app.screen.height), 
-                new Rect(cmd.regionBounds.origin, cmd.regionBounds.size),
-            );
-        }
+    private createViewPort(): ViewPort {
+        const innerBounds = Rect.fromCoordinates(0, 0, this.app.screen.width, this.app.screen.height);
+        const gpsTopLeftOrigin = this.config.generator.map.topLeftOrigin;
+        const topLeftOrigin = gpsToPoint(gpsTopLeftOrigin);
+        const gpsBottomRight = addOffsetToCoordinates(gpsTopLeftOrigin, this.config.generator.map.widthInKm * KM, this.config.generator.map.heightInKm * KM);
+        const bottomRight = gpsToPoint(gpsBottomRight);
+        const outerBounds = Rect.fromCoordinates(
+            topLeftOrigin.x, 
+            topLeftOrigin.y,
+            bottomRight.x,
+            bottomRight.y,
+        );
+        return new ViewPort(innerBounds, outerBounds);
     }
 
     private updateZone(cmd: MoveCommand) {
         let zone = this._zones.get(cmd.zone.id);
         if (!zone && this._viewPort) {
             const bounds = new Rect(cmd.zone.bounds.origin, cmd.zone.bounds.size);
-            const p = this._viewPort.translatePoint(bounds.origin);
+            const topLeft = gpsToPoint(addOffsetToCoordinates(this.config.generator.map.topLeftOrigin, bounds.origin.x, bounds.origin.y));
+            const p = this._viewPort.translatePoint(topLeft);
             const sz = this._viewPort.translateSize(bounds.size);
             zone = {
                 id: cmd.zone.id,
@@ -170,7 +177,7 @@ export class VehicleViewerViewModel {
                     break;
                 }
                 if (this._viewPort) {
-                    const p = this._viewPort.translatePoint(cmd.lastCommand.location);
+                    const p = this._viewPort.translatePoint(gpsToPoint(cmd.lastCommand.gps));
                     cmd.sprite.x = p.x;
                     cmd.sprite.y = p.y;    
                 }
