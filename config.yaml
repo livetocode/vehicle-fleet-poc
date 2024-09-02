@@ -59,6 +59,9 @@ collector:
     # - csv
     # - arrow
 
+querier:
+  defaultTimeoutInMS: 30000
+  
 viewer:
   logging:
     enabled: true

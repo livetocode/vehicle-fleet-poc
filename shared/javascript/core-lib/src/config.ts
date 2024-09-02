@@ -127,6 +127,10 @@ export interface CollectorConfig {
     output: OutputConfig;
 }  
 
+export interface QuerierConfig {
+    defaultTimeoutInMS: number;
+}
+
 export interface ViewerConfig {
     logging: LoggingConfig;
 }
@@ -136,5 +140,6 @@ export interface Config {
     partitioning: PartitioningConfig;
     generator: GeneratorConfig;
     collector: CollectorConfig;  
+    querier: QuerierConfig;
     viewer: ViewerConfig;
 }

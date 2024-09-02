@@ -26,6 +26,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
     protected async processTypedEvent(event: VehicleQuery): Promise<void> {
         this.logger.debug('Received query', event);
         this.resetStats();
+        const timeout = event.timeout ?? this.config.querier.defaultTimeoutInMS;
         const fromDate = new Date(event.fromDate);
         const toDate = new Date(event.toDate);
         if (fromDate.getTime() > toDate.getTime()) {
@@ -35,8 +36,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         watch.start();
         const polygon = gpsCoordinatesToPolyon(event.polygon);
         const geohashes = this.createGeohashes(polygon);
+        let timeoutExpired = false;
         let selectedRecordCount = 0;
-        // TODO: add a timeout option to stop enumerating after a specific period of time
         for (const filename of this.enumerateFiles(fromDate, toDate, geohashes)) {
             this.processedFilesCount += 1;
             for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon)) {
@@ -45,6 +46,10 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
                 if (event.limit && selectedRecordCount >= event.limit) {
                     break;
                 }
+            }
+            if (watch.elapsedTimeInMS() >= timeout) {
+                timeoutExpired = true;
+                break;
             }
         }
         watch.stop();
@@ -55,6 +60,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             processedFilesCount: this.processedFilesCount,
             processedRecordCount: this.processedRecordCount,
             selectedRecordCount,
+            timeoutExpired,
         };
         this.logger.debug('Stats', stats);
         this.messageBus.publish('query.vehicles.results', stats);
