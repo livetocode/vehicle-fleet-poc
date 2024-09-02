@@ -110,6 +110,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         const colNames = df.columns;
         const idx_timestamp = colNames.indexOf('timestamp');
         const idx_vehicleId = colNames.indexOf('vehicleId');
+        const idx_vehicleType = colNames.indexOf('vehicleType');
         const idx_gps_lat = colNames.indexOf('gps_lat');
         const idx_gps_lon = colNames.indexOf('gps_lon');
         const idx_gps_alt = colNames.indexOf('gps_alt');
@@ -120,6 +121,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             this.processedRecordCount += 1;
             const timestamp = row[idx_timestamp];
             const vehicleId = row[idx_vehicleId];
+            const vehicleType = row[idx_vehicleType];
             const gps_lat = row[idx_gps_lat];
             const gps_lon = row[idx_gps_lon];
             const gps_alt = row[idx_gps_alt];
@@ -134,6 +136,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
                         type: 'vehicle-query-result',
                         queryId,
                         vehicleId,
+                        vehicleType,
                         direction,
                         speed,
                         timestamp: timestamp.toISOString(),

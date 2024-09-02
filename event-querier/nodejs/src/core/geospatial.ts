@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const geohash = require('ngeohash');
 
 // This function was copied from https://github.com/Bonsanto/polygon-geohasher/blob/master/polygon_geohasher/polygon_geohasher.py
+// and converted by ChatGPT.
 export function polygonToGeohashes(polygon: Feature<Polygon>, precision: number, inner: boolean = true): Set<string> {
     const innerGeohashes = new Set<string>();
     const outerGeohashes = new Set<string>();

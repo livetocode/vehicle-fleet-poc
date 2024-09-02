@@ -13,6 +13,7 @@ export interface MoveCommand {
 
 export interface EngineOptions {
     vehicleCount: number;
+    vehicleTypes: string[];
     regionBounds: Rect;
     zoneSize: Size;
     speed: Range;
@@ -58,6 +59,7 @@ export class Engine {
             nextState = {
                 ...vehicle.state,
                 direction,
+                speed: getRandomRangeValue(this.options.speed), // change the speed every time we do a turn
                 localBounds: getRandomBounds(vehicle.state.location, zone.bounds, direction),
             }
         }
@@ -90,7 +92,8 @@ export class Engine {
                         const id = vehicleIdx.toString();
                         const location = zone.bounds.getRandomPosition();
                         const direction = getRandomDirection();
-                        const vehicle = new Vehicle(id, {
+                        const type = options.vehicleTypes[i % options.vehicleTypes.length];
+                        const vehicle = new Vehicle(id, type, {
                             location,
                             direction,
                             speed: getRandomRangeValue(options.speed),

@@ -76,6 +76,17 @@ async function main() {
     const startDate = getStartDate(config.generator);
     const engine = new Engine({
         vehicleCount,
+        vehicleTypes: [
+            'Ambulance',
+            'Audi',
+            'Black_viper',
+            'Car',
+            'Mini_truck',
+            'Mini_van',
+            'Police',
+            'taxi',
+            'truck',
+        ],
         regionBounds: new Rect(
             { 
                 x: 0, 
@@ -133,6 +144,7 @@ async function main() {
             const msg: MoveCommand = {
                 type: 'move',
                 vehicleId: cmd.vehicle.id,
+                vehicleType: cmd.vehicle.type,
                 zone: {
                     id: cmd.zone.id,
                     bounds: cmd.zone.bounds,

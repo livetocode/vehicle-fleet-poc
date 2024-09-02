@@ -13,7 +13,11 @@ export interface VehicleState {
 export class Vehicle {
     private _state: Readonly<VehicleState>;
 
-    constructor(public readonly id: string, initialState: Readonly<VehicleState>) {
+    constructor(
+        public readonly id: string, 
+        public readonly type: string, 
+        initialState: Readonly<VehicleState>,
+    ) {
         this._state = initialState;
     }
 

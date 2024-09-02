@@ -112,7 +112,10 @@ export class VehicleViewerViewModel {
     private onMoveVehicle(cmd: MoveCommand) {
         let v = this._vehicles.get(cmd.vehicleId);
         if (!v) {
-            const assetIndex = Math.trunc(this._assets.length * Math.random());
+            let assetIndex = this._assets.findIndex(x => x.alias === cmd.vehicleType);
+            if (!assetIndex) {
+                assetIndex = Math.trunc(this._assets.length * Math.random());
+            }
             const assetRef = this._assets[assetIndex];
             const assetAlias = assetRef.alias;
             const sprite = Sprite.from(assetAlias);

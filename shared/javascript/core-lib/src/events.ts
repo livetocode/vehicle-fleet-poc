@@ -4,6 +4,7 @@ import { GpsCoordinates, IRect, Point } from "./geometry.js";
 export interface MoveCommand {
     type: 'move';
     vehicleId: string;
+    vehicleType: string;
     zone: {
         id: string;
         bounds: IRect;
@@ -72,6 +73,7 @@ export interface VehicleQuery {
     toDate: string;
     polygon: GpsCoordinates[];
     limit?: number;
+    timeout?: number;
 }
 
 export interface VehicleQueryResult {
@@ -79,6 +81,7 @@ export interface VehicleQueryResult {
     queryId: string;
     timestamp: string;
     vehicleId: string;
+    vehicleType: string;
     gps: GpsCoordinates;
     direction: string;
     speed: number;
@@ -92,4 +95,5 @@ export interface VehicleQueryResultStats {
     processedRecordCount: number;
     selectedRecordCount: number;
     elapsedTimeInMS: number;
+    timeoutExpired: boolean;
 }

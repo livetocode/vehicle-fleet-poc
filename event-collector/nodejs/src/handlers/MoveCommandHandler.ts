@@ -12,6 +12,7 @@ import { getProcessStats } from "../core/diagnostics/processStats.js";
 export interface PersistedMoveCommand {
     timestamp: Date;
     vehicleId: string;
+    vehicleType: string;
     gps_lat: number;
     gps_lon: number;
     gps_alt: number;
@@ -82,6 +83,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
             event: {
                 timestamp: new Date(event.timestamp),
                 vehicleId: event.vehicleId,
+                vehicleType: event.vehicleType,
                 gps_lat: event.gps.lat,
                 gps_lon: event.gps.lon,
                 gps_alt: event.gps.alt,
