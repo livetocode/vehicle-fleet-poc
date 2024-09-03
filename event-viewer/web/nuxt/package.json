@@ -10,8 +10,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "nats.ws": "^1.29.0",
     "core-lib": "file:../../../shared/javascript/core-lib",
+    "latlon-geohash": "^2.0.0",
+    "nats.ws": "^1.29.0",
     "nuxt": "^3.12.4",
     "pixi.js": "^8.2.5",
     "vue": "^3.4.33",

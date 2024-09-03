@@ -1,6 +1,7 @@
-import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type VehicleQueryResult } from 'core-lib';
+import { Application, Assets, Container, Graphics, Polygon, Sprite } from 'pixi.js';
+import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type VehicleQuery, type VehicleQueryResult } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
+import Geohash from 'latlon-geohash';
 
 export interface AssetRef {
     alias: string;
@@ -19,15 +20,24 @@ export interface Zone {
     shape: Graphics;
 }
 
+export interface GeohashShape {
+    id: string;
+    bounds: Rect;
+    shape: Graphics;
+}
+
 export class VehicleViewerViewModel {
     private _app?: Application;
     private _container?: Container;
     private _zoneContainer?: Container;
+    private _geohashContainer?: Container;
     private _viewPort?: ViewPort;
     private _vehicles = new Map<string, Vehicle>();
     private _zones = new Map<string, Zone>();
+    private _geohashes = new Map<string, GeohashShape>();
     private _assets: AssetRef[] = [];
     private _moveHandler?: EventHandler;
+    private _queryHandler?: EventHandler;
     private _queryResultHandler?: EventHandler;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger) {
@@ -47,6 +57,9 @@ export class VehicleViewerViewModel {
     async init(host: any) {
         const app = new Application();
         this._app = app;
+        const geohashContainer = new Container();
+        this._geohashContainer = geohashContainer;        
+        app.stage.addChild(geohashContainer);
         const zoneContainer = new Container();
         this._zoneContainer = zoneContainer;        
         app.stage.addChild(zoneContainer);
@@ -64,14 +77,19 @@ export class VehicleViewerViewModel {
             this.animate(time);
         });
         this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
+        this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
         this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
-        this._messageBus.registerHandlers(this._moveHandler, this._queryResultHandler);
+        this._messageBus.registerHandlers(this._moveHandler, this._queryHandler, this._queryResultHandler);
     }
 
     async dispose() {
         if (this._moveHandler) {
             this._messageBus?.unregisterHandler(this._moveHandler);
             this._moveHandler = undefined;
+        }
+        if (this._queryHandler) {
+            this._messageBus?.unregisterHandler(this._queryHandler);
+            this._queryHandler = undefined;
         }
         if (this._queryResultHandler) {
             this._messageBus?.unregisterHandler(this._queryResultHandler);
@@ -87,7 +105,24 @@ export class VehicleViewerViewModel {
             return;
         }
         this.updateZone(cmd);
+        this.updateGeohashes(cmd);
         this.onMoveVehicle(cmd);
+    }
+    
+    private onProcessQuery(res: VehicleQuery) {
+        this.logger.debug('Received query. Reset viewer.', res);
+        this._container?.removeChildren();
+        this._zoneContainer?.removeChildren();
+        this._geohashContainer?.removeChildren();
+        this._geohashes.clear();
+        this._vehicles.clear();
+        this._zones.clear();
+        const viewport = this._viewPort;
+        if (viewport) {
+            const points = res.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
+            const shape = new Graphics().poly(points).stroke({ color: 0xff0000 })
+            this._zoneContainer?.addChild(shape);
+        }
     }
 
     private onProcessQueryResult(res: VehicleQueryResult) {
@@ -104,6 +139,7 @@ export class VehicleViewerViewModel {
             gps: res.gps,
             timestamp: res.timestamp,        
         };
+        this.updateGeohashes(cmd);
         this.onMoveVehicle(cmd);
     }
 
@@ -135,10 +171,31 @@ export class VehicleViewerViewModel {
             zone = {
                 id: cmd.zone.id,
                 bounds,
-                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x444444 })
+                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x555555 })
             }
             this._zones.set(zone.id, zone);
             this._zoneContainer?.addChild(zone.shape);
+        }
+    }
+
+    private updateGeohashes(cmd: MoveCommand) {
+        if (this.config.partitioning.dataPartition.type !== 'geohash') {
+            return;
+        }
+        const hash = (Geohash as any).encode(cmd.gps.lat, cmd.gps.lon, this.config.partitioning.dataPartition.hashLength);
+        let g = this._geohashes.get(hash);
+        if (!g && this._viewPort) {
+            const gBounds = (Geohash as any).bounds(hash);
+            const bounds = Rect.fromCoordinates(gBounds.sw.lon, gBounds.ne.lat, gBounds.ne.lon, gBounds.sw.lat);
+            const p = this._viewPort.translatePoint(bounds.origin);
+            const sz = this._viewPort.translateSize(bounds.size);
+            g = {
+                id: hash,
+                bounds,
+                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x222222 })
+            }
+            this._geohashes.set(g.id, g);
+            this._geohashContainer?.addChild(g.shape);
         }
     }
 
