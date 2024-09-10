@@ -18,21 +18,79 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 
 # Architecture
 
+## Messages
+
+````
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| Topic                   | Consumer Group  | Event Type                 | Produced by    | Consumed by     | Usage                                    |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| commands.move.*         |                 | move                       | generator      | collector       | The collector will agregate the move     |
+|                         |                 |                            |                |                 | commands and persist them as a chunk.    |
+|                         |                 |                            |                +-----------------+------------------------------------------+
+|                         |                 |                            |                | viewer          | The viewer will display the move of      |
+|                         |                 |                            |                |                 | each vehicle.                            |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| commands.flush.*        |                 | flush                      | generator      | collector       | At the end of the generation, a flush    |
+|                         |                 |                            |                |                 | command is sent to force the collectors  |
+|                         |                 |                            |                |                 | to write the accumulated data.           |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| stats                   |                 | aggregate-period-stats     | collector      | viewer          | Every time a chunk of data is persisted  |
+|                         |                 |                            |                |                 | by the collector, some stats on the chunk|
+|                         |                 |                            |                |                 | will be sent to the viewer.              |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| query.vehicles          | vehicle-querier | vehicle-query              | viewer         | querier         | A client is querying the persisted data. |
+|                         |                 |                            |                |                 | The querier will filter the chunks based |
+|                         |                 |                            |                |                 | on the time period and the geohashes of  |
+|                         |                 |                            |                |                 | the polygon filter.                      |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| query.vehicles.results  |                 | vehicle-query-result       | querier        | viewer          | While parsing the chunks, the querier    |
+|                         |                 |                            |                |                 | will send all the move commands that     |
+|                         |                 |                            |                |                 | match the criteria. The viewer will then |
+|                         |                 |                            |                |                 | be able to replay them.                  |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| query.vehicles.results  |                 | vehicle-query-result-stats | querier        | viewer          | Once the query is complete, the querier  |
+|                         |                 |                            |                |                 | will send some stats to the viewer, to   |
+|                         |                 |                            |                |                 | measure the performance and processing   |
+|                         |                 |                            |                |                 | that was required.                       |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+```
+
+Note that when a consumer uses a "consumer group" name, it means that the message will be handled only once by a member of the group.
+This is a regular work queue with competing consumers, which is different from the default pub/sub case.
+
+### Collecting move commands
+
+generator -(many)-> type:move/topic:commands.move.*   --> collector: aggregate -(many)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
+generator -(once)-> type:flush/topic:commands.flush.* --> collector: flush     -(once)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
+
+### Querying move commands
+
+viewer -(once)-> type:vehicle-query/topic:query.vehicles --> queryer: search (1) -(many)-> type:vehicle-query-result/topic:query.vehicles.results --> viewer
+                                                                             (2) -(once)-> type:vehicle-query-result-stats/topic:query.vehicles.results --> viewer
+
 ## Local dev
 
 ### Diagram
 
 
 ```
-                                           +-----> Event Viewer
-                                           |         + NuxtJS
-Event Generator ==> Event Hub -------------+ 
-                     + NATS                |                     
-                                           +----> Event Collector ---> Event Aggregate Store <----- Event query
-                                                     |                     + File system               + Custom
-                                    Event Store <----+     
-                                      + In memory                        
-                                      + DuckDB                           
+
+                            +------------+
+      Event Generator-------| Event Hub  |------Event Viewer
+                            | (NATS)     |
+                            +------------+
+                              |      |
+                        +-----+      +-----+
+                        |                  |
+                  Event collector       Event querier
+                   |    |                  |
+        +----------+  writes             reads
+        |               |                  |
++-------------+      +-----------------------+
+| Event Store |      | Event Aggregate Store |
+| (In memory) |      | (File system or S3)   |
++-------------+      +-----------------------+
+
 ```
 
 ### Technologies:
@@ -40,9 +98,9 @@ Event Generator ==> Event Hub -------------+
 - Event Hub: [NATS](https://nats.io/)
 - Event Generator: Typescript NodeJS
 - Event Viewer: Nuxt server, Typescript, PixiJS
-- Event Collector: Typescript NodeJS
+- Event Collector: Typescript NodeJS, https://pola.rs/, Parquet format, S3, geohash
 - Event Store: In memory, DuckDB
-- Event Query: Typescript NodeJS
+- Event Querier: Typescript NodeJS, geohash, turf
 
 ## Cloud
 
@@ -55,7 +113,7 @@ Event Generator ==> Event Hub -------------+
                                            |         + NuxtJS
 Event Generator ==> Event Hub -------------+         + PowerBI
                      + Azure Event Hubs    |
-                                           +----> Event Collector -------> Event Aggregate Store <------ Event query
+                                           +----> Event Collector -------> Event Aggregate Store <------ Event querier
                                                     + Azure Synapse            + Azure Blob                 + Azure Stream Analytics
 ```
 
@@ -66,8 +124,8 @@ Event Generator ==> Event Hub -------------+         + PowerBI
 - Event Generator: Typescript NodeJS
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: [Azure Synapse Analytics](https://azure.microsoft.com/fr-fr/products/synapse-analytics/)
-- Event Store: Azure Event Hub
-- Event Query: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
+- Event Store: Azure Event Hubs
+- Event Querier: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
 
 ### AWS
 
@@ -78,7 +136,7 @@ Event Generator ==> Event Hub -------------+         + PowerBI
                                            |         + NuxtJS
 Event Generator ==> Event Hub -------------+         
                      + AWS Eventbridge     |
-                                           +----> Event Collector -------> Event Aggregate Store <------ Event query
+                                           +----> Event Collector -------> Event Aggregate Store <------ Event querier
                                                   + Amazon Data Firehose       + AWS S3                     + Amazon Athena
 ```
 
@@ -89,8 +147,8 @@ Event Generator ==> Event Hub -------------+
 - Event Generator: Typescript NodeJS
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: [Amazon Data firehose](https://aws.amazon.com/firehose/)
-- Event Store: Azure Event Hub
-- Event Query: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
+- Event Store: Amazon Eventbridge
+- Event Querier: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
 
 ## File formats
 

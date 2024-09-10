@@ -16,11 +16,11 @@ python3 -m venv .venv
 
 Then you must install the required packages:
 ```shell
-./venv/bin/pip3 install -r requirements.txt
+.venv/bin/pip3 install -r requirements.txt
 ```
 
 ## Execute
 
 ```shell
-./venv/bin/python3 estimate.py
+.venv/bin/python3 estimate.py
 ```
