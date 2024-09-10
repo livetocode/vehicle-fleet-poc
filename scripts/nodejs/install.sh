@@ -4,3 +4,4 @@ set -e
 (cd event-collector/nodejs && npm i) &
 (cd event-generator/nodejs && npm i)
 (cd event-viewer/web/nuxt && npm i)
+(cd event-querier/web/nuxt && npm i)
