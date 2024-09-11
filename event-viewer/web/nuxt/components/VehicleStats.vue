@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { formatBytes, formatCounts } from 'core-lib';
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, inject } from 'vue';
+import { type MessageBus } from '../utils/messaging';
 import { VehicleStatsViewModel } from './VehicleStats.vm';
 
 const appConfig = useAppConfig();
 const logger = createLogger(appConfig.viewer.logging, 'viewer');
 
 const props = defineProps({
-  messageBus: Object,
 });
-const _vm = new VehicleStatsViewModel(props.messageBus, logger);
+const messageBus = inject<MessageBus>('messageBus');
+const _vm = new VehicleStatsViewModel(messageBus, logger);
 const totalSizeAsStr = computed(() => {
   const formatted = formatBytes(_vm.totalSize.value, 1);
   return `${formatted.value} ${formatted.units}`;

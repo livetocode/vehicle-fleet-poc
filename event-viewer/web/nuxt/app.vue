@@ -7,6 +7,7 @@
     throw new Error('Expected a NATS hub');
   }
   const messageBus = new NatsMessageBus(appConfig.hub, logger);
+  provide('messageBus', messageBus);
 
 onMounted(() => {
   logger.debug('App is mounting...');
@@ -28,22 +29,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="root-panel">
-    <VehicleViewer class="viewer" :messageBus="messageBus" />
-    <div>
-      <VehicleStats :messageBus="messageBus" />  
-      <VehicleQuerier :messageBus="messageBus" />  
-    </div>
+  <div>
+    <NuxtLoadingIndicator />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
   </div>
 </template>
-
-<style>
-.root-panel {
-  display: flex;
-}
-.viewer {
-  height: 100vh;
-  width: 80vw;
-}
-
-</style>
