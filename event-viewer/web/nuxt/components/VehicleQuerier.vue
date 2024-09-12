@@ -24,9 +24,9 @@ onUnmounted(() => {
 <template>
   <div style="padding: 10px;">
     <p>Queries:</p>
-    <button @click="_vm.simpleQuery()">Small</button>
-    <button @click="_vm.mediumQuery()">Medium</button>
-    <button @click="_vm.lshapeQuery()">L shape</button>
+    <v-btn @click="_vm.simpleQuery()">Small</v-btn>
+    <v-btn @click="_vm.mediumQuery()">Medium</v-btn>
+    <v-btn @click="_vm.lshapeQuery()">L shape</v-btn>
     <p>Results: {{_vm.resultCount}}</p>
     <p>{{_vm.stats}}</p>
     <p>Found {{_vm.vehicleIds.value.length}} vehicles:</p>

@@ -6,7 +6,7 @@
 <template>
   <div class="root-panel">
     <VehicleViewer class="viewer" />
-    <div>
+    <div class="side-panel">
       <VehicleStats />  
       <VehicleQuerier />  
     </div>
@@ -21,6 +21,9 @@
 .viewer {
   height: 100vh;
   width: 80vw;
+}
+.side-panel {
+  padding-left: 15px;
 }
 
 </style>

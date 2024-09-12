@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@mdi/font": "^7.4.47",
     "core-lib": "file:../../../shared/javascript/core-lib",
     "latlon-geohash": "^2.0.0",
     "nats.ws": "^1.29.0",
@@ -18,5 +19,9 @@
     "vue": "^3.4.33",
     "vue-router": "^4.4.0",
     "yaml": "^2.4.5"
+  },
+  "devDependencies": {
+    "vite-plugin-vuetify": "^2.0.4",
+    "vuetify": "^3.7.1"
   }
 }
