@@ -28,6 +28,7 @@ export interface GeohashShape {
 
 export class VehicleViewerViewModel {
     private _app?: Application;
+    private _mainAreaContainer?: Container;
     private _container?: Container;
     private _zoneContainer?: Container;
     private _geohashContainer?: Container;
@@ -39,6 +40,7 @@ export class VehicleViewerViewModel {
     private _moveHandler?: EventHandler;
     private _queryHandler?: EventHandler;
     private _queryResultHandler?: EventHandler;
+    private host: any;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         if (!_messageBus) {
@@ -55,8 +57,12 @@ export class VehicleViewerViewModel {
     }
 
     async init(host: any) {
+        this.host = host;
         const app = new Application();
         this._app = app;
+        const mainAreaContainer = new Container();
+        this._mainAreaContainer = mainAreaContainer;        
+        app.stage.addChild(mainAreaContainer);
         const geohashContainer = new Container();
         this._geohashContainer = geohashContainer;        
         app.stage.addChild(geohashContainer);
@@ -67,11 +73,12 @@ export class VehicleViewerViewModel {
         this._container = container;        
         app.stage.addChild(container);
 
-        await app.init({ resizeTo: host, });
-        host.appendChild(app.canvas);    
+        await app.init({ resizeTo: host, background: 0x222222 });
+        host.appendChild(app.canvas);
 
         await this.preload();
         this._viewPort = this.createViewPort();
+        this.createGrid();
         
         app.ticker.add((time: any) => {
             this.animate(time);
@@ -80,6 +87,9 @@ export class VehicleViewerViewModel {
         this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
         this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
         this._messageBus.registerHandlers(this._moveHandler, this._queryHandler, this._queryResultHandler);
+        app.renderer.on('resize', () => {
+            this.reset();
+        });
     }
 
     async dispose() {
@@ -110,13 +120,8 @@ export class VehicleViewerViewModel {
     }
     
     private onProcessQuery(res: VehicleQuery) {
-        this.logger.debug('Received query. Reset viewer.', res);
-        this._container?.removeChildren();
-        this._zoneContainer?.removeChildren();
-        this._geohashContainer?.removeChildren();
-        this._geohashes.clear();
-        this._vehicles.clear();
-        this._zones.clear();
+        this.logger.debug('Received query', res);
+        this.reset();
         const viewport = this._viewPort;
         if (viewport) {
             const points = res.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
@@ -143,8 +148,27 @@ export class VehicleViewerViewModel {
         this.onMoveVehicle(cmd);
     }
 
+    private reset() {
+        this._container?.removeChildren();
+        this._mainAreaContainer?.removeChildren();
+        this._zoneContainer?.removeChildren();
+        this._geohashContainer?.removeChildren();
+        this._geohashes.clear();
+        this._vehicles.clear();
+        this._zones.clear();
+        this._viewPort = this.createViewPort();
+        this.createGrid();
+    }
+
     private createViewPort(): ViewPort {
-        const innerBounds = Rect.fromCoordinates(0, 0, this.app.screen.width, this.app.screen.height);
+        // Note that we need to take into account the offset position of the component in the page,
+        // otherwise the height of the PixiJS app is too large because of the header containing the App bar.
+        const bodyRect = document.body.getBoundingClientRect();
+        const hostRect = this.host.getBoundingClientRect();
+        const xOffset   = hostRect.left - bodyRect.left;
+        const yOffset   = hostRect.top - bodyRect.top;
+    
+        const innerBounds = Rect.fromCoordinates(0, 0, this.app.screen.width - xOffset, this.app.screen.height - yOffset);
         const gpsTopLeftOrigin = this.config.generator.map.topLeftOrigin;
         const topLeftOrigin = gpsToPoint(gpsTopLeftOrigin);
         const gpsBottomRight = addOffsetToCoordinates(gpsTopLeftOrigin, this.config.generator.map.widthInKm * KM, this.config.generator.map.heightInKm * KM);
@@ -158,6 +182,16 @@ export class VehicleViewerViewModel {
         return new ViewPort(innerBounds, outerBounds);
     }
 
+    private createGrid() {
+        if (!this._viewPort) {
+            return;
+        }
+        const p = this._viewPort.translatePoint(this._viewPort.outerBound.origin);
+        const sz = this._viewPort.translateSize(this._viewPort.outerBound.size);
+        const shape = new Graphics().rect(p.x, p.y, sz.width, sz.height).fill({ color: 'black' });
+        this._mainAreaContainer?.addChild(shape);
+    }
+
     private updateZone(cmd: MoveCommand) {
         if (!cmd.zone) {
             return;
@@ -165,13 +199,16 @@ export class VehicleViewerViewModel {
         let zone = this._zones.get(cmd.zone.id);
         if (!zone && this._viewPort) {
             const bounds = new Rect(cmd.zone.bounds.origin, cmd.zone.bounds.size);
-            const topLeft = gpsToPoint(addOffsetToCoordinates(this.config.generator.map.topLeftOrigin, bounds.origin.x, bounds.origin.y));
+            const gpsTopLeft = addOffsetToCoordinates(this.config.generator.map.topLeftOrigin, bounds.origin.x, bounds.origin.y);
+            const topLeft = gpsToPoint(gpsTopLeft);
+            const bottomRight = gpsToPoint(addOffsetToCoordinates(gpsTopLeft, bounds.width, bounds.height));
+            const gpsBounds = Rect.fromCoordinates(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
             const p = this._viewPort.translatePoint(topLeft);
-            const sz = this._viewPort.translateSize(bounds.size);
+            const sz = this._viewPort.translateSize(gpsBounds.size);
             zone = {
                 id: cmd.zone.id,
                 bounds,
-                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x555555 })
+                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x007700 })
             }
             this._zones.set(zone.id, zone);
             this._zoneContainer?.addChild(zone.shape);
@@ -192,7 +229,7 @@ export class VehicleViewerViewModel {
             g = {
                 id: hash,
                 bounds,
-                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x222222 })
+                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x333333 })
             }
             this._geohashes.set(g.id, g);
             this._geohashContainer?.addChild(g.shape);
@@ -225,15 +262,15 @@ export class VehicleViewerViewModel {
 
     private async preload() {
         this._assets = [
-            { alias: 'Ambulance', src: 'cars/Ambulance.png' },
-            { alias: 'Audi', src: 'cars/Audi.png' },
-            { alias: 'Black_viper', src: 'cars/Black_viper.png' },
-            { alias: 'Car', src: 'cars/Car.png' },
-            { alias: 'Mini_truck', src: 'cars/Mini_truck.png' },
-            { alias: 'Mini_van', src: 'cars/Mini_van.png' },
-            { alias: 'Police', src: 'cars/Police.png' },
-            { alias: 'taxi', src: 'cars/taxi.png' },
-            { alias: 'truck', src: 'cars/truck.png' },
+            { alias: 'Ambulance', src: '/cars/Ambulance.png' },
+            { alias: 'Audi', src: '/cars/Audi.png' },
+            { alias: 'Black_viper', src: '/cars/Black_viper.png' },
+            { alias: 'Car', src: '/cars/Car.png' },
+            { alias: 'Mini_truck', src: '/cars/Mini_truck.png' },
+            { alias: 'Mini_van', src: '/cars/Mini_van.png' },
+            { alias: 'Police', src: '/cars/Police.png' },
+            { alias: 'taxi', src: '/cars/taxi.png' },
+            { alias: 'truck', src: '/cars/truck.png' },
         ];
         await Assets.load(this._assets);            
     }
