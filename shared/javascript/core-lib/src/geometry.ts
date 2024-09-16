@@ -155,19 +155,37 @@ export class Rect {
 }
 
 export class ViewPort {
-    constructor(public readonly innerBounds: Rect, public readonly outerBound: Rect) {}
+    private scaleFactor: number;
+    private offset: Point;
+
+    constructor(public readonly innerBounds: Rect, public readonly outerBound: Rect) {
+        const xFactor = innerBounds.width / outerBound.width;
+        const yFactor = innerBounds.height / outerBound.height;
+        this.scaleFactor = Math.min(xFactor, yFactor);
+        if (xFactor > yFactor) {
+            this.offset = {
+                x: (innerBounds.width - (outerBound.width * this.scaleFactor)) / 2,
+                y: 0,
+            }
+        } else {
+            this.offset = {
+                x: 0,
+                y: (innerBounds.height - (outerBound.height * this.scaleFactor)) / 2,
+            }
+        }
+    }
     
     translatePoint(location: Point): Point {
         return {
-            x: this.innerBounds.minX + this.innerBounds.width * ((location.x - this.outerBound.minX) / this.outerBound.width),
-            y: this.innerBounds.minY + this.innerBounds.height * ((location.y - this.outerBound.minY) / this.outerBound.height),
+            x: this.innerBounds.minX + this.offset.x + (location.x - this.outerBound.minX) * this.scaleFactor,
+            y: this.innerBounds.minY + this.offset.y + (location.y - this.outerBound.minY) * this.scaleFactor,
         };
     }
 
     translateSize(size: Size): Size {
         return {
-            width: this.innerBounds.width * (size.width / this.outerBound.width),
-            height: this.innerBounds.height * (size.height / this.outerBound.height),
+            width: size.width * this.scaleFactor,
+            height: size.height * this.scaleFactor,
         };
     }
 }
