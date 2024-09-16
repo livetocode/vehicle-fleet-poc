@@ -145,7 +145,6 @@ async function main() {
                     id: cmd.zone.id,
                     bounds: cmd.zone.bounds,
                 },
-                regionBounds: cmd.region.bounds,
                 location: loc,
                 direction: cmd.newState.direction,
                 speed: cmd.newState.speed,

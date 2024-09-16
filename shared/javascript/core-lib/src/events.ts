@@ -9,7 +9,6 @@ export interface MoveCommand {
         id: string;
         bounds: IRect;
     }
-    regionBounds?: IRect;
     location: Point;
     direction: string;
     speed: number;
