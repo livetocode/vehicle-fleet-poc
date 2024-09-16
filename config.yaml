@@ -25,7 +25,7 @@ generator:
     level: debug
   generatorCount: 1
   vehicleCount: 150
-  maxNumberOfEvents: 1000000
+  maxNumberOfEvents: 100000
   refreshIntervalInSecs: 5
   realtime: false
   sendFlush: true
@@ -45,7 +45,7 @@ collector:
   logging:
     enabled: true
     level: debug
-  collectorCount: 1
+  collectorCount: 4
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb
@@ -60,6 +60,11 @@ collector:
     # - arrow
 
 querier:
+  logging:
+    enabled: true
+    level: debug
+  querierCount: 1
+  autoStart: true
   defaultTimeoutInMS: 30000
   
 viewer:

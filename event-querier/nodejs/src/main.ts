@@ -18,8 +18,8 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
 
 async function main() {
     const config = loadConfig('../../config.yaml');    
-    const collectorIndex = parseInt(process.env.QUERIER_INDEX || '0');
-    const logger =  createLogger(config.collector.logging, `Querier #${collectorIndex}`);
+    const querierIndex = parseInt(process.env.QUERIER_INDEX || '0');
+    const logger =  createLogger(config.querier.logging, `Querier #${querierIndex}`);
     
     const messageBus = createMessageBus(config.hub, logger);
     await messageBus.start();

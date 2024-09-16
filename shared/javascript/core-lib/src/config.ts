@@ -128,7 +128,10 @@ export interface CollectorConfig {
 }  
 
 export interface QuerierConfig {
+    logging: LoggingConfig;
+    querierCount: number;
     defaultTimeoutInMS: number;
+    autoStart: boolean;
 }
 
 export interface ViewerConfig {

@@ -94,6 +94,7 @@ export interface VehicleQueryResultStats {
     processedFilesCount: number;
     processedRecordCount: number;
     selectedRecordCount: number;
+    distinctVehicleCount: number;
     elapsedTimeInMS: number;
     timeoutExpired: boolean;
 }

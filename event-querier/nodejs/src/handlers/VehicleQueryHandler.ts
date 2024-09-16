@@ -32,6 +32,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         if (fromDate.getTime() > toDate.getTime()) {
             throw new Error('fromDate must be less than toDate');
         }
+        const distinctVehicles = new Set<string>();
         const watch = new Stopwatch();
         watch.start();
         const polygon = gpsCoordinatesToPolyon(event.polygon);
@@ -43,6 +44,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon)) {
                 this.publishResult(res);
                 selectedRecordCount += 1;
+                distinctVehicles.add(res.vehicleId);
                 if (event.limit && selectedRecordCount >= event.limit) {
                     break;
                 }
@@ -60,6 +62,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             processedFilesCount: this.processedFilesCount,
             processedRecordCount: this.processedRecordCount,
             selectedRecordCount,
+            distinctVehicleCount: distinctVehicles.size,
             timeoutExpired,
         };
         this.logger.debug('Stats', stats);
