@@ -39,6 +39,9 @@ generator:
         alt: 11.76
     widthInKm: 40
     heightInKm: 20
+  zoneSize:
+    widthInKm: 10
+    heightInKm: 10
 
 collector:
   verbose: false

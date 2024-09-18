@@ -188,6 +188,12 @@ export class ViewPort {
             height: size.height * this.scaleFactor,
         };
     }
+    
+    translateRect(rect: Rect): Rect {
+        const p = this.translatePoint(rect.origin);
+        const sz = this.translateSize(rect.size);
+        return new Rect(p, sz);
+    }
 }
 
 export function offsetPoint(p : Point, dx: number, dy: number) : Point {

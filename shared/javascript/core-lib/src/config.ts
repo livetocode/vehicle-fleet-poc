@@ -84,6 +84,11 @@ export type MapConfig = {
     heightInKm: number;
 }
 
+export type ZoneSize = {
+    widthInKm: number;
+    heightInKm: number;
+}
+
 export interface GeneratorConfig {
     logging: LoggingConfig;
     generatorCount: number;
@@ -95,6 +100,7 @@ export interface GeneratorConfig {
     terminateCollector: boolean;
     startDate?: string;
     map: MapConfig;
+    zoneSize: ZoneSize;
 }
 
 export interface FileOutputConfig {

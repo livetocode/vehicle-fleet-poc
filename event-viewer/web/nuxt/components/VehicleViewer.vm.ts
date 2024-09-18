@@ -34,8 +34,6 @@ export class VehicleViewerViewModel {
     private _geohashContainer?: Container;
     private _viewPort?: ViewPort;
     private _vehicles = new Map<string, Vehicle>();
-    private _zones = new Map<string, Zone>();
-    private _geohashes = new Map<string, GeohashShape>();
     private _assets: AssetRef[] = [];
     private _moveHandler?: EventHandler;
     private _queryHandler?: EventHandler;
@@ -79,7 +77,9 @@ export class VehicleViewerViewModel {
         await this.preload();
         this._viewPort = this.createViewPort();
         this.createGrid();
-        
+        this.createGeohashes();
+        this.createZones();
+
         app.ticker.add((time: any) => {
             this.animate(time);
         });
@@ -114,8 +114,6 @@ export class VehicleViewerViewModel {
         if (!this._app) {
             return;
         }
-        this.updateZone(cmd);
-        this.updateGeohashes(cmd);
         this.onMoveVehicle(cmd);
     }
     
@@ -138,13 +136,11 @@ export class VehicleViewerViewModel {
             type: 'move',
             vehicleId: res.vehicleId,
             vehicleType: res.vehicleType,
-            location: gpsToPoint(res.gps),
             direction: res.direction,
             speed: res.speed,
             gps: res.gps,
             timestamp: res.timestamp,        
         };
-        this.updateGeohashes(cmd);
         this.onMoveVehicle(cmd);
     }
 
@@ -153,11 +149,11 @@ export class VehicleViewerViewModel {
         this._mainAreaContainer?.removeChildren();
         this._zoneContainer?.removeChildren();
         this._geohashContainer?.removeChildren();
-        this._geohashes.clear();
         this._vehicles.clear();
-        this._zones.clear();
         this._viewPort = this.createViewPort();
         this.createGrid();
+        this.createGeohashes();
+        this.createZones();
     }
 
     private createViewPort(): ViewPort {
@@ -186,54 +182,57 @@ export class VehicleViewerViewModel {
         if (!this._viewPort) {
             return;
         }
-        const p = this._viewPort.translatePoint(this._viewPort.outerBound.origin);
-        const sz = this._viewPort.translateSize(this._viewPort.outerBound.size);
-        const shape = new Graphics().rect(p.x, p.y, sz.width, sz.height).fill({ color: 'black' });
+        const r = this._viewPort.translateRect(this._viewPort.outerBound);
+        const shape = new Graphics().rect(r.minX, r.minY, r.width, r.height).fill({ color: 'black' });
         this._mainAreaContainer?.addChild(shape);
     }
 
-    private updateZone(cmd: MoveCommand) {
-        if (!cmd.zone) {
+    private createGeohashes() {
+        if (!this._viewPort) {
             return;
         }
-        let zone = this._zones.get(cmd.zone.id);
-        if (!zone && this._viewPort) {
-            const bounds = new Rect(cmd.zone.bounds.origin, cmd.zone.bounds.size);
-            const gpsTopLeft = addOffsetToCoordinates(this.config.generator.map.topLeftOrigin, bounds.origin.x, bounds.origin.y);
-            const topLeft = gpsToPoint(gpsTopLeft);
-            const bottomRight = gpsToPoint(addOffsetToCoordinates(gpsTopLeft, bounds.width, bounds.height));
-            const gpsBounds = Rect.fromCoordinates(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
-            const p = this._viewPort.translatePoint(topLeft);
-            const sz = this._viewPort.translateSize(gpsBounds.size);
-            zone = {
-                id: cmd.zone.id,
-                bounds,
-                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x007700 })
-            }
-            this._zones.set(zone.id, zone);
-            this._zoneContainer?.addChild(zone.shape);
-        }
-    }
-
-    private updateGeohashes(cmd: MoveCommand) {
         if (this.config.partitioning.dataPartition.type !== 'geohash') {
             return;
         }
-        const hash = (Geohash as any).encode(cmd.gps.lat, cmd.gps.lon, this.config.partitioning.dataPartition.hashLength);
-        let g = this._geohashes.get(hash);
-        if (!g && this._viewPort) {
-            const gBounds = (Geohash as any).bounds(hash);
-            const bounds = Rect.fromCoordinates(gBounds.sw.lon, gBounds.ne.lat, gBounds.ne.lon, gBounds.sw.lat);
-            const p = this._viewPort.translatePoint(bounds.origin);
-            const sz = this._viewPort.translateSize(bounds.size);
-            g = {
-                id: hash,
-                bounds,
-                shape: new Graphics().rect(p.x, p.y, sz.width, sz.height).stroke({ color: 0x333333 })
+        const origin = this.config.generator.map.topLeftOrigin;
+        const hash = (Geohash as any).encode(origin.lat, origin.lon, this.config.partitioning.dataPartition.hashLength);
+        const gBounds = (Geohash as any).bounds(hash);
+        const bounds = Rect.fromCoordinates(gBounds.sw.lon, gBounds.ne.lat, gBounds.ne.lon, gBounds.sw.lat);
+        const r = this._viewPort.translateRect(bounds);
+        const areaRect = this._viewPort.translateRect(this._viewPort.outerBound);
+        let currentX = r.minX;
+        let currentY = r.minY;
+        while (currentY < areaRect.maxY) {
+            while (currentX < areaRect.maxX) {
+                const shape = new Graphics().rect(currentX, currentY, r.width, r.height).stroke({ color: 0x333333 });
+                this._geohashContainer?.addChild(shape);
+                currentX += r.width;
             }
-            this._geohashes.set(g.id, g);
-            this._geohashContainer?.addChild(g.shape);
+            currentY += r.height;
+            currentX = r.minX;
         }
+    }
+
+    private createZones() {
+        if (!this._viewPort) {
+            return;
+        }
+        const topLeft = this.config.generator.map.topLeftOrigin;
+        const bottomRight = addOffsetToCoordinates(topLeft, this.config.generator.zoneSize.widthInKm * KM, this.config.generator.zoneSize.heightInKm * KM);
+        const bounds = Rect.fromCoordinates(topLeft.lon, topLeft.lat, bottomRight.lon, bottomRight.lat);
+        const r = this._viewPort.translateRect(bounds);
+        const areaRect = this._viewPort.translateRect(this._viewPort.outerBound);
+        let currentX = r.minX;
+        let currentY = r.minY;
+        while (currentY < areaRect.maxY-1) {
+            while (currentX < areaRect.maxX-1) {
+                const shape = new Graphics().rect(currentX, currentY, r.width, r.height).stroke({ color: 0x007700 });
+                this._zoneContainer?.addChild(shape);
+                currentX += r.width;
+            }
+            currentY += r.height;
+            currentX = r.minX;
+        }        
     }
 
     private onMoveVehicle(cmd: MoveCommand) {

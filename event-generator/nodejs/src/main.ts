@@ -98,8 +98,8 @@ async function main() {
             }
         ),
         zoneSize: {
-            width:  10 * KM,
-            height: 10 * KM,
+            width:  config.generator.zoneSize.widthInKm * KM,
+            height: config.generator.zoneSize.heightInKm * KM,
         },
         speed: {
             min:  3 * KM,
@@ -141,11 +141,7 @@ async function main() {
                 type: 'move',
                 vehicleId: cmd.vehicle.id,
                 vehicleType: cmd.vehicle.type,
-                zone: {
-                    id: cmd.zone.id,
-                    bounds: cmd.zone.bounds,
-                },
-                location: loc,
+                zoneId: cmd.zone.id,
                 direction: cmd.newState.direction,
                 speed: cmd.newState.speed,
                 gps: gpsPos,
