@@ -111,3 +111,122 @@ export function formatCounts(value: number, decimals: number = 1) {
         factor: 1,
     }
 }
+
+export function formatDays(value: number, decimals: number = 1) {
+    const YEAR = 365
+    const MONTH = 30
+    const absValue = Math.abs(value)
+    if (absValue >= YEAR) {
+      return {
+        value: roundDecimals(value / YEAR, decimals),
+        units: 'years',
+        factor: YEAR,
+      }
+    }
+    if (absValue >= MONTH) {
+      return {
+        value: roundDecimals(value / MONTH, decimals),
+        units: 'months',
+        factor: MONTH,
+      }
+    }
+    if (absValue > 0) {
+      return {
+        value,
+        units: 'days',
+        factor: 1,
+      }
+    }
+    // no unit for zero
+    return {
+      value: roundDecimals(value, 1),
+      units: '',
+      factor: 1,
+    }
+}
+
+export function formatMSecs(value: number, decimals: number = 1) {
+    const SEC = 1000;
+    const MINUTE = 60*SEC;
+    const HOUR = 60*MINUTE;
+    if (value > HOUR) {
+        return {
+            value: roundDecimals(value / HOUR, decimals),
+            units: 'h',
+            factor: HOUR,
+          }    
+    }
+    if (value > MINUTE) {
+        return {
+            value: roundDecimals(value / MINUTE, decimals),
+            units: 'm',
+            factor: MINUTE,
+          }    
+    }
+    if (value > SEC) {
+        return {
+            value: roundDecimals(value / SEC, decimals),
+            units: 's',
+            factor: SEC,
+          }    
+    }
+    if (value > 0) {
+        return {
+          value,
+          units: 'ms',
+          factor: 1,
+        }
+      }
+    // no unit for zero
+    return {
+        value: roundDecimals(value, 1),
+        units: '',
+        factor: 1,
+      }
+}
+
+export function formatNumber(
+    value: number,
+    units: string,
+    decimals: number = 1,
+    appendUnits: boolean = true,
+    factor: number = 1,
+    factorUnits?: string
+  ) {
+    let convertedValue = {
+      value,
+      units,
+      factor,
+    }
+    if (factor > 1 && factorUnits) {
+      convertedValue.value = roundDecimals(value / factor, decimals)
+      convertedValue.units = factorUnits
+    } else if (units === 'B' || units === 'Bytes') {
+      convertedValue = formatBytes(value, decimals)
+    } else if (units === '%') {
+      convertedValue.value = roundDecimals(value, decimals)
+    } else if (units === 'raw') {
+      convertedValue.value = roundDecimals(value, decimals)
+      convertedValue.units = ''
+    } else if (units === 'days') {
+      convertedValue = formatDays(roundDecimals(value, decimals))
+    } else if (units === 'ms') {
+      convertedValue = formatMSecs(roundDecimals(value, decimals))
+    } else if (units) {
+      throw new Error('Unknown units: ' + units)
+    } else {
+      convertedValue = formatCounts(value, decimals)
+    }
+    let text = (convertedValue.value || 0).toLocaleString()
+    if (appendUnits && convertedValue.units) {
+      text += ' ' + convertedValue.units
+    }
+    return {
+      text,
+      value: convertedValue.value,
+      units: convertedValue.units,
+      factor: convertedValue.factor,
+      decimals,
+      appendUnits,
+    }
+  }

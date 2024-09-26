@@ -1,8 +1,9 @@
 import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Logger } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
+import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
-class Stat {
+class AggregatedStat {
     lastValue = 0;
     minValue = 0;
     maxValue = 0;
@@ -31,21 +32,53 @@ class Stat {
         this.sum += value;
         this.count += 1;
     }
+    
+    clear() {
+        this.lastValue = 0;
+        this.minValue = 0;
+        this.maxValue = 0;
+        this.sum = 0;
+        this.count = 0;
+    }
+
+    toStatValue(): StatValue {
+        return {
+            values: [
+                {
+                    title: 'min',
+                    value: this.minValue,
+                },
+                {
+                    title: 'avg',
+                    value: this.average,
+                },
+                {
+                    title: 'max',
+                    value: this.maxValue,
+                },
+            ],
+            decimals: 1,
+            unitType: this.unit,
+            unitPlural: this.name,
+        };
+    }
 }
 
 export class VehicleStatsViewModel {
-    public events = ref<AggregatePeriodStats[]>([]);
-    public totalEventCount = ref<number>(0);
-    public totalTimePartitionCount = ref<number>(0);
-    public totalDataPartitionCount = ref<number>(0);
-    public totalSize = ref<number>(0);
-    public stats = ref<Stat[]>([]);
+    public statValues = ref<StatValue[]>([]);
+    private events = ref<AggregatePeriodStats[]>([]);
+    private totalEventCount = 0;
+    private totalTimePartitionCount = 0;
+    private totalDataPartitionCount = 0;
+    private totalSize = 0;
     private _statsHandler?: EventHandler;
     private _timePartitions = new Set();
-    private _memoryStat = new Stat('Memory used', 'MB');
-    private _loadAverageStat = new Stat('Load / 1 min', '%');
+    private _memoryStat = new AggregatedStat('Memory used', 'B');
+    private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
     
-    constructor(private _messageBus: MessageBus, private logger: Logger) {}
+    constructor(private _messageBus: MessageBus, private logger: Logger) {
+        this.statValues.value = this.createStats();
+    }
 
     async init(): Promise<void> {
         this._statsHandler = new LambdaEventHandler(
@@ -70,16 +103,41 @@ export class VehicleStatsViewModel {
     }
 
 
+    private createStats(): StatValue[] {
+        return [
+            {
+                unitPlural: 'Events',
+                value: this.totalEventCount,
+            },
+            {
+                unitPlural: 'Time partitions',
+                value: this.totalTimePartitionCount,
+            },
+            {
+                unitPlural: 'Data partitions',
+                value: this.totalDataPartitionCount,
+            },
+            {
+                unitPlural: 'Storage size',
+                value: this.totalSize,
+                unitType: 'B'
+            },
+            this._loadAverageStat.toStatValue(),
+            this._memoryStat.toStatValue(),
+        ];
+    }
+
     private onProcessStats(ev: AggregatePeriodStats): void {
         this.logger.debug(ev);
         if ((ev as any).type === 'reset-aggregate-period-stats') {
-            this.totalEventCount.value = 0;
-            this.totalTimePartitionCount.value = 0;
-            this.totalDataPartitionCount.value = 0;
-            this.totalSize.value = 0;
+            this.totalEventCount = 0;
+            this.totalTimePartitionCount = 0;
+            this.totalDataPartitionCount = 0;
+            this.totalSize = 0;
             this.events.value = [];
             this._timePartitions.clear();
-            this.stats.value = [];
+            this._memoryStat.clear();
+            this._loadAverageStat.clear();
             return;
         }
         this._timePartitions.add(ev.partitionKey);
@@ -88,13 +146,13 @@ export class VehicleStatsViewModel {
             events.shift();
         }
         this.events.value = events;
-        this.totalEventCount.value += ev.eventCount;
-        this.totalTimePartitionCount.value = this._timePartitions.size;
-        this.totalDataPartitionCount.value += ev.partitions.length;
-        this.totalSize.value += ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
-        this._memoryStat.add(roundDecimals(ev.processStats.memory.heapUsed / (1024 * 1024), 1)); // MB
+        this.totalEventCount += ev.eventCount;
+        this.totalTimePartitionCount = this._timePartitions.size;
+        this.totalDataPartitionCount += ev.partitions.length;
+        this.totalSize += ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
+        this._memoryStat.add(ev.processStats.memory.heapUsed); 
         this._loadAverageStat.add(roundDecimals(ev.processStats.loadAverage[0], 1));
-        this.stats.value = [this._memoryStat, this._loadAverageStat];
+        this.statValues.value = this.createStats();
     }
 
 }

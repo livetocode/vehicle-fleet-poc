@@ -4,25 +4,15 @@
     });
 </script>
 <template>
-  <div class="root-panel">
+  <div>
+    <VehicleStats />  
     <VehicleViewer class="viewer" />
-    <div class="side-panel">
-      <VehicleStats />  
-    </div>
   </div>
-
 </template>
 
 <style>
-.root-panel {
-  display: flex;
-}
 .viewer {
   height: 100vh;
-  width: 80vw;
+  width: 100vw;
 }
-.side-panel {
-  padding-left: 15px;
-}
-
 </style>

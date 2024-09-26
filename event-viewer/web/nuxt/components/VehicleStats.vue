@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { formatBytes, formatCounts } from 'core-lib';
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue';
 import { type MessageBus } from '../utils/messaging';
 import { VehicleStatsViewModel } from './VehicleStats.vm';
@@ -11,17 +10,6 @@ const props = defineProps({
 });
 const messageBus = inject<MessageBus>('messageBus');
 const _vm = new VehicleStatsViewModel(messageBus, logger);
-const totalSizeAsStr = computed(() => {
-  const formatted = formatBytes(_vm.totalSize.value, 1);
-  return `${formatted.value} ${formatted.units}`;
-});
-const totalEventCountAsStr = computed(() => {
-  if (_vm.totalEventCount.value === 0) {
-    return '0';
-  }
-  const formatted = formatCounts(_vm.totalEventCount.value, 1);
-  return `${_vm.totalEventCount.value} (${formatted.value} ${formatted.units})`;
-});
 
 onMounted(() => {
   _vm.init().catch(console.error);
@@ -34,20 +22,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div style="padding: 10px;">
-    <span>Stats:</span>
-    <ul>
-      <li>Total events: {{totalEventCountAsStr}}</li>
-      <li>Total time partitions: {{_vm.totalTimePartitionCount}}</li>
-      <li>Total data partitions: {{_vm.totalDataPartitionCount}}</li>
-      <li>Total size: {{totalSizeAsStr}}</li>      
-      <li v-for="(stat, i) in _vm.stats.value" :key="i" >
-        {{stat.name}}:<br/>{{stat.minValue}} / {{ stat.average}} / {{stat.maxValue}} {{stat.unit}}
-      </li>
-    </ul>
-    <span>Events:</span>
+  <div class="stat-area d-flex align-center justify-space-between">
+    <owl-stats :stats="_vm.statValues.value" />
+    <v-btn class="ml-8 text-none" color="primary" size="small">View data partitions...</v-btn>
+    <!-- <span>Events:</span>
     <ul>
       <li v-for="(ev, i) in _vm.events.value" :key="i" >{{ev.partitionKey}} #{{ev.collectorIndex}}: {{_vm.formatStats(ev)}}</li>
-    </ul>    
+    </ul>     -->
   </div>
 </template>
+<style scoped>
+.stat-area {
+  padding-top: 8px;
+  padding-left: 20px;
+  padding-right: 16px;
+}
+
+</style>
