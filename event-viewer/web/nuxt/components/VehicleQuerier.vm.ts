@@ -151,6 +151,15 @@ export class VehicleQuerierViewModel {
                     value: this._lastQueryResultStats.processedFilesCount,
                 },    
                 {
+                    unitPlural: 'Processed bytes',
+                    value: this._lastQueryResultStats.processedBytes,
+                    unitType: 'B',
+                },    
+                {
+                    unitPlural: 'Records / sec',
+                    value: this._lastQueryResultStats.processedRecordCount / (this._lastQueryResultStats.elapsedTimeInMS / 1000),
+                },    
+                {
                     unitPlural: 'Elapsed time',
                     value: this._lastQueryResultStats.elapsedTimeInMS,
                     unitType: 'ms',

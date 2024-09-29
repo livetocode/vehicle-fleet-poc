@@ -10,6 +10,7 @@ import * as turf from '@turf/turf';
 
 export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
     private processedFilesCount = 0;
+    private processedBytes = 0;
     private processedRecordCount = 0;
     constructor(
         private config: Config,
@@ -38,6 +39,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         const polygon = gpsCoordinatesToPolyon(event.polygon);
         const geohashes = this.createGeohashes(polygon);
         let timeoutExpired = false;
+        let limitReached = false;
         let selectedRecordCount = 0;
         for (const filename of this.enumerateFiles(fromDate, toDate, geohashes)) {
             this.processedFilesCount += 1;
@@ -46,8 +48,12 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
                 selectedRecordCount += 1;
                 distinctVehicles.add(res.vehicleId);
                 if (event.limit && selectedRecordCount >= event.limit) {
+                    limitReached = true;
                     break;
                 }
+            }
+            if (limitReached) {
+                break;
             }
             if (watch.elapsedTimeInMS() >= timeout) {
                 timeoutExpired = true;
@@ -60,10 +66,12 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             queryId: event.id,
             elapsedTimeInMS: watch.elapsedTimeInMS(),
             processedFilesCount: this.processedFilesCount,
+            processedBytes: this.processedBytes,
             processedRecordCount: this.processedRecordCount,
             selectedRecordCount,
             distinctVehicleCount: distinctVehicles.size,
             timeoutExpired,
+            limitReached,
         };
         this.logger.debug('Stats', stats);
         this.messageBus.publish('query.vehicles.results', stats);
@@ -110,6 +118,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
     private *searchFile(queryId: string, filename: string, fromDate: Date, toDate: Date, polygon: Feature<Polygon>) {
         this.logger.debug('search file ', filename);
         const df = pl.readParquet(filename);
+        const fstats = fs.statSync(filename);
+        this.processedBytes += fstats.size;
         const colNames = df.columns;
         const idx_timestamp = colNames.indexOf('timestamp');
         const idx_vehicleId = colNames.indexOf('vehicleId');

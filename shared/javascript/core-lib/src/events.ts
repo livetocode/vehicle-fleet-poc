@@ -87,9 +87,11 @@ export interface VehicleQueryResultStats {
     type: 'vehicle-query-result-stats';
     queryId: string;
     processedFilesCount: number;
+    processedBytes: number;
     processedRecordCount: number;
     selectedRecordCount: number;
     distinctVehicleCount: number;
     elapsedTimeInMS: number;
     timeoutExpired: boolean;
+    limitReached: boolean;
 }
