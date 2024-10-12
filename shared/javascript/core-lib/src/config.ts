@@ -91,7 +91,7 @@ export type ZoneSize = {
 
 export interface GeneratorConfig {
     logging: LoggingConfig;
-    generatorCount: number;
+    instances: number;
     vehicleCount: number;
     maxNumberOfEvents: number;
     refreshIntervalInSecs: number;
@@ -127,7 +127,7 @@ export type OutputConfig =
 
 export interface CollectorConfig {
     logging: LoggingConfig;
-    collectorCount: number;
+    instances: number;
     geohashLength: number;
     eventStore: EventStoreConfig;
     output: OutputConfig;
@@ -135,7 +135,7 @@ export interface CollectorConfig {
 
 export interface QuerierConfig {
     logging: LoggingConfig;
-    querierCount: number;
+    instances: number;
     defaultTimeoutInMS: number;
     autoStart: boolean;
 }

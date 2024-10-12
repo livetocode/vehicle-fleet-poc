@@ -70,7 +70,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
 
     protected async processTypedEvent(event: MoveCommand): Promise<void> {
         const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(event);
-        const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.collectorCount;
+        const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.instances;
         if (this.collectorIndex !== collectorIndex) {
             this.logger.warn(`Received event for wrong collector index #${collectorIndex}`);
             return;
@@ -145,7 +145,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
         const statsEvent: AggregatePeriodStats = {
             type: 'aggregate-period-stats',
-            collectorCount: this.config.collector.collectorCount,
+            collectorCount: this.config.collector.instances,
             collectorIndex: this.collectorIndex,
             fromTime: partitionKey.fromTime.toUTCString(),
             toTime: partitionKey.untilTime.toUTCString(),

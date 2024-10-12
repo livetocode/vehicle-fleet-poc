@@ -1,6 +1,6 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { Config, ConsoleLogger, Logger, LoggingConfig, NoopLogger } from 'core-lib';
+import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 

@@ -45,7 +45,7 @@ delete_folder("output")
 processes = []
 
 step("Start collectors")
-COLLECTOR_COUNT = config['collector']['collectorCount']
+COLLECTOR_COUNT = config['collector']['instances']
 for idx in range(COLLECTOR_COUNT):
     processes.append(start_background_nodejs_app("event-collector/nodejs", env = { 'COLLECTOR_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
 print("Wait for collectors to be ready...")
@@ -55,7 +55,7 @@ if not processes:
     raise Exception("Collectors failed to execute")
 
 step("Start generators")
-GENERATOR_COUNT = config['generator']['generatorCount']
+GENERATOR_COUNT = config['generator']['instances']
 for idx in range(GENERATOR_COUNT):
     processes.append(start_background_nodejs_app("event-generator/nodejs", env = { 'GENERATOR_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
 
@@ -65,7 +65,7 @@ step("Execution complete")
 
 if config['querier']['autoStart']:
     step("Start queriers")
-    QUERIER_COUNT = config['querier']['querierCount']
+    QUERIER_COUNT = config['querier']['instances']
     for idx in range(QUERIER_COUNT):
         processes.append(start_background_nodejs_app("event-querier/nodejs", env = { 'QUERIER_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
 

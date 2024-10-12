@@ -48,7 +48,7 @@ function getStartDate(config: GeneratorConfig): string {
 async function main() {
     const config = loadConfig('../../config.yaml');
     if (config.partitioning.dataPartition.type === 'collectorIndex') {
-        if (config.collector.collectorCount !== config.generator.generatorCount) {
+        if (config.collector.instances !== config.generator.instances) {
             throw new Error('When you use the collectorIndex data partitioning strategy, you must have the same number of generators and collectors');
         }
     }
@@ -56,9 +56,9 @@ async function main() {
     const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
     const messageBus = createMessageBus(config.hub, logger);
     const vehicleCount = config.generator.vehicleCount;
-    let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.generatorCount);
+    let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.instances);
     if (generatorIndex === 0) {
-        maxNumberOfEvents += config.generator.maxNumberOfEvents % config.generator.generatorCount;
+        maxNumberOfEvents += config.generator.maxNumberOfEvents % config.generator.instances;
     }
     const refreshIntervalInSecs = config.generator.refreshIntervalInSecs;
     const realtime = config.generator.realtime;
@@ -148,8 +148,8 @@ async function main() {
                 timestamp: cmd.timestamp.toISOString(),
             }
             const dataPartitionKey = dataPartitionStrategy.getPartitionKey(msg);
-            const collectorIndex = computeHashNumber(dataPartitionKey) % config.collector.collectorCount;
-            if (config.generator.generatorCount === 1 || collectorIndex === generatorIndex) {
+            const collectorIndex = computeHashNumber(dataPartitionKey) % config.collector.instances;
+            if (config.generator.instances === 1 || collectorIndex === generatorIndex) {
                 messageBus.publish(`commands.move.${collectorIndex}`, msg);
                 publishedEvents += 1;
             }
@@ -182,8 +182,8 @@ async function main() {
         type: 'flush',
         exitProcess: terminateCollector,
     }
-    if (config.generator.generatorCount === 1) {
-        for (let i = 0; i < config.collector.collectorCount; i++) {
+    if (config.generator.instances === 1) {
+        for (let i = 0; i < config.collector.instances; i++) {
             messageBus.publish(`commands.flush.${i}`, flushCmd);
         }    
     } else {
