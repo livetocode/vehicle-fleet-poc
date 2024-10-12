@@ -5,7 +5,7 @@
 </script>
 <template>
   <div>
-    <VehicleStats />  
+    <VehicleTracking />  
     <VehicleViewer class="viewer" />
   </div>
 </template>

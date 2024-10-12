@@ -64,7 +64,7 @@ class AggregatedStat {
     }
 }
 
-export class VehicleStatsViewModel {
+export class VehicleTrackingViewModel {
     public statValues = ref<StatValue[]>([]);
     private events = ref<AggregatePeriodStats[]>([]);
     private totalEventCount = 0;

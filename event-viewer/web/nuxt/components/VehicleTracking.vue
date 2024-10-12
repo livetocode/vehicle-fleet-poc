@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue';
 import { type MessageBus } from '../utils/messaging';
-import { VehicleStatsViewModel } from './VehicleStats.vm';
+import { VehicleTrackingViewModel } from './VehicleTracking.vm';
 
 const appConfig = useAppConfig();
 const logger = createLogger(appConfig.viewer.logging, 'viewer');
@@ -9,7 +9,7 @@ const logger = createLogger(appConfig.viewer.logging, 'viewer');
 const props = defineProps({
 });
 const messageBus = inject<MessageBus>('messageBus');
-const _vm = new VehicleStatsViewModel(messageBus, logger);
+const _vm = new VehicleTrackingViewModel(messageBus, logger);
 
 onMounted(() => {
   _vm.init().catch(console.error);
