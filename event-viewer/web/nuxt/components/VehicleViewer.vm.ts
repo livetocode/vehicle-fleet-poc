@@ -40,7 +40,7 @@ export class VehicleViewerViewModel {
     private _queryResultHandler?: EventHandler;
     private host: any;
     
-    constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger) {
+    constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger, private mode: string) {
         if (!_messageBus) {
             throw new Error('Expected to receive a messageBus!');
         }
@@ -83,10 +83,14 @@ export class VehicleViewerViewModel {
         app.ticker.add((time: any) => {
             this.animate(time);
         });
-        this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-        this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
-        this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
-        this._messageBus.registerHandlers(this._moveHandler, this._queryHandler, this._queryResultHandler);
+        if (this.mode === 'tracking') {
+            this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
+            this._messageBus.registerHandlers(this._moveHandler);
+        } else if (this.mode === 'search') {
+            this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
+            this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
+            this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
+        }
         app.renderer.on('resize', () => {
             this.reset();
         });

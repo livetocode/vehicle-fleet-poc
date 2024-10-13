@@ -6,7 +6,7 @@
 <template>
   <div>
     <VehicleTracking />  
-    <VehicleViewer class="viewer" />
+    <VehicleViewer mode="tracking" class="viewer" />
   </div>
 </template>
 

@@ -6,7 +6,7 @@
 <template>
   <div>
     <VehicleQuerier />  
-    <VehicleViewer class="viewer" />
+    <VehicleViewer mode="search" class="viewer" />
   </div>
 </template>
 

@@ -8,10 +8,14 @@ const appConfig = useAppConfig();
 const logger = createLogger(appConfig.viewer.logging, 'viewer');
 
 const props = defineProps({
+    mode: {
+      type: String,
+      default: 'tracking',
+    },
 });
 const messageBus = inject<MessageBus>('messageBus');
 const root = ref(null);
-const _vm = new VehicleViewerViewModel(appConfig, messageBus, logger);
+const _vm = new VehicleViewerViewModel(appConfig, messageBus, logger, props.mode);
 
 onMounted(() => {
   logger.debug('VehicleViewer mounted', root);
