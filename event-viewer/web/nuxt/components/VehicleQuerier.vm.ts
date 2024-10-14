@@ -97,17 +97,18 @@ export class VehicleQuerierViewModel {
         };
     }
 
-    startQuery(isActiveRef: any) {
-        if (!this.fldPolygon.value) {
+    startQuery(data: { periodId: string, polygonId: string }) {
+        const polygonId = data.polygonId;
+        if (!polygonId) {
             return;
         }
-        if (!this.fldPeriod.value) {
+        const periodId = data.periodId;
+        if (!periodId) {
             return;
         }
-        isActiveRef.value = false;
-        this.logger.info(`Start ${this.fldPolygon.value} query for ${this.fldPeriod.value}`);
-        const polygon = this.polygons[this.fldPolygon.value];
-        const period = this.periods[this.fldPeriod.value];
+        this.logger.info(`Start ${polygonId} query for ${periodId}`);
+        const polygon = this.polygons[polygonId];
+        const period = this.periods[periodId];        
         this.query({
             type: 'vehicle-query',
             id: crypto.randomUUID(),

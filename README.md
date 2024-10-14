@@ -238,10 +238,20 @@ NATS server should be running. See [README](./event-hub/README.md) for the instr
 
 ### run the web viewer (optional)
 
+You can use the dev mode with hotreload but it is much slower than the production build, when there are a lot of vehicles:
+
 ```shell
 cd ./event/viewer/web/nuxt
 open http://localhost:3000/
 npm run dev
+```
+
+Or you can build a production release and run it (this is much more performant):
+```shell
+cd ./event/viewer/web/nuxt
+npm npm run build
+open http://localhost:3000/
+npm run preview
 ```
 
 ### generate events
