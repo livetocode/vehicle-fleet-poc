@@ -104,6 +104,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         }
         const dataFolder = this.config.collector.output.folder;
         const filenames = fs.readdirSync(dataFolder);
+        filenames.sort();
         for (const filename of filenames) {
             if (filename >= fromPrefix && filename < toPrefix) {
                 const otherSegments = filename.substring(fromPrefix.length + 1).split('-');
