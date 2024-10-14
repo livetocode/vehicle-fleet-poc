@@ -28,8 +28,8 @@ export interface GeohashShape {
 
 export class VehicleViewerViewModel {
     private _app?: Application;
-    private _mainAreaContainer?: Container;
-    private _container?: Container;
+    private _gridContainer?: Container;
+    private _vehiclesContainer?: Container;
     private _zoneContainer?: Container;
     private _geohashContainer?: Container;
     private _viewPort?: ViewPort;
@@ -59,7 +59,7 @@ export class VehicleViewerViewModel {
         const app = new Application();
         this._app = app;
         const mainAreaContainer = new Container();
-        this._mainAreaContainer = mainAreaContainer;        
+        this._gridContainer = mainAreaContainer;        
         app.stage.addChild(mainAreaContainer);
         const geohashContainer = new Container();
         this._geohashContainer = geohashContainer;        
@@ -68,7 +68,7 @@ export class VehicleViewerViewModel {
         this._zoneContainer = zoneContainer;        
         app.stage.addChild(zoneContainer);
         const container = new Container();
-        this._container = container;        
+        this._vehiclesContainer = container;        
         app.stage.addChild(container);
 
         await app.init({ resizeTo: host, background: 0x222222 });
@@ -92,7 +92,7 @@ export class VehicleViewerViewModel {
             this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
         }
         app.renderer.on('resize', () => {
-            this.reset();
+            this.reset(false);
         });
     }
 
@@ -123,7 +123,7 @@ export class VehicleViewerViewModel {
     
     private onProcessQuery(res: VehicleQuery) {
         this.logger.debug('Received query', res);
-        this.reset();
+        this.reset(true);
         const viewport = this._viewPort;
         if (viewport) {
             const points = res.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
@@ -148,16 +148,22 @@ export class VehicleViewerViewModel {
         this.onMoveVehicle(cmd);
     }
 
-    private reset() {
-        this._container?.removeChildren();
-        this._mainAreaContainer?.removeChildren();
+    private reset(includeVehicles: boolean) {
+        if (includeVehicles) {
+            this._vehiclesContainer?.removeChildren();
+            this._vehicles.clear();
+        } else {
+            for (const v of this._vehicles.values()) {
+                v.isDirty = true;
+            }
+        }
+        this._gridContainer?.removeChildren();
         this._zoneContainer?.removeChildren();
         this._geohashContainer?.removeChildren();
-        this._vehicles.clear();
         this._viewPort = this.createViewPort();
         this.createGrid();
-        this.createGeohashes();
         this.createZones();
+        this.createGeohashes();
     }
 
     private createViewPort(): ViewPort {
@@ -188,7 +194,7 @@ export class VehicleViewerViewModel {
         }
         const r = this._viewPort.translateRect(this._viewPort.outerBound);
         const shape = new Graphics().rect(r.minX, r.minY, r.width, r.height).fill({ color: 'black' });
-        this._mainAreaContainer?.addChild(shape);
+        this._gridContainer?.addChild(shape);
     }
 
     private createGeohashes() {
@@ -250,7 +256,7 @@ export class VehicleViewerViewModel {
             const assetAlias = assetRef.alias;
             const sprite = Sprite.from(assetAlias);
             sprite.anchor.set(0.5);
-            this._container?.addChild(sprite);
+            this._vehiclesContainer?.addChild(sprite);
     
             v = {
                 sprite,
