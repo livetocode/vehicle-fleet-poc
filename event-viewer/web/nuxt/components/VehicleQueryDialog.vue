@@ -8,14 +8,24 @@ const props = defineProps({
         type: Array,
         default: [],
     },
+    limit: {
+        type: Number,
+        default: 1000000,
+    },
+    timeout: {
+        type: Number,
+        default: 30,
+    },
 });
 const emit = defineEmits<{
     (e: 'onCancel'): void,
-    (e: 'onAccept', payload: { periodId: string, polygonId: string }): void,
+    (e: 'onAccept', payload: { periodId: string, polygonId: string, limit: number, timeout: number }): void,
 }>();
 
-let fldPeriodId = props.periods[0] as string;
-let fldPolygonId = props.polygons[0] as string;
+let fldPeriodId = ref(props.periods[0] as string);
+let fldPolygonId = ref(props.polygons[0] as string);
+let fldLimit = ref(props.limit);
+let fldTimeout = ref(props.timeout);
 
 function onCancelDialog(isActive: Ref<boolean>) {
     isActive.value = false;
@@ -25,8 +35,10 @@ function onCancelDialog(isActive: Ref<boolean>) {
 function onAcceptDialog(isActive: Ref<boolean>) {
     isActive.value = false;
     const data = {
-        periodId: fldPeriodId,
-        polygonId: fldPolygonId,
+        periodId: fldPeriodId.value,
+        polygonId: fldPolygonId.value,
+        limit: fldLimit.value,
+        timeout: fldTimeout.value,
     };
     emit('onAccept', data);
 };
@@ -75,6 +87,20 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                   ></v-select>
                 </v-col>
 
+              </v-row>
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
+                    <v-text-field type="number" label="Limit" v-model="fldLimit"></v-text-field>
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
+                    <v-text-field type="number" label="Timout (secs)" v-model="fldTimeout"></v-text-field>
+                </v-col>
               </v-row>
 
               <small class="text-caption text-medium-emphasis">*indicates required field</small>

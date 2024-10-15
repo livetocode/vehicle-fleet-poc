@@ -24,10 +24,15 @@ onUnmounted(() => {
 <template>
   <div>
     <div class="stat-area d-flex align-center justify-space-between">
-      <owl-stats :stats="_vm.statValues.value" />
-      <VehicleQueryDialog :periods="Object.keys(_vm.periods)" :polygons="Object.keys(_vm.polygons)" @on-accept="(data) => _vm.startQuery(data)" />
-    </div>
-  
+      <div class="d-flex align-center">
+        <owl-stats :stats="_vm.statValues.value" />
+        <div class="ml-3">
+          <v-checkbox v-if="_vm.limitReached.value" label="Limit reached" density="compact" hide-details readonly v-model="_vm.limitReached.value"></v-checkbox>
+          <v-checkbox v-if="_vm.timoutReached.value" label="Timeout reached" density="compact" hide-details readonly v-model="_vm.timoutReached.value"></v-checkbox>
+        </div>
+      </div>
+        <VehicleQueryDialog :periods="Object.keys(_vm.periods)" :polygons="Object.keys(_vm.polygons)" @on-accept="(data) => _vm.startQuery(data)" />          
+    </div>  
   </div>
 </template>
 <style scoped>

@@ -9,8 +9,9 @@ export class VehicleQuerierViewModel {
     public resultCount = ref<number>(0);
     public polygons: any;
     public periods: any;
-    public fldPolygon = ref('Small box');
-    public fldPeriod = ref('10 min');
+    public limitReached = ref(false);
+    public timoutReached = ref(false);
+
     private _queryResultHandler?: EventHandler;
     private _queryResultStatsHandler?: EventHandler;
     private _vehicleIds = new Set<number>();
@@ -97,7 +98,7 @@ export class VehicleQuerierViewModel {
         };
     }
 
-    startQuery(data: { periodId: string, polygonId: string }) {
+    startQuery(data: { periodId: string, polygonId: string, limit: number, timeout: number }) {
         const polygonId = data.polygonId;
         if (!polygonId) {
             return;
@@ -108,14 +109,21 @@ export class VehicleQuerierViewModel {
         }
         this.logger.info(`Start ${polygonId} query for ${periodId}`);
         const polygon = this.polygons[polygonId];
+        if (!polygon) {
+            return;
+        }
         const period = this.periods[periodId];        
+        if (!period) {
+            return;
+        }
         this.query({
             type: 'vehicle-query',
             id: crypto.randomUUID(),
             fromDate: period.from,
             toDate: period.to,
-            polygon,
-            limit: 1000000,
+            polygon,            
+            limit: data.limit ?? 1000000,
+            timeout: (data.timeout ?? 30) * 1000,
         });
     }
 
@@ -207,5 +215,7 @@ export class VehicleQuerierViewModel {
         }
         this._lastQueryResultStats = ev;
         this.statValues.value = this.createStats();
+        this.timoutReached.value = ev.timeoutExpired;
+        this.limitReached.value = ev.limitReached;
     }
 }
