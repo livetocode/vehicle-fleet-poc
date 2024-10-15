@@ -63,6 +63,9 @@ const formattedValues = computed(() => {
                 </div>
             </div>
         </div>
+        <v-chip-group v-if="props.stat?.flags">
+          <v-chip v-for="(flag, idx) in props.stat.flags" :key="idx" size="x-small">{{flag}}</v-chip>
+        </v-chip-group>
       </div>
     </owl-app-sheet>
   </div>
@@ -79,7 +82,6 @@ const formattedValues = computed(() => {
 
 .stat-values-item {
   font-size: 0.8em;
-
 }
 
 .stat-values-item:not(:first-child) {

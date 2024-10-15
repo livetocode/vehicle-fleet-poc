@@ -9,8 +9,6 @@ export class VehicleQuerierViewModel {
     public resultCount = ref<number>(0);
     public polygons: any;
     public periods: any;
-    public limitReached = ref(false);
-    public timoutReached = ref(false);
 
     private _queryResultHandler?: EventHandler;
     private _queryResultStatsHandler?: EventHandler;
@@ -174,6 +172,19 @@ export class VehicleQuerierViewModel {
                     unitType: 'ms',
                 },    
             ]);
+            const flags: string[] = [];
+            if (this._lastQueryResultStats.timeoutExpired) {
+                flags.push('timeout');
+            }
+            if (this._lastQueryResultStats.limitReached) {
+                flags.push('limit');
+            }
+            if (flags.length > 0) {
+                result.push({
+                    unitPlural: 'Exceeded',
+                    flags,
+                });
+            }
         }
         return result;
     }
@@ -215,7 +226,5 @@ export class VehicleQuerierViewModel {
         }
         this._lastQueryResultStats = ev;
         this.statValues.value = this.createStats();
-        this.timoutReached.value = ev.timeoutExpired;
-        this.limitReached.value = ev.limitReached;
     }
 }
