@@ -43,7 +43,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         let selectedRecordCount = 0;
         for (const filename of this.enumerateFiles(fromDate, toDate, geohashes)) {
             this.processedFilesCount += 1;
-            for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon)) {
+            for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon, event.vehicleTypes)) {
                 this.publishResult(res);
                 selectedRecordCount += 1;
                 distinctVehicles.add(res.vehicleId);
@@ -116,7 +116,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         }
     }
 
-    private *searchFile(queryId: string, filename: string, fromDate: Date, toDate: Date, polygon: Feature<Polygon>) {
+    private *searchFile(queryId: string, filename: string, fromDate: Date, toDate: Date, polygon: Feature<Polygon>, vehicleTypes: string[]) {
         this.logger.debug('search file ', filename);
         const df = pl.readParquet(filename);
         const fstats = fs.statSync(filename);
@@ -145,7 +145,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             if (timestamp >= fromDate && timestamp <= toDate) {
                 const pos = turf.point([gps_lon, gps_lat]);
                 const isInsidePolygon = turf.booleanContains(polygon, pos);
-                if (isInsidePolygon) {
+                const isValidVehicle = vehicleTypes.length === 0 || vehicleTypes.includes(vehicleType);
+                if (isInsidePolygon && isValidVehicle) {
                     const ev: VehicleQueryResult = {
                         type: 'vehicle-query-result',
                         queryId,

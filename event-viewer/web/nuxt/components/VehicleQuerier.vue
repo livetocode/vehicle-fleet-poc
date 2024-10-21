@@ -25,7 +25,11 @@ onUnmounted(() => {
   <div>
     <div class="stat-area d-flex align-center justify-space-between">
         <owl-stats :stats="_vm.statValues.value" />
-        <VehicleQueryDialog :periods="Object.keys(_vm.periods)" :polygons="Object.keys(_vm.polygons)" @on-accept="(data) => _vm.startQuery(data)" />          
+        <VehicleQueryDialog 
+            :periods="Object.keys(_vm.periods)" 
+            :polygons="Object.keys(_vm.polygons)" 
+            :vehicleTypes="_vm.vehicleTypes" 
+            @on-accept="(data) => _vm.startQuery(data)" />          
     </div>  
   </div>
 </template>

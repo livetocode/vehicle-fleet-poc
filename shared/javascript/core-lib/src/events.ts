@@ -67,6 +67,7 @@ export interface VehicleQuery {
     fromDate: string;
     toDate: string;
     polygon: GpsCoordinates[];
+    vehicleTypes: string[],
     limit?: number;
     timeout?: number;
 }

@@ -9,6 +9,7 @@ export class VehicleQuerierViewModel {
     public resultCount = ref<number>(0);
     public polygons: any;
     public periods: any;
+    public vehicleTypes: string[];
 
     private _queryResultHandler?: EventHandler;
     private _queryResultStatsHandler?: EventHandler;
@@ -20,6 +21,7 @@ export class VehicleQuerierViewModel {
     constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         this.polygons = this.createPolygons();
         this.periods = this.createPeriods();
+        this.vehicleTypes = config.generator.vehicleTypes;
         this.reset();
     }
 
@@ -96,7 +98,7 @@ export class VehicleQuerierViewModel {
         };
     }
 
-    startQuery(data: { periodId: string, polygonId: string, limit: number, timeout: number }) {
+    startQuery(data: { periodId: string, polygonId: string, vehicleTypes: string[], limit: number, timeout: number }) {
         const polygonId = data.polygonId;
         if (!polygonId) {
             return;
@@ -120,6 +122,7 @@ export class VehicleQuerierViewModel {
             fromDate: period.from,
             toDate: period.to,
             polygon,            
+            vehicleTypes: data.vehicleTypes,
             limit: data.limit ?? 1000000,
             timeout: (data.timeout ?? 30) * 1000,
         });

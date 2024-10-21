@@ -93,6 +93,7 @@ export interface GeneratorConfig {
     logging: LoggingConfig;
     instances: number;
     vehicleCount: number;
+    vehicleTypes: string[];
     maxNumberOfEvents: number;
     refreshIntervalInSecs: number;
     realtime: boolean;

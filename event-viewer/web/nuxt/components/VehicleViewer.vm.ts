@@ -249,7 +249,7 @@ export class VehicleViewerViewModel {
         let v = this._vehicles.get(cmd.vehicleId);
         if (!v) {
             let assetIndex = this._assets.findIndex(x => x.alias === cmd.vehicleType);
-            if (!assetIndex) {
+            if (assetIndex < 0) {
                 assetIndex = Math.trunc(this._assets.length * Math.random());
             }
             const assetRef = this._assets[assetIndex];

@@ -42,6 +42,16 @@ generator:
   zoneSize:
     widthInKm: 10
     heightInKm: 10
+  vehicleTypes:
+    - Ambulance
+    - Audi
+    - Black_viper
+    - Car
+    - Mini_truck
+    - Mini_van
+    - Police
+    - taxi
+    - truck
 
 collector:
   verbose: false

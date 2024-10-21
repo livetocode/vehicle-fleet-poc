@@ -8,6 +8,10 @@ const props = defineProps({
         type: Array,
         default: [],
     },
+    vehicleTypes: {
+        type: Array,
+        default: [],
+    },
     limit: {
         type: Number,
         default: 1000000,
@@ -19,11 +23,12 @@ const props = defineProps({
 });
 const emit = defineEmits<{
     (e: 'onCancel'): void,
-    (e: 'onAccept', payload: { periodId: string, polygonId: string, limit: number, timeout: number }): void,
+    (e: 'onAccept', payload: { periodId: string, polygonId: string, vehicleTypes: string[], limit: number, timeout: number }): void,
 }>();
 
 let fldPeriodId = ref(props.periods[0] as string);
 let fldPolygonId = ref(props.polygons[0] as string);
+let fldVehicleTypes = ref<string[]>([]);
 let fldLimit = ref(props.limit);
 let fldTimeout = ref(props.timeout);
 
@@ -37,6 +42,7 @@ function onAcceptDialog(isActive: Ref<boolean>) {
     const data = {
         periodId: fldPeriodId.value,
         polygonId: fldPolygonId.value,
+        vehicleTypes: fldVehicleTypes.value,
         limit: fldLimit.value,
         timeout: fldTimeout.value,
     };
@@ -100,6 +106,26 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                   sm="6"
                 >
                     <v-text-field type="number" label="Timout (secs)" v-model="fldTimeout"></v-text-field>
+                </v-col>
+              </v-row>
+
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
+                  <v-select
+                    v-model="fldVehicleTypes"
+                    :items="props.vehicleTypes"
+                    label="Vehicle Type"
+                    multiple
+                    clearable
+                  ></v-select>
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
                 </v-col>
               </v-row>
 
