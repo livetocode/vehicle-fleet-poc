@@ -217,7 +217,7 @@ export function formatNumber(
     } else {
       convertedValue = formatCounts(value, decimals)
     }
-    let text = (convertedValue.value || 0).toLocaleString()
+    let text = (convertedValue.value || 0).toLocaleString(undefined, { minimumFractionDigits: decimals });
     if (appendUnits && convertedValue.units) {
       text += ' ' + convertedValue.units
     }

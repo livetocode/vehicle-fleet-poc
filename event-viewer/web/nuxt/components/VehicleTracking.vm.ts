@@ -75,6 +75,7 @@ export class VehicleTrackingViewModel {
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
+    private _nextEventStatsId = 1;
     
     constructor(private _messageBus: MessageBus, private logger: Logger) {
         this.statValues.value = this.createStats();
@@ -130,6 +131,7 @@ export class VehicleTrackingViewModel {
     private onProcessStats(ev: AggregatePeriodStats): void {
         this.logger.debug(ev);
         if ((ev as any).type === 'reset-aggregate-period-stats') {
+            this._nextEventStatsId = 1;
             this.totalEventCount = 0;
             this.totalTimePartitionCount = 0;
             this.totalDataPartitionCount = 0;
@@ -141,8 +143,13 @@ export class VehicleTrackingViewModel {
             return;
         }
         this._timePartitions.add(ev.partitionKey);
-        const events = [...this.events.value, ev];
-        if (events.length > 20) {
+        const evWithId = {
+            ...ev,
+            id: this._nextEventStatsId,
+        }
+        this._nextEventStatsId += 1;
+        const events = [...this.events.value, evWithId];
+        if (events.length > 100) {
             events.shift();
         }
         this.events.value = events;

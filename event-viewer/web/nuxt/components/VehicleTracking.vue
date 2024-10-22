@@ -24,11 +24,7 @@ onUnmounted(() => {
 <template>
   <div class="stat-area d-flex align-center justify-space-between">
     <owl-stats :stats="_vm.statValues.value" />
-    <v-btn class="ml-8 text-none" color="primary" size="small">View data partitions...</v-btn>
-    <!-- <span>Events:</span>
-    <ul>
-      <li v-for="(ev, i) in _vm.events.value" :key="i" >{{ev.partitionKey}} #{{ev.collectorIndex}}: {{_vm.formatStats(ev)}}</li>
-    </ul>     -->
+    <DataPartitionsDialog :partitions="_vm.events.value"  />
   </div>
 </template>
 <style scoped>
