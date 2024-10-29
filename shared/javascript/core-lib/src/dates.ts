@@ -23,6 +23,10 @@ export class TimeRange implements Comparable {
         return compareTimeRange(this, other);
     }
 
+    includes(date: Date): boolean {
+        return date.getTime() >= this.fromTime.getTime() && date.getTime() < this.untilTime.getTime();
+    }
+
     toString() {
         return formatTimeRange(this);
     }

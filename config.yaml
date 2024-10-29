@@ -11,7 +11,8 @@ hub:
 partitioning:
   timePartition:
     aggregationPeriodInMin: 10
-    maxCapacity: 20000000
+    maxCapacity: 100000
+    maxActivePartitions: 2
   dataPartition:
     # type: id
     # type: idGroup
@@ -23,9 +24,9 @@ generator:
   logging:
     enabled: true
     level: debug
-  instances: 1
+  instances: 2
   vehicleCount: 1500
-  maxNumberOfEvents: 1000000
+  maxNumberOfEvents: 5000000
   refreshIntervalInSecs: 5
   realtime: false
   sendFlush: true
@@ -58,7 +59,7 @@ collector:
   logging:
     enabled: true
     level: debug
-  instances: 4
+  instances: 5
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb

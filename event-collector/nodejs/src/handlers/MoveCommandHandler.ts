@@ -40,6 +40,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
             config,
             logger,
             messageBus,
+            eventStore,
             aggregateStore,
             collectorIndex,
         );
@@ -75,6 +76,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
             this.logger.warn(`Received event for wrong collector index #${collectorIndex}`);
             return;
         }
+        this.logger.trace(event);
         const geoHash = this.geohashPartitioner.getPartitionKey(event);
         const storedEvent: StoredEvent<PersistedMoveCommand> = { 
             timestamp: new Date(event.timestamp), 
@@ -114,14 +116,22 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         private config: Config,
         protected logger: Logger,
         private messageBus: MessageBus,
+        private eventStore: EventStore<PersistedMoveCommand>,
         private aggregateStore: AggregateStore<PersistedMoveCommand>,
         private collectorIndex: number,
     ) {
-        super(logger, config.partitioning.timePartition.maxCapacity);
+        super(logger, config.partitioning.timePartition.maxCapacity, config.partitioning.timePartition.maxActivePartitions);
     }
     
     protected getPartitionKey(obj: StoredEvent<PersistedMoveCommand>): TimeRange {
         return calcTimeWindow(obj.timestamp, this.config.partitioning.timePartition.aggregationPeriodInMin);
+    }
+    
+    protected getMaxValidPartitionKey(): TimeRange {
+        const maxFuturePartitions = Math.max(1, Math.round(this.maxActivePartitions * 0.3)); // 30% of the active partitions
+        const aggregationPeriodInMS = this.config.partitioning.timePartition.aggregationPeriodInMin * 60 * 1000;
+        const nextTimeRangeFromNow = Date.now() + maxFuturePartitions * aggregationPeriodInMS;
+        return calcTimeWindow(new Date(nextTimeRangeFromNow), this.config.partitioning.timePartition.aggregationPeriodInMin);
     }
 
     protected async persistObjects(objects: StoredEvent<PersistedMoveCommand>[], partitionKey: TimeRange, isPartial: boolean, partialFlushSequence: number): Promise<void> {
@@ -158,6 +168,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             processStats: getProcessStats(),
         }
         this.messageBus.publish('stats', statsEvent);
+        await this.eventStore.delete(partitionKey, this.collectorIndex);
     }
 
 }

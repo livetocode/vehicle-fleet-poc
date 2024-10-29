@@ -1,3 +1,4 @@
+import { TimeRange } from "core-lib";
 import { EventStore, StoredEvent } from "./EventStore.js";
 
 export class NoOpEventStore<T> implements EventStore<T> {
@@ -12,6 +13,6 @@ export class NoOpEventStore<T> implements EventStore<T> {
     async *fetch(collectorIndex?: number): AsyncGenerator<StoredEvent<T>[], any, unknown> {
     }
 
-    async delete(untilTimestamp: Date, collectorIndex?: number): Promise<void> {
+    async delete(range: TimeRange, collectorIndex?: number): Promise<void> {
     }
 }

@@ -1,3 +1,4 @@
+import { TimeRange } from "core-lib";
 import { EventStore, StoredEvent } from "./EventStore.js";
 
 export class InMemoryEventStore<T> implements EventStore<T> {
@@ -17,12 +18,12 @@ export class InMemoryEventStore<T> implements EventStore<T> {
         yield result;
     }
 
-    async delete(untilTimestamp: Date, collectorIndex?: number): Promise<void> {
-        this._events = this._events.filter(ev => !this.isMatchingRecord(ev, untilTimestamp, collectorIndex))
+    async delete(range: TimeRange, collectorIndex?: number): Promise<void> {
+        this._events = this._events.filter(ev => !this.isMatchingRecord(ev, range, collectorIndex));
     }
 
-    private isMatchingRecord(event: StoredEvent<T>, untilTimestamp?: Date, collectorIndex?: number) {
-        const isTimestampInRange = untilTimestamp === undefined || event.timestamp.getTime() <  untilTimestamp.getTime();
+    private isMatchingRecord(event: StoredEvent<T>, range?: TimeRange, collectorIndex?: number) {
+        const isTimestampInRange = range === undefined || range.includes(event.timestamp);
         const isMatchingCollector = collectorIndex === undefined || event.collectorIndex === collectorIndex;
         return isTimestampInRange && isMatchingCollector;
     }

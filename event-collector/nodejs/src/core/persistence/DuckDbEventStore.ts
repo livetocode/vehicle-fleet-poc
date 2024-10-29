@@ -1,5 +1,6 @@
 import { Database, Statement } from "duckdb-async";
 import { EventStore, StoredEvent } from "./EventStore.js";
+import { TimeRange } from "core-lib";
 
 export class DuckDbEventStore<T> implements EventStore<T> {
     private _db?: Database;
@@ -18,7 +19,7 @@ export class DuckDbEventStore<T> implements EventStore<T> {
         )`);
         await db.run('CREATE INDEX events_idx ON events (timestamp);');
         this._insertStatement = await db.prepare(`INSERT INTO events (timestamp, partitionKey, collectorIndex, event) VALUES (?, ?, ?, ?)`);
-        this._deleteStatement = await db.prepare(`DELETE FROM events WHERE timestamp < ?::TIMESTAMP and collectorIndex = ?::INTEGER`);
+        this._deleteStatement = await db.prepare(`DELETE FROM events WHERE timestamp >= ?::TIMESTAMP AND timestamp < ?::TIMESTAMP and collectorIndex = ?::INTEGER`);
         this._selectStatement = await db.prepare(`
             SELECT timestamp, partitionKey, collectorIndex, event 
             FROM events 
@@ -56,8 +57,8 @@ export class DuckDbEventStore<T> implements EventStore<T> {
         }
     }
 
-    async delete(untilTimestamp: Date, collectorIndex?: number): Promise<void> {
-        await this._deleteStatement?.run(untilTimestamp, collectorIndex ?? 0);
+    async delete(range: TimeRange, collectorIndex?: number): Promise<void> {
+        await this._deleteStatement?.run(range.fromTime, range.untilTime, collectorIndex ?? 0);
         await this._deleteStatement?.finalize();
     }
 }

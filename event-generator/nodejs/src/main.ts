@@ -1,4 +1,4 @@
-import { Engine } from "./engine.js";
+import { Engine, VehiclePredicate } from "./engine.js";
 import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber, LoggingConfig, Logger, NoopLogger, GeneratorConfig } from 'core-lib';
 import { createMessageBus } from 'messaging-lib';
 import fs from 'fs';
@@ -74,6 +74,11 @@ async function main() {
     
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
     const startDate = getStartDate(config.generator);
+    let vehiclePredicate: VehiclePredicate | undefined;
+    if (config.generator.instances > 1) {
+        vehiclePredicate = (idx, id) => idx % config.generator.instances === generatorIndex;
+    }
+
     const engine = new Engine({
         vehicleCount,
         vehicleTypes: config.generator.vehicleTypes,
@@ -98,6 +103,7 @@ async function main() {
         refreshIntervalInSecs,
         startDate,
         enableOscillation: true,
+        vehiclePredicate,
     });
 
     const anchor: GpsCoordinates = config.generator.map.topLeftOrigin;
@@ -117,7 +123,6 @@ async function main() {
     const watch = new Stopwatch();
     watch.start();
     let eventCount = 0;
-    let publishedEvents = 0;
     let done = false;
     while (!done) {
         let accumulatedWaitInMS = 0;
@@ -131,7 +136,7 @@ async function main() {
                 type: 'move',
                 vehicleId: cmd.vehicle.id,
                 vehicleType: cmd.vehicle.type,
-                zoneId: cmd.zone.id,
+                zoneId: cmd.newState.zone.id,
                 direction: cmd.newState.direction,
                 speed: cmd.newState.speed,
                 gps: gpsPos,
@@ -139,13 +144,10 @@ async function main() {
             }
             const dataPartitionKey = dataPartitionStrategy.getPartitionKey(msg);
             const collectorIndex = computeHashNumber(dataPartitionKey) % config.collector.instances;
-            if (config.generator.instances === 1 || collectorIndex === generatorIndex) {
-                messageBus.publish(`commands.move.${collectorIndex}`, msg);
-                publishedEvents += 1;
-            }
+            messageBus.publish(`commands.move.${collectorIndex}`, msg);
             eventCount++;
             idx++;
-            if (publishedEvents >= maxNumberOfEvents) {
+            if (eventCount >= maxNumberOfEvents) {
                 done = true;
                 break;
             }
@@ -159,7 +161,6 @@ async function main() {
         if (realtime) {
             const delta = refreshIntervalInMS - accumulatedWaitInMS;
             if (delta > 0) {
-                console.log('delta', delta)
                 await sleep(delta);
             }
         } else {
@@ -167,17 +168,17 @@ async function main() {
         }
     }
     watch.stop();
-    logger.info(`Done generating ${publishedEvents} out of ${eventCount} events in ${watch.elapsedTimeAsString()}`);
+    logger.info(`Done generating ${eventCount} out of ${config.generator.maxNumberOfEvents} events in ${watch.elapsedTimeAsString()}`);
     const flushCmd: FlushCommand = {
         type: 'flush',
         exitProcess: terminateCollector,
     }
-    if (config.generator.instances === 1) {
+    if (generatorIndex === 0) {
+        await sleep(1000); // wait before flushing, in order to let the other generators complete their generation
         for (let i = 0; i < config.collector.instances; i++) {
+            logger.info(`Flushing collector #${i}`);
             messageBus.publish(`commands.flush.${i}`, flushCmd);
         }    
-    } else {
-        messageBus.publish(`commands.flush.${generatorIndex}`, flushCmd);
     }
     await messageBus.stop();
 }

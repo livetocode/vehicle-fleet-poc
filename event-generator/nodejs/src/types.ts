@@ -8,6 +8,7 @@ export interface VehicleState {
     direction: Direction;
     offset: Point;
     localBounds: Rect;
+    zone: Zone;
 }
 
 export class Vehicle {
@@ -84,36 +85,40 @@ export class Vehicle {
 }
 
 export class Zone {
-    private vehicles: Vehicle[] = [];
     constructor(public readonly id: string, public readonly bounds: Rect) {}
-    
-    add(vehicle: Vehicle) {
-        this.vehicles.push(vehicle);
-    }
-
-    *enumerateVehicles() {
-        for (const v of this.vehicles) {
-            yield v;
-        }
-    }
 }
 
 export class Region {
-    private zones: Zone[] = [];
+    private _vehicles: Vehicle[] = [];
+    private _zones: Zone[] = [];
 
     constructor(public readonly bounds: Rect) { }
 
-    add(zone: Zone) {
+    get zones() {
+        return this._zones;
+    }
+
+    addZone(zone: Zone) {
         if (!this.bounds.containsBounds(zone.bounds)) {
             console.log(this.bounds, zone.bounds);
             throw new Error(`one bounds must be completely included in the region's bounds`);
         }
-        this.zones.push(zone);
+        this._zones.push(zone);
+    }
+
+    addVehicle(vehicle: Vehicle) {
+        this._vehicles.push(vehicle);
     }
 
     *enumerateZones() {
-        for (const z of this.zones) {
+        for (const z of this._zones) {
             yield z;
+        }
+    }
+
+    *enumerateVehicles() {
+        for (const v of this._vehicles) {
+            yield v;
         }
     }
 }

@@ -10,9 +10,15 @@ const headers = [
   { title: 'Key', align: 'start', key: 'partitionKey' },
   { title: 'Collector', align: 'end', key: 'collectorIndex' },
   { title: 'Events', align: 'end', key: 'eventCount'},
-  { title: 'Data partitions', align: 'end', key: 'partitions', sort: (a, b) => a.length - b.length },
+  { title: 'Data partitions', align: 'end', key: 'partitionCount' },
+  { title: 'File Size', align: 'end', key: 'size' },
   { title: 'Process stats', align: 'end', key: 'processStats', sortable: false },
   { title: 'Elapsed time', align: 'end', key: 'elapsedTimeInMS' },
+];
+const sortBy = [
+  { key: 'partitionKey', order: 'asc' },
+  { key: 'collectorIndex', order: 'asc' },
+  { key: 'eventCount', order: 'desc' },
 ];
 
 const partitionsHeaders = [
@@ -32,7 +38,7 @@ function getPartitions() {
   const partitions = props.partitions.map((x, idx) => ({
   ...x,
   partitionCount: x.partitions.length,
-  elapsedTime: formatNumber(x.elapsedTimeInMS, 'ms').text,
+  size: x.partitions.reduce((acc: number, curr: any) => acc + curr.size, 0),
 }));
   return partitions;
 }
@@ -67,18 +73,23 @@ function getPartitions() {
             <v-card-text class="pt-0">
               <v-data-table-virtual
                 :headers="headers"
-                :items="props.partitions"
+                :items="getPartitions()"
+                :sort-by="sortBy"
                 height="600"
                 item-value="id"
                 fixed-header
+                multi-sort
                 show-expand
                 density="compact"
               >
                 <template v-slot:item.eventCount="{ value }">
                   {{ formatNumber(value).text }}
                 </template>              
-                <template v-slot:item.partitions="{ value }">
-                  {{ value.length }}
+                <template v-slot:item.partitionCount="{ value }">
+                  {{ value }}
+                </template>              
+                <template v-slot:item.size="{ value }">
+                  {{ formatNumber(value, 'Bytes').text }}
                 </template>              
                 <template v-slot:item.processStats="{ value }">
                   {{ formatNumber(value.memory.heapUsed, 'Bytes').text }} / {{ formatNumber(value.loadAverage[0], '%').text }}

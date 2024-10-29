@@ -71,6 +71,7 @@ export type DataPartitionStrategyConfig =
 export type TimePartitioningConfig = {
     aggregationPeriodInMin: number; 
     maxCapacity: number;
+    maxActivePartitions: number;
 }
 
 export type PartitioningConfig = {
