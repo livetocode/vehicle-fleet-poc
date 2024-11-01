@@ -54,6 +54,7 @@ export interface AggregatePeriodStats {
     partitions: DataPartitionStats[];
     formats: string[];
     elapsedTimeInMS: number;
+    totalElapsedTimeInMS: number;
     processStats: ProcessStats;
 }
 

@@ -12,10 +12,14 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
     private totalAccumulated = 0;
     private totalPartitions = 0;
     private totalPartialPartitions = 0;
+    protected firstEventReceivedAt?: Date;
 
     constructor(protected logger: Logger, protected maxCapacity: number, protected maxActivePartitions: number) {}
 
     async write(obj: TObject): Promise<void> {
+        if (!this.firstEventReceivedAt) {
+            this.firstEventReceivedAt = new Date();
+        }
         const partitionKey = this.getPartitionKey(obj);
         let partition = this.findPartition(partitionKey);
         if (!partition) {
@@ -62,6 +66,7 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
         this.totalAccumulated = 0;
         this.totalPartitions = 0;
         this.totalPartialPartitions = 0;
+        this.firstEventReceivedAt = undefined;
     }
 
     private async flushPartition(partition: Partition<TObject, TPartitionKey>) {

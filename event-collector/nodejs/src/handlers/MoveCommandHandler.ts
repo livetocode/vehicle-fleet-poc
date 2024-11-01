@@ -153,6 +153,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         }
         watch.stop();
         this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
+        const totalElapsedTimeInMS = this.firstEventReceivedAt ? new Date().getTime() - this.firstEventReceivedAt.getTime() : 0;
         const statsEvent: AggregatePeriodStats = {
             type: 'aggregate-period-stats',
             collectorCount: this.config.collector.instances,
@@ -165,6 +166,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             partitions: partitionStats,
             formats: [...formats],
             elapsedTimeInMS: watch.elapsedTimeInMS(),
+            totalElapsedTimeInMS,
             processStats: getProcessStats(),
         }
         this.messageBus.publish('stats', statsEvent);

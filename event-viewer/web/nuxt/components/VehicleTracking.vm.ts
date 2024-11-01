@@ -71,6 +71,7 @@ export class VehicleTrackingViewModel {
     private totalTimePartitionCount = 0;
     private totalDataPartitionCount = 0;
     private totalSize = 0;
+    private totalElapsedTimeInMS = 0;
     private _statsHandler?: EventHandler;
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
@@ -111,6 +112,10 @@ export class VehicleTrackingViewModel {
                 value: this.totalEventCount,
             },
             {
+                unitPlural: 'Events / sec',
+                value: this.totalElapsedTimeInMS > 0 ? this.totalEventCount / (this.totalElapsedTimeInMS/1000) : 0,
+            },
+            {
                 unitPlural: 'Time partitions',
                 value: this.totalTimePartitionCount,
             },
@@ -122,6 +127,11 @@ export class VehicleTrackingViewModel {
                 unitPlural: 'Storage size',
                 value: this.totalSize,
                 unitType: 'B'
+            },
+            {
+                unitPlural: 'Elapsed time',
+                value: this.totalElapsedTimeInMS,
+                unitType: 'ms',
             },
             this._loadAverageStat.toStatValue(),
             this._memoryStat.toStatValue(),
@@ -136,6 +146,7 @@ export class VehicleTrackingViewModel {
             this.totalTimePartitionCount = 0;
             this.totalDataPartitionCount = 0;
             this.totalSize = 0;
+            this.totalElapsedTimeInMS = 0;
             this.events.value = [];
             this._timePartitions.clear();
             this._memoryStat.clear();
@@ -157,6 +168,7 @@ export class VehicleTrackingViewModel {
         this.totalTimePartitionCount = this._timePartitions.size;
         this.totalDataPartitionCount += ev.partitions.length;
         this.totalSize += ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
+        this.totalElapsedTimeInMS = Math.max(this.totalElapsedTimeInMS, ev.totalElapsedTimeInMS);
         this._memoryStat.add(ev.processStats.memory.heapUsed); 
         this._loadAverageStat.add(roundDecimals(ev.processStats.loadAverage[0], 1));
         this.statValues.value = this.createStats();
