@@ -71,6 +71,7 @@ export interface VehicleQuery {
     vehicleTypes: string[],
     limit?: number;
     timeout?: number;
+    ttl?: string;
 }
 
 export interface VehicleQueryResult {

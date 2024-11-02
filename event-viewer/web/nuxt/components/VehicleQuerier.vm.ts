@@ -125,6 +125,7 @@ export class VehicleQuerierViewModel {
             vehicleTypes: data.vehicleTypes,
             limit: data.limit ?? 1000000,
             timeout: (data.timeout ?? 30) * 1000,
+            ttl: new Date(Date.now() + 5 * 1000).toISOString(), // Message will expire in 5 seconds
         });
     }
 

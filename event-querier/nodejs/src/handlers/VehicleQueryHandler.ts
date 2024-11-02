@@ -26,6 +26,10 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
 
     protected async processTypedEvent(event: VehicleQuery): Promise<void> {
         this.logger.debug('Received query', event);
+        if (event.ttl && event.ttl < new Date().toISOString()) {
+            this.logger.warn('Ignoring request because its TTL has been exceeded');
+            return;
+        }
         this.resetStats();
         const timeout = event.timeout ?? this.config.querier.defaultTimeoutInMS;
         const fromDate = new Date(event.fromDate);
