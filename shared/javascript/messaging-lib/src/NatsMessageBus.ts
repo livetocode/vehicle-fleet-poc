@@ -8,8 +8,13 @@ export class NatsMessageBus implements MessageBus {
     private connection?: NatsConnection;
     private codec = JSONCodec();
     private handlers = new Map<string, EventHandler[]>();
+    private uid = crypto.randomUUID();
 
     constructor(private hub: NatsHubConfig, private logger: Logger) {
+    }
+
+    get privateInboxName(): string {
+        return `inbox.${this.uid}`;
     }
 
     async start(): Promise<void> {

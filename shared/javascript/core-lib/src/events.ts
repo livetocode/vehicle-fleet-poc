@@ -64,6 +64,7 @@ export interface ResetAggregatePeriodStats {
 
 export interface VehicleQuery {
     type: 'vehicle-query';
+    replyTo: string;
     id: string;
     fromDate: string;
     toDate: string;

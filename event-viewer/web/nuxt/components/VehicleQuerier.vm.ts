@@ -118,6 +118,7 @@ export class VehicleQuerierViewModel {
         }
         this.query({
             type: 'vehicle-query',
+            replyTo: this._messageBus.privateInboxName,
             id: crypto.randomUUID(),
             fromDate: period.from,
             toDate: period.to,
@@ -198,6 +199,7 @@ export class VehicleQuerierViewModel {
         this._currentQuery = q;
         this._lastUpdateTimestamp = new Date();
         this._messageBus.publish('query.vehicles', q);
+        this._messageBus.publish(this._messageBus.privateInboxName, q); // Send it to our inbox to let the viewer display the polygon shape and clear the data
     }
 
     private onProcessQueryResult(ev: VehicleQueryResult): void {

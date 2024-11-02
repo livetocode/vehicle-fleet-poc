@@ -14,8 +14,7 @@ onMounted(() => {
   messageBus.start().then(() => {
     messageBus.watch('commands.move.*').catch(console.error);
     messageBus.watch('stats').catch(console.error);
-    messageBus.watch('query.vehicles').catch(console.error);
-    messageBus.watch('query.vehicles.results').catch(console.error);
+    messageBus.watch(messageBus.privateInboxName).catch(console.error);
   }).catch(console.error);
   logger.debug('App is mounted');
 });

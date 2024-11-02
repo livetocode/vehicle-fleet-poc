@@ -43,12 +43,12 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                 |                            |                |                 | on the time period and the geohashes of  |
 |                         |                 |                            |                |                 | the polygon filter.                      |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| query.vehicles.results  |                 | vehicle-query-result       | querier        | viewer          | While parsing the chunks, the querier    |
+| inbox.<UID>             |                 | vehicle-query-result       | querier        | viewer          | While parsing the chunks, the querier    |
 |                         |                 |                            |                |                 | will send all the move commands that     |
 |                         |                 |                            |                |                 | match the criteria. The viewer will then |
 |                         |                 |                            |                |                 | be able to replay them.                  |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| query.vehicles.results  |                 | vehicle-query-result-stats | querier        | viewer          | Once the query is complete, the querier  |
+| inbox.<UID>             |                 | vehicle-query-result-stats | querier        | viewer          | Once the query is complete, the querier  |
 |                         |                 |                            |                |                 | will send some stats to the viewer, to   |
 |                         |                 |                            |                |                 | measure the performance and processing   |
 |                         |                 |                            |                |                 | that was required.                       |

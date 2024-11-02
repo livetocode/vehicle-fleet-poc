@@ -48,7 +48,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         for (const filename of this.enumerateFiles(fromDate, toDate, geohashes)) {
             this.processedFilesCount += 1;
             for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon, event.vehicleTypes)) {
-                this.publishResult(res);
+                this.messageBus.publish(event.replyTo, res);
                 selectedRecordCount += 1;
                 distinctVehicles.add(res.vehicleId);
                 if (event.limit && selectedRecordCount >= event.limit) {
@@ -78,16 +78,12 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             limitReached,
         };
         this.logger.debug('Stats', stats);
-        this.messageBus.publish('query.vehicles.results', stats);
+        this.messageBus.publish(event.replyTo, stats);
     }
 
     private resetStats() {
         this.processedFilesCount = 0;
         this.processedRecordCount = 0;
-    }
-
-    private publishResult(result: VehicleQueryResult) {
-        this.messageBus.publish('query.vehicles.results', result);
     }
 
     private createGeohashes(polygon: Feature<Polygon>) {
