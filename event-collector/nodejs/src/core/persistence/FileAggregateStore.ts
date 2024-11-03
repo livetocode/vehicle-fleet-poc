@@ -32,9 +32,11 @@ export class FileAggregateStore<T> implements AggregateStore<T> {
                     this.folder, 
                     ext,
                     ...fromParts,
-                    `${partitionKey}.${ext}`);    
+                    `${fromParts.join('-')}-${partitionKey}.${ext}`);    
             }
-            await fs.mkdir(path.dirname(filename), { recursive: true });
+            if (this.flatLayout === false) {
+                await fs.mkdir(path.dirname(filename), { recursive: true });
+            }
             try {
                 await fs.access(filename);
                 this.logger.warn(`file ${filename} already exists!`);

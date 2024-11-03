@@ -102,15 +102,21 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         if (this.config.collector.output.type !== 'file') {
             throw new Error('Expected output type to be "file"');
         }
-        const dataFolder = this.config.collector.output.folder;
-        const filenames = fs.readdirSync(dataFolder);
-        filenames.sort();
-        for (const filename of filenames) {
-            if (filename >= fromPrefix && filename < toPrefix) {
-                const otherSegments = filename.substring(fromPrefix.length + 1).split('-');
+        let dataFolder = this.config.collector.output.folder;
+        if (this.config.collector.output.flatLayout === false) {
+            dataFolder = path.join(dataFolder, this.config.querier.dataFormat);
+            const commonRoots = findCommonRootParts(fromDate, toDate);
+            for (const commonRoot of commonRoots) {
+                dataFolder = path.join(dataFolder, commonRoot);
+            }
+        }
+        const fileExt = `.${this.config.querier.dataFormat}`;
+        for (const { file, directory } of readAllFiles(dataFolder)) {
+            if (file.name.endsWith(fileExt) && file.name >= fromPrefix && file.name < toPrefix) {
+                const otherSegments = file.name.substring(fromPrefix.length + 1).split('-');
                 const fileGeohash = otherSegments[0];
                 if (geohashes.has(fileGeohash)) {
-                    yield path.join(dataFolder, filename);
+                    yield path.join(directory, file.name);
                 }
             }
         }
@@ -118,7 +124,23 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
 
     private *searchFile(queryId: string, filename: string, fromDate: Date, toDate: Date, polygon: Feature<Polygon>, vehicleTypes: string[]) {
         this.logger.debug('search file ', filename);
-        const df = pl.readParquet(filename);
+        let df: pl.DataFrame;
+        switch(this.config.querier.dataFormat) {
+            case 'parquet':
+                df = pl.readParquet(filename);
+                break;
+            case 'csv':
+                df = pl.readCSV(filename);
+                break;
+            case 'json':
+                df = pl.readJSON(filename);
+                break;
+            case 'arrow':
+                df = pl.readIPC(filename);
+                break;
+            default:
+                throw new Error(`Unsupported file format: ${this.config.querier.dataFormat}`);
+        }
         const fstats = fs.statSync(filename);
         this.processedBytes += fstats.size;
         const colNames = df.columns;
@@ -167,4 +189,31 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             }
         }
     }
+}
+
+export function* readAllFiles(directory: string): Generator<{ file: fs.Dirent; directory: string }> {
+    const files = fs.readdirSync(directory, { withFileTypes: true });
+    files.sort((a, b) => a.name.localeCompare(b.name));
+  
+    for (const file of files) {
+      if (file.isDirectory()) {
+        yield* readAllFiles(path.join(directory, file.name));
+      } else {
+        yield { file, directory };
+      }
+    }
+}
+
+export function findCommonRootParts(d1: Date, d2: Date) {
+    const dp1 = dateToUtcParts(d1);
+    const dp2 = dateToUtcParts(d2);
+    const result: string[] = [];
+    for (let i = 0; i < dp1.length; i++) {
+        if (dp1[i] === dp2[i]) {
+            result.push(dp1[i]);
+        } else {
+            break;
+        }
+    }
+    return result;
 }

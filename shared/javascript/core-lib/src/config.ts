@@ -140,6 +140,7 @@ export interface QuerierConfig {
     instances: number;
     defaultTimeoutInMS: number;
     autoStart: boolean;
+    dataFormat: string;
 }
 
 export interface ViewerConfig {

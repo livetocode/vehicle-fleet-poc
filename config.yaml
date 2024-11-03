@@ -67,7 +67,7 @@ collector:
     # type: noop
     type: file
     folder: ../../output/data
-    flatLayout: true
+    flatLayout: false
     formats:
     - parquet
     # - csv
@@ -80,6 +80,7 @@ querier:
   instances: 1
   autoStart: true
   defaultTimeoutInMS: 30000
+  dataFormat: parquet
   
 viewer:
   logging:
