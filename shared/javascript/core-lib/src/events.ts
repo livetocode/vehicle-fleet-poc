@@ -56,6 +56,8 @@ export interface AggregatePeriodStats {
     elapsedTimeInMS: number;
     totalElapsedTimeInMS: number;
     processStats: ProcessStats;
+    totalRejectedMessagesInThePast: number;
+    totalRejectedMessagesInTheFuture: number;
 }
 
 export interface ResetAggregatePeriodStats {

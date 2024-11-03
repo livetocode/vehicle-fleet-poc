@@ -168,6 +168,8 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             elapsedTimeInMS: watch.elapsedTimeInMS(),
             totalElapsedTimeInMS,
             processStats: getProcessStats(),
+            totalRejectedMessagesInTheFuture: this.totalRejectedMessagesInTheFuture,
+            totalRejectedMessagesInThePast: this.totalRejectedMessagesInThePast,
         }
         this.messageBus.publish('stats', statsEvent);
         await this.eventStore.delete(partitionKey, this.collectorIndex);

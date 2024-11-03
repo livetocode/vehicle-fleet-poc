@@ -72,6 +72,8 @@ export class VehicleTrackingViewModel {
     private totalDataPartitionCount = 0;
     private totalSize = 0;
     private totalElapsedTimeInMS = 0;
+    private totalRejectedMessagesInThePast = 0;
+    private totalRejectedMessagesInTheFuture = 0;
     private _statsHandler?: EventHandler;
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
@@ -106,6 +108,22 @@ export class VehicleTrackingViewModel {
 
 
     private createStats(): StatValue[] {
+        const rejectedMessages: StatValue[] = [];
+        if (this.totalRejectedMessagesInTheFuture + this.totalRejectedMessagesInThePast > 0) {
+            rejectedMessages.push({
+                unitPlural: 'Rejected events',
+                values: [
+                    {
+                        title: 'past',
+                        value: this.totalRejectedMessagesInThePast,
+                    },
+                    {
+                        title: 'future',
+                        value: this.totalRejectedMessagesInTheFuture,
+                    },
+                ],
+            });
+        }
         return [
             {
                 unitPlural: 'Events',
@@ -133,6 +151,7 @@ export class VehicleTrackingViewModel {
                 value: this.totalElapsedTimeInMS,
                 unitType: 'ms',
             },
+            ...rejectedMessages,
             this._loadAverageStat.toStatValue(),
             this._memoryStat.toStatValue(),
         ];
@@ -147,6 +166,8 @@ export class VehicleTrackingViewModel {
             this.totalDataPartitionCount = 0;
             this.totalSize = 0;
             this.totalElapsedTimeInMS = 0;
+            this.totalRejectedMessagesInThePast = 0;
+            this.totalRejectedMessagesInTheFuture = 0;
             this.events.value = [];
             this._timePartitions.clear();
             this._memoryStat.clear();
@@ -169,6 +190,8 @@ export class VehicleTrackingViewModel {
         this.totalDataPartitionCount += ev.partitions.length;
         this.totalSize += ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
         this.totalElapsedTimeInMS = Math.max(this.totalElapsedTimeInMS, ev.totalElapsedTimeInMS);
+        this.totalRejectedMessagesInThePast += ev.totalRejectedMessagesInThePast;
+        this.totalRejectedMessagesInTheFuture += ev.totalRejectedMessagesInTheFuture;
         this._memoryStat.add(ev.processStats.memory.heapUsed); 
         this._loadAverageStat.add(roundDecimals(ev.processStats.loadAverage[0], 1));
         this.statValues.value = this.createStats();

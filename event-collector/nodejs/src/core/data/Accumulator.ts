@@ -12,6 +12,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
     private totalAccumulated = 0;
     private totalPartitions = 0;
     private totalPartialPartitions = 0;
+    protected totalRejectedMessagesInThePast = 0;
+    protected totalRejectedMessagesInTheFuture = 0;
     protected firstEventReceivedAt?: Date;
 
     constructor(protected logger: Logger, protected maxCapacity: number, protected maxActivePartitions: number) {}
@@ -26,7 +28,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
             const maxValidPartitionKey = this.getMaxValidPartitionKey();
             if (partitionKey.compareTo(maxValidPartitionKey) >= 0) {
                 // Ignore events that arrive too earlier (we allow now + aggregationPeriodInMin only)
-                this.logger.debug(`Object is in the future: ${partitionKey} >= ${maxValidPartitionKey}`);
+                this.totalRejectedMessagesInTheFuture += 1;
+                this.logger.debug(`Object is in the future: ${partitionKey} should not exceed ${maxValidPartitionKey}`);
                 return;
             }
             while (this.partitions.length >= this.maxActivePartitions) {
@@ -34,7 +37,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
                 if (oldestPartition) {
                     if (partitionKey.compareTo(oldestPartition.partitionKey) < 0) {
                         // Ignore events that arrive too late (we keep 2 active partitions only)
-                        this.logger.debug(`Object is out of order: ${partitionKey} < ${oldestPartition.partitionKey}`);
+                        this.totalRejectedMessagesInThePast += 1;
+                        this.logger.debug(`Object is too late: ${partitionKey} is older than oldest active partition ${oldestPartition.partitionKey}`);
                         return;
                     }
                     await this.flushPartition(oldestPartition);
@@ -66,6 +70,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
         this.totalAccumulated = 0;
         this.totalPartitions = 0;
         this.totalPartialPartitions = 0;
+        this.totalRejectedMessagesInThePast = 0;
+        this.totalRejectedMessagesInTheFuture = 0;
         this.firstEventReceivedAt = undefined;
     }
 
@@ -75,6 +81,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
             this.logger.debug(`Flushing partition '${partitionKeyName}' containing ${partition.objects.length} entries.`);
             await this.persistObjects(partition.objects, partition.partitionKey, false, partition.partialFlushCounter);
             this.totalPartitions += 1;
+            this.totalRejectedMessagesInThePast = 0;
+            this.totalRejectedMessagesInTheFuture = 0;
             this.logger.debug(`Flush complete. ${this.totalAccumulated} entries accumulated in ${this.totalPartitions} partitions.`);
         }
 
@@ -87,6 +95,8 @@ export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
             await this.persistObjects(partition.objects, partition.partitionKey, true, partition.partialFlushCounter);
             this.totalPartitions += 1;
             this.totalPartialPartitions += 1;
+            this.totalRejectedMessagesInThePast = 0;
+            this.totalRejectedMessagesInTheFuture = 0;
             this.logger.debug(`Partial flush complete. ${this.totalPartialPartitions} partial partitions.`);
             partition.partialFlushCounter += 1;
             partition.objects = [];
