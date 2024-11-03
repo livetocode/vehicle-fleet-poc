@@ -141,6 +141,7 @@ export interface QuerierConfig {
     defaultTimeoutInMS: number;
     autoStart: boolean;
     dataFormat: string;
+    parallelSearch: boolean;
 }
 
 export interface ViewerConfig {

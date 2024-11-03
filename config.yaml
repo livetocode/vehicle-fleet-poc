@@ -81,6 +81,7 @@ querier:
   autoStart: true
   defaultTimeoutInMS: 30000
   dataFormat: parquet
+  parallelSearch: true
   
 viewer:
   logging:

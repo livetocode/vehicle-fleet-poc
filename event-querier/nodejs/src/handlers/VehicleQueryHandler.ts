@@ -5,13 +5,16 @@ import fs from 'fs';
 import path from 'path';
 import pl from 'nodejs-polars';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
-import { Feature, Polygon } from "geojson";
+import { Feature, GeoJsonProperties, Polygon } from "geojson";
 import * as turf from '@turf/turf';
 
 export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
     private processedFilesCount = 0;
     private processedBytes = 0;
     private processedRecordCount = 0;
+    private selectedRecordCount = 0;
+    private distinctVehicles = new Set<string>();
+
     constructor(
         private config: Config,
         private logger: Logger,
@@ -21,7 +24,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
     }
 
     get eventTypes(): string[] {
-        return ['vehicle-query']; 
+        return ['vehicle-query', 'vehicle-query-partition']; 
     }
 
     protected async processTypedEvent(event: VehicleQuery): Promise<void> {
@@ -31,36 +34,23 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             return;
         }
         this.resetStats();
-        const timeout = event.timeout ?? this.config.querier.defaultTimeoutInMS;
         const fromDate = new Date(event.fromDate);
         const toDate = new Date(event.toDate);
         if (fromDate.getTime() > toDate.getTime()) {
             throw new Error('fromDate must be less than toDate');
         }
-        const distinctVehicles = new Set<string>();
         const watch = new Stopwatch();
         watch.start();
         const polygon = gpsCoordinatesToPolyon(event.polygon);
         const geohashes = this.createGeohashes(polygon);
         let timeoutExpired = false;
         let limitReached = false;
-        let selectedRecordCount = 0;
         for (const filename of this.enumerateFiles(fromDate, toDate, geohashes)) {
             this.processedFilesCount += 1;
-            for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon, event.vehicleTypes)) {
-                this.messageBus.publish(event.replyTo, res);
-                selectedRecordCount += 1;
-                distinctVehicles.add(res.vehicleId);
-                if (event.limit && selectedRecordCount >= event.limit) {
-                    limitReached = true;
-                    break;
-                }
-            }
-            if (limitReached) {
-                break;
-            }
-            if (watch.elapsedTimeInMS() >= timeout) {
-                timeoutExpired = true;
+            const status = this.processFile(event, fromDate, toDate, polygon, watch, filename);
+            limitReached = status.limitReached;
+            timeoutExpired = status.timeoutExpired;
+            if (limitReached || timeoutExpired) {
                 break;
             }
         }
@@ -72,8 +62,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
             processedFilesCount: this.processedFilesCount,
             processedBytes: this.processedBytes,
             processedRecordCount: this.processedRecordCount,
-            selectedRecordCount,
-            distinctVehicleCount: distinctVehicles.size,
+            selectedRecordCount: this.selectedRecordCount,
+            distinctVehicleCount: this.distinctVehicles.size,
             timeoutExpired,
             limitReached,
         };
@@ -81,9 +71,37 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery> {
         this.messageBus.publish(event.replyTo, stats);
     }
 
+    private processFile(
+        event: VehicleQuery,
+        fromDate: Date,
+        toDate: Date,
+        polygon: Feature<Polygon, GeoJsonProperties>,
+        watch: Stopwatch,
+        filename: string,
+    ) {
+        const timeout = event.timeout ?? this.config.querier.defaultTimeoutInMS;
+        let timeoutExpired = false;
+        let limitReached = false;
+        for (const res of this.searchFile(event.id, filename, fromDate, toDate, polygon, event.vehicleTypes)) {
+            this.messageBus.publish(event.replyTo, res);
+            this.selectedRecordCount += 1;
+            this.distinctVehicles.add(res.vehicleId);
+            if (event.limit && this.selectedRecordCount >= event.limit) {
+                limitReached = true;
+                break;
+            }
+        }
+        if (!limitReached && watch.elapsedTimeInMS() >= timeout) {
+            timeoutExpired = true;
+        }
+        return { limitReached, timeoutExpired };
+    }
+
     private resetStats() {
         this.processedFilesCount = 0;
         this.processedRecordCount = 0;
+        this.selectedRecordCount = 0;
+        this.distinctVehicles.clear();
     }
 
     private createGeohashes(polygon: Feature<Polygon>) {

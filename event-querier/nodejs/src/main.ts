@@ -32,6 +32,9 @@ async function main() {
     messageBus.registerHandlers(vehicleQueryHandler);
 
     await messageBus.watch(`query.vehicles`, 'vehicle-querier');
+    if (config.querier.parallelSearch) {
+        await messageBus.watch(`query.vehicles.partitions`, 'vehicle-querier-partitions');
+    }
 }
 
 main().catch(console.error);
