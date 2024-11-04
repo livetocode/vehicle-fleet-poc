@@ -76,13 +76,14 @@ collector:
 querier:
   logging:
     enabled: true
-    level: debug
-  instances: 1
+    level: info
+  instances: 5
   autoStart: true
   defaultTimeoutInMS: 30000
   dataFormat: parquet
   parallelSearch: true
-  
+  useChunking: false
+
 viewer:
   logging:
     enabled: true

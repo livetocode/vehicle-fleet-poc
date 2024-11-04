@@ -20,6 +20,14 @@ const props = defineProps({
         type: Number,
         default: 30,
     },
+    parallelize: {
+        type: Boolean,
+        default: true,
+    },
+    useChunking: {
+        type: Boolean,
+        default: true,
+    },
 });
 const emit = defineEmits<{
     (e: 'onCancel'): void,
@@ -31,6 +39,8 @@ let fldPolygonId = ref(props.polygons[0] as string);
 let fldVehicleTypes = ref<string[]>([]);
 let fldLimit = ref(props.limit);
 let fldTimeout = ref(props.timeout);
+let fldParallelize = ref(props.parallelize);
+let fldUseChunking = ref(props.useChunking);
 
 function onCancelDialog(isActive: Ref<boolean>) {
     isActive.value = false;
@@ -45,6 +55,8 @@ function onAcceptDialog(isActive: Ref<boolean>) {
         vehicleTypes: fldVehicleTypes.value,
         limit: fldLimit.value,
         timeout: fldTimeout.value,
+        parallelize: fldParallelize.value,
+        useChunking: fldUseChunking.value,
     };
     emit('onAccept', data);
 };
@@ -109,6 +121,20 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                 </v-col>
               </v-row>
 
+              <v-row dense>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
+                    <v-checkbox label="Parallel search" v-model="fldParallelize"></v-checkbox>
+                </v-col>
+                <v-col
+                  cols="12"
+                  sm="6"
+                >
+                    <v-checkbox label="Use chunking" v-model="fldUseChunking"></v-checkbox>
+                </v-col>
+              </v-row>
               <v-row dense>
                 <v-col
                   cols="12"

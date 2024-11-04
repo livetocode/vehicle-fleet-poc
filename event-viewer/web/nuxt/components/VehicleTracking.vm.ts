@@ -1,4 +1,4 @@
-import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Logger } from "core-lib";
+import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Logger, type ResetAggregatePeriodStats } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
@@ -75,6 +75,7 @@ export class VehicleTrackingViewModel {
     private totalRejectedMessagesInThePast = 0;
     private totalRejectedMessagesInTheFuture = 0;
     private _statsHandler?: EventHandler;
+    private _resetStatsHandler?: EventHandler;
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
@@ -86,16 +87,24 @@ export class VehicleTrackingViewModel {
 
     async init(): Promise<void> {
         this._statsHandler = new LambdaEventHandler(
-            ['aggregate-period-stats', 'reset-aggregate-period-stats'], 
+            ['aggregate-period-stats'], 
             async (ev: any) => { this.onProcessStats(ev); },
         );
-        this._messageBus.registerHandlers(this._statsHandler);
+        this._resetStatsHandler = new LambdaEventHandler(
+            ['reset-aggregate-period-stats'], 
+            async (ev: any) => { this.onResetStats(ev); },
+        );
+        this._messageBus.registerHandlers(this._statsHandler, this._resetStatsHandler);
     }
 
     async dispose(): Promise<void> {
         if (this._statsHandler) {
             this._messageBus?.unregisterHandler(this._statsHandler);
             this._statsHandler = undefined;
+        }
+        if (this._resetStatsHandler) {
+            this._messageBus?.unregisterHandler(this._resetStatsHandler);
+            this._resetStatsHandler = undefined;
         }
     }
 
@@ -156,24 +165,25 @@ export class VehicleTrackingViewModel {
             this._memoryStat.toStatValue(),
         ];
     }
+    
+    private onResetStats(ev: ResetAggregatePeriodStats): void {
+        this.logger.debug(ev);
+        this._nextEventStatsId = 1;
+        this.totalEventCount = 0;
+        this.totalTimePartitionCount = 0;
+        this.totalDataPartitionCount = 0;
+        this.totalSize = 0;
+        this.totalElapsedTimeInMS = 0;
+        this.totalRejectedMessagesInThePast = 0;
+        this.totalRejectedMessagesInTheFuture = 0;
+        this.events.value = [];
+        this._timePartitions.clear();
+        this._memoryStat.clear();
+        this._loadAverageStat.clear();
+    }
 
     private onProcessStats(ev: AggregatePeriodStats): void {
         this.logger.debug(ev);
-        if ((ev as any).type === 'reset-aggregate-period-stats') {
-            this._nextEventStatsId = 1;
-            this.totalEventCount = 0;
-            this.totalTimePartitionCount = 0;
-            this.totalDataPartitionCount = 0;
-            this.totalSize = 0;
-            this.totalElapsedTimeInMS = 0;
-            this.totalRejectedMessagesInThePast = 0;
-            this.totalRejectedMessagesInTheFuture = 0;
-            this.events.value = [];
-            this._timePartitions.clear();
-            this._memoryStat.clear();
-            this._loadAverageStat.clear();
-            return;
-        }
         this._timePartitions.add(ev.partitionKey);
         const evWithId = {
             ...ev,

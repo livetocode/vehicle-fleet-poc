@@ -21,7 +21,7 @@ export interface PersistedMoveCommand {
     direction: string;
 }
 
-export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
+export class MoveCommandHandler extends GenericEventHandler<MoveCommand | FlushCommand> {
     private accumulator: MoveCommandAccumulator;
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
@@ -54,22 +54,25 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
         await this.restore();
     }
 
-    process(event: Command): Promise<void> {
+    protected async processTypedEvent(event: MoveCommand | FlushCommand): Promise<void> {
         if (event.type === 'flush') {
-            return this.processFlushEvent(event);
+            return this.processFlushCommand(event);
         }
-        return super.process(event);
+        if (event.type === 'move') {
+            return this.processMoveCommand(event);
+        }
+        throw new Error(`Unexpected event '${(event as any).type}'`);
     }
-    
-    protected async processFlushEvent(event: FlushCommand): Promise<void> {
+
+    private async processFlushCommand(event: FlushCommand): Promise<void> {
         this.logger.warn('Trigger flush');
         await this.accumulator.flush();
         if (event.exitProcess) {
             await this.messageBus.stop();
         }
     }
-
-    protected async processTypedEvent(event: MoveCommand): Promise<void> {
+    
+    private async processMoveCommand(event: MoveCommand): Promise<void> {
         const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(event);
         const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.instances;
         if (this.collectorIndex !== collectorIndex) {
@@ -98,7 +101,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand> {
         await this.accumulator.write(storedEvent);
     }
 
-    protected async restore(): Promise<void> {
+    private async restore(): Promise<void> {
         this.logger.info('Restoring move command accumulator from storage...');
         let count = 0;
         for await (const batch of this.eventStore.fetch(this.collectorIndex)) {

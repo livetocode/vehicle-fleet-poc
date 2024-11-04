@@ -75,6 +75,8 @@ export interface VehicleQuery {
     limit?: number;
     timeout?: number;
     ttl?: string;
+    parallelize?: boolean;
+    useChunking?: boolean;
 }
 
 export interface VehicleQueryResult {
@@ -100,4 +102,19 @@ export interface VehicleQueryResultStats {
     elapsedTimeInMS: number;
     timeoutExpired: boolean;
     limitReached: boolean;
+}
+
+export interface VehicleQueryPartition {
+    type: 'vehicle-query-partition';
+    partitionQueryId: string;
+    replyTo: string;
+    query: VehicleQuery;
+    filename: string;
+}
+
+export interface VehicleQueryPartitionResultStats {
+    type: 'vehicle-query-partition-result-stats';
+    partitionQueryId: string;
+    stats: VehicleQueryResultStats;
+    distinctVehicleIds: string[];
 }

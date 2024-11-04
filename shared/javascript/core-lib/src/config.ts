@@ -142,6 +142,7 @@ export interface QuerierConfig {
     autoStart: boolean;
     dataFormat: string;
     parallelSearch: boolean;
+    useChunking: boolean;
 }
 
 export interface ViewerConfig {

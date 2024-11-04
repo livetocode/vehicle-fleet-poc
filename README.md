@@ -20,7 +20,7 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 
 ## Messages
 
-````
+```
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | Topic                   | Consumer Group  | Event Type                 | Produced by    | Consumed by     | Usage                                    |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
@@ -43,6 +43,11 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                 |                            |                |                 | on the time period and the geohashes of  |
 |                         |                 |                            |                |                 | the polygon filter.                      |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+|query.vehicles.partitions| vehicle-querier-| vehicle-query-partition    | querier        | querier         | The querier is delegating the file       |
+|                         | partitions      |                            |                |                 | processing to the cluster of queriers.   |
+|                         |                 |                            |                |                 | The response will be sent using the      |
+|                         |                 |                            |                |                 | vehicle-query-partition-result-stats evt |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | inbox.<UID>             |                 | vehicle-query-result       | querier        | viewer          | While parsing the chunks, the querier    |
 |                         |                 |                            |                |                 | will send all the move commands that     |
 |                         |                 |                            |                |                 | match the criteria. The viewer will then |
@@ -53,6 +58,10 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                 |                            |                |                 | measure the performance and processing   |
 |                         |                 |                            |                |                 | that was required.                       |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.<UID>             |                 | vehicle-query-result-stats | querier        | querier         | This is a partial result sent back to    |
+|                         |                 |                            |                |                 | the querier that delegated the           |
+|                         |                 |                            |                |                 | processing.                              |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 ```
 
 Note that when a consumer uses a "consumer group" name, it means that the message will be handled only once by a member of the group.
@@ -60,15 +69,55 @@ This is a regular work queue with competing consumers, which is different from t
 
 ### Collecting move commands
 
+```
 generator -(many)-> type:move/topic:commands.move.*   --> collector: aggregate -(many)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
 generator -(once)-> type:flush/topic:commands.flush.* --> collector: flush     -(once)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
+```
 
 ### Querying move commands
 
+#### Serialized processing
+
+```
 viewer -(once)-> type:vehicle-query/topic:query.vehicles --> queryer: search (1) -(many)-> type:vehicle-query-result/topic:query.vehicles.results --> viewer
                                                                              (2) -(once)-> type:vehicle-query-result-stats/topic:query.vehicles.results --> viewer
+```
+
+#### Parallel processing
+
+```
+viewer -(once)-> type:vehicle-query/topic:query.vehicles --> queryer: search (1) -(many)-> type:vehicle-query-partition/topic:query.vehicles.partitions --> querier
+                                                                             (2) -(many)-> type:vehicle-query-partition-result-stats/inbox --> querier
+                                                                             (3) -(many)-> type:vehicle-query-result/topic:query.vehicles.results --> viewer
+                                                                             (4) -(once)-> type:vehicle-query-result-stats/topic:query.vehicles.results --> viewer
+```
 
 ## Local dev
+
+### Features
+
+- web UI for viewing realtime data or query results
+- distributed services using a message broker
+- durable storage of events
+- distributed event generation with multiple instances for higher throughput
+- multiple data formats (parquet, csv, json, arrow)
+- multiple storage providers (filesystem, S3...)
+- flexible aggregation of events
+
+    - max window capacity
+    - concurrent time windows
+    - multiple data partitioning strategies (geohash, vehicle id...)
+
+- flexible search
+
+    - serialized or parallelized
+    - record limit
+    - timeout
+    - ttl
+    - time filters (time range)
+    - geoloc filters (polygons)
+    - data filters (vehicle type)
+
 
 ### Diagram
 
@@ -177,19 +226,17 @@ create a script that would do the cost projections for the data that will be agg
 
 #### Generator
 
-- Support partitioning (by zone) to have multiple separate processes that can generate data at the same time and increase throughput
 
 #### Collector
 
 - use long term storage to persist events until they can be aggregated (instead of just using memory)
+- implement consistent hashing for paritioning geohashes in the instances
 - rewrite in Rust for speedup
 
 #### Viewer
 
 ##### Web
 
-- display the stats
-- display the geohash zones at various levels
 - use a mapping widget to display the vehicles?
 - try other Web frameworks?
 

@@ -98,7 +98,15 @@ export class VehicleQuerierViewModel {
         };
     }
 
-    startQuery(data: { periodId: string, polygonId: string, vehicleTypes: string[], limit: number, timeout: number }) {
+    startQuery(data: { 
+        periodId: string,
+        polygonId: string,
+        vehicleTypes: string[],
+        limit: number,
+        timeout: number,
+        parallelize: boolean,
+        useChunking: boolean,
+    }) {
         const polygonId = data.polygonId;
         if (!polygonId) {
             return;
@@ -127,6 +135,8 @@ export class VehicleQuerierViewModel {
             limit: data.limit ?? 1000000,
             timeout: (data.timeout ?? 30) * 1000,
             ttl: new Date(Date.now() + 5 * 1000).toISOString(), // Message will expire in 5 seconds
+            parallelize: data.parallelize,
+            useChunking: data.useChunking,
         });
     }
 

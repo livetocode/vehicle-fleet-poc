@@ -31,10 +31,11 @@ async function main() {
     );
     messageBus.registerHandlers(vehicleQueryHandler);
 
-    await messageBus.watch(`query.vehicles`, 'vehicle-querier');
     if (config.querier.parallelSearch) {
-        await messageBus.watch(`query.vehicles.partitions`, 'vehicle-querier-partitions');
+        messageBus.watch(`query.vehicles.partitions`, 'vehicle-querier-partitions').catch(console.error);
+        messageBus.watch(messageBus.privateInboxName).catch(console.error);
     }
+    await messageBus.watch(`query.vehicles`, 'vehicle-querier');
 }
 
 main().catch(console.error);
