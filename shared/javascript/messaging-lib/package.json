@@ -17,7 +17,10 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+    "core-lib": "file:../../../shared/javascript/core-lib",
+    "express": "^4.21.1",
+    "express-prom-bundle": "^8.0.0",
     "nats": "^2.26.0",
-    "core-lib": "file:../../../shared/javascript/core-lib"
+    "prom-client": "^15.1.3"
   }
 }

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import YAML from 'yaml';
 import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig } from 'core-lib';
-import { createMessageBus } from 'messaging-lib';
+import { createMessageBus, createWebServer } from 'messaging-lib';
 import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 
 function loadConfig(filename: string): Config {
@@ -20,8 +20,8 @@ async function main() {
     const config = loadConfig('../../config.yaml');    
     const querierIndex = parseInt(process.env.QUERIER_INDEX || '0');
     const logger =  createLogger(config.querier.logging, `Querier #${querierIndex}`);
-    
-    const messageBus = createMessageBus(config.hub, logger);
+
+    const messageBus = createMessageBus(config.hub, 'querier', logger);
     await messageBus.start();
     
     const vehicleQueryHandler = new VehicleQueryHandler(
@@ -31,11 +31,14 @@ async function main() {
     );
     messageBus.registerHandlers(vehicleQueryHandler);
 
+    const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
+    const server = createWebServer(httpPortOverride ?? config.querier.httpPort, logger, 'querier');
     if (config.querier.parallelSearch) {
         messageBus.watch(`query.vehicles.partitions`, 'vehicle-querier-partitions').catch(console.error);
         messageBus.watch(messageBus.privateInboxName).catch(console.error);
-    }
+    }    
     await messageBus.watch(`query.vehicles`, 'vehicle-querier');
+    server.close();
 }
 
 main().catch(console.error);

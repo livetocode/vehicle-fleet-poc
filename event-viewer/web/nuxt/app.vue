@@ -6,7 +6,7 @@
   if (appConfig.hub.type !== 'nats') {
     throw new Error('Expected a NATS hub');
   }
-  const messageBus = new NatsMessageBus(appConfig.hub, logger);
+  const messageBus = new NatsMessageBus(appConfig.hub, 'viewer', logger);
   provide('messageBus', messageBus);
 
 onMounted(() => {

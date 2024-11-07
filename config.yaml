@@ -25,6 +25,7 @@ generator:
     enabled: true
     level: debug
   instances: 2
+  httpPort: 7710
   vehicleCount: 1500
   maxNumberOfEvents: 5000000
   refreshIntervalInSecs: 5
@@ -60,6 +61,7 @@ collector:
     enabled: true
     level: debug
   instances: 5
+  httpPort: 7720
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb
@@ -78,6 +80,7 @@ querier:
     enabled: true
     level: info
   instances: 5
+  httpPort: 7730
   autoStart: true
   defaultTimeoutInMS: 30000
   dataFormat: parquet

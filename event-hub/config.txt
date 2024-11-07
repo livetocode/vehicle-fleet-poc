@@ -1,3 +1,6 @@
+# Enable monitoring
+http_port: 8222
+
 websocket {
     # Specify a host and port to listen for websocket connections
     #
@@ -8,7 +11,7 @@ websocket {
     #
     # host: "hostname"
     port: 4243
-
+    
     # This will optionally specify what host:port for websocket
     # connections to be advertised in the cluster.
     #

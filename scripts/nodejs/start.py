@@ -43,11 +43,17 @@ step("Cleanup data")
 delete_folder("output")
 
 processes = []
+next_http_port = 7700;
 
 step("Start collectors")
 COLLECTOR_COUNT = config['collector']['instances']
 for idx in range(COLLECTOR_COUNT):
-    processes.append(start_background_nodejs_app("event-collector/nodejs", env = { 'COLLECTOR_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
+    processes.append(start_background_nodejs_app("event-collector/nodejs", env = { 
+        'COLLECTOR_INDEX': str(idx),
+        'PATH': os.environ['PATH'],
+        'NODE_HTTP_PORT': str(next_http_port),
+    }))
+    next_http_port += 1
 print("Wait for collectors to be ready...")
 time.sleep(2)
 processes = [process for process in processes if process.poll() is None]
@@ -57,7 +63,12 @@ if not processes:
 step("Start generators")
 GENERATOR_COUNT = config['generator']['instances']
 for idx in range(GENERATOR_COUNT):
-    processes.append(start_background_nodejs_app("event-generator/nodejs", env = { 'GENERATOR_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
+    processes.append(start_background_nodejs_app("event-generator/nodejs", env = { 
+        'GENERATOR_INDEX': str(idx), 
+        'PATH': os.environ['PATH'],
+        'NODE_HTTP_PORT': str(next_http_port),
+    }))
+    next_http_port += 1
 
 wait_for_processes_to_complete(processes)
 
@@ -67,7 +78,12 @@ if config['querier']['autoStart']:
     step("Start queriers")
     QUERIER_COUNT = config['querier']['instances']
     for idx in range(QUERIER_COUNT):
-        processes.append(start_background_nodejs_app("event-querier/nodejs", env = { 'QUERIER_INDEX': str(idx), 'PATH': os.environ['PATH'] }))
+        processes.append(start_background_nodejs_app("event-querier/nodejs", env = { 
+            'QUERIER_INDEX': str(idx),
+            'PATH': os.environ['PATH'],
+            'NODE_HTTP_PORT': str(next_http_port),
+        }))
+        next_http_port += 1
 
     wait_for_processes_to_complete(processes)
 

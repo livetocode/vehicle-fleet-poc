@@ -1,6 +1,6 @@
 import { Engine, VehiclePredicate } from "./engine.js";
 import { KM, sleep, Rect, formatPoint, GpsCoordinates, MoveCommand, FlushCommand, Config, ConsoleLogger, addOffsetToCoordinates, Stopwatch, DataPartitionStrategyConfig, computeHashNumber, LoggingConfig, Logger, NoopLogger, GeneratorConfig } from 'core-lib';
-import { createMessageBus } from 'messaging-lib';
+import { createMessageBus, createWebServer } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
 import { IdDataPartitionStrategy } from "./data/IdDataPartitionStrategy.js";
@@ -54,7 +54,7 @@ async function main() {
     }
     const generatorIndex = parseInt(process.env.GENERATOR_INDEX || '0');
     const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
-    const messageBus = createMessageBus(config.hub, logger);
+    const messageBus = createMessageBus(config.hub, 'generator', logger);
     const vehicleCount = config.generator.vehicleCount;
     let maxNumberOfEvents = Math.trunc(config.generator.maxNumberOfEvents / config.generator.instances);
     if (generatorIndex === 0) {
@@ -66,6 +66,8 @@ async function main() {
     if (config.hub.type !== 'nats') {
         throw new Error('Expected nats config in hub');
     }
+    const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
+    const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, 'generator');
     await messageBus.start();
 
     if (generatorIndex === 0) {
@@ -181,6 +183,7 @@ async function main() {
         }    
     }
     await messageBus.stop();
+    server.close();
 }
 
 main().catch(console.error);

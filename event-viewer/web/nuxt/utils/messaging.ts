@@ -36,11 +36,11 @@ export class NatsMessageBus implements MessageBus {
     private handlers = new Map<string, EventHandler[]>();
     private uid = crypto.randomUUID();
 
-    constructor(private hub: NatsHubConfig, private logger: Logger) {
+    constructor(private hub: NatsHubConfig, private appName: string, private logger: Logger) {
     }
 
     get privateInboxName(): string {
-        return `inbox.${this.uid}`;
+        return `inbox.${this.appName}.${this.uid}`;
     }
 
     async start(): Promise<void> {
@@ -65,7 +65,7 @@ export class NatsMessageBus implements MessageBus {
             throw new Error('Expected MessageBus to be initialized');
         }
 
-        this.logger.info(`Listening to '${subject}' messages...`);
+        this.logger.info(`NATS is listening to '${subject}' messages...`);
         const sub = this.connection.subscribe(subject);
         const watch = new Stopwatch();
         watch.start();
@@ -79,13 +79,13 @@ export class NatsMessageBus implements MessageBus {
                     try {
                         await handler.process(data);
                     } catch(err) {
-                        this.logger.error('Handler failed to process command', data, err);
+                        this.logger.error('NATS handler failed to process command', data, err);
                     }
                 }                
             }
         }
         watch.stop();
-        this.logger.info(`Subscription for '${subject}' closed after processing `, messageCount, " messages in ", watch.elapsedTimeAsString());
+        this.logger.info(`NATS subscription for '${subject}' closed after processing `, messageCount, " messages in ", watch.elapsedTimeAsString());
     }
     
     registerHandlers(...handlers: EventHandler[]) {

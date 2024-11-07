@@ -9,7 +9,7 @@ import { CsvFileWriter } from "./core/persistence/formats/CsvFileWriter.js";
 import { ArrowFileWriter } from "./core/persistence/formats/ArrowFileWriter.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
 import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger } from 'core-lib';
-import { createMessageBus } from 'messaging-lib';
+import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { FileWriter } from './core/persistence/formats/FileWriter.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
@@ -91,7 +91,7 @@ async function main() {
     const collectorIndex = parseInt(process.env.COLLECTOR_INDEX || '0');
     const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
     
-    const messageBus = createMessageBus(config.hub, logger);
+    const messageBus = createMessageBus(config.hub, 'collector', logger);
     await messageBus.start();
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
@@ -112,7 +112,10 @@ async function main() {
     await moveCommandHandler.init();
     messageBus.registerHandlers(moveCommandHandler);
 
+    const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
+    const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, 'collector');
     await messageBus.watch(`commands.*.${collectorIndex}`);
+    server.close();
 }
 
 main().catch(console.error);
