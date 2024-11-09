@@ -2,7 +2,7 @@ import fs from 'fs';
 import YAML from 'yaml';
 import { MoveCommandHandler, PersistedMoveCommand } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
-import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
+// import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { ParquetFileWriter } from "./core/persistence/formats/ParquetFileWriter.js";
 import { JsonFileWriter } from "./core/persistence/formats/JsonFileWriter.js";
 import { CsvFileWriter } from "./core/persistence/formats/CsvFileWriter.js";
@@ -20,7 +20,12 @@ import { IdGroupDataPartitionStrategy } from './core/data/IdGroupDataPartitionSt
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
-    return YAML.parse(file);
+    const result: Config = YAML.parse(file);
+    const instances = process.env.COLLECTOR_INSTANCES;
+    if (instances && parseInt(instances) > 0) {
+        result.collector.instances = parseInt(instances);
+    }
+    return result;
 }
 
 function createEventStore(config: EventStoreConfig) {
@@ -29,8 +34,9 @@ function createEventStore(config: EventStoreConfig) {
             return  new NoOpEventStore<PersistedMoveCommand>();
         case'memory':
             return  new InMemoryEventStore<PersistedMoveCommand>();  
-        case 'duckdb':
-            return new DuckDbEventStore<PersistedMoveCommand>();
+        // Disabled because it causes an error when running in Docker with ARM CPU
+        // case 'duckdb':
+        //     return new DuckDbEventStore<PersistedMoveCommand>();
         default:
             throw new Error(`Unknown event store type '${(config as any).type}'`);
     }

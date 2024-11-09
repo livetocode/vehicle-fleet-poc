@@ -9,7 +9,16 @@ import { IdGroupDataPartitionStrategy } from "./data/IdGroupDataPartitionStrateg
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
-    return YAML.parse(file);
+    const result: Config = YAML.parse(file);
+    const generatorInstances = process.env.GENERATOR_INSTANCES;
+    if (generatorInstances && parseInt(generatorInstances) > 0) {
+        result.generator.instances = parseInt(generatorInstances);
+    }
+    const collectorInstances = process.env.COLLECTOR_INSTANCES;
+    if (collectorInstances && parseInt(collectorInstances) > 0) {
+        result.collector.instances = parseInt(collectorInstances);
+    }
+    return result;
 }
 
 function createDataPartitionStrategy(config: DataPartitionStrategyConfig) {

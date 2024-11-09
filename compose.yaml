@@ -1,0 +1,96 @@
+services:
+  event-hub:
+    build:
+      dockerfile: event-hub/Dockerfile
+    ports:
+      - "4222:4222"
+      - "4243:4243"
+      - "8222:8222"
+      - "6222:6222"
+    volumes:
+      - type: bind
+        source: ./event-hub/config.txt
+        target: /etc/nats/nats-server.conf
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8222/varz"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      start_interval: 5s
+
+  event-collector:
+    build:
+      dockerfile: .docker/nodejs.Dockerfile
+      args:
+        APP: collector
+    environment:
+      NATS_SERVERS: event-hub:4222
+      COLLECTOR_INSTANCES: 1
+    ports:
+      - "7720:7720"
+    volumes:
+      - type: bind
+        source: ./output
+        target: /apps/output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7720/ping"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      start_interval: 5s
+    depends_on:
+      event-hub:
+        condition: service_healthy
+        restart: true
+
+  event-querier:
+    build:
+      dockerfile: .docker/nodejs.Dockerfile
+      args:
+        APP: querier
+    environment:
+      NATS_SERVERS: event-hub:4222
+      QUERIER_INSTANCES: 1
+    ports:
+      - "7730:7730"
+    volumes:
+      - type: bind
+        source: ./output
+        target: /apps/output
+    depends_on:
+      event-hub:
+        condition: service_healthy
+        restart: true
+
+  event-viewer:
+    build:
+      dockerfile: .docker/nodejs.Dockerfile
+      args:
+        APP: viewer
+    ports:
+      - "3000:3000"
+    depends_on:
+      event-hub:
+        condition: service_healthy
+        restart: true
+
+  event-generator:
+    build:
+      dockerfile: .docker/nodejs.Dockerfile
+      args:
+        APP: generator
+    environment:
+      NATS_SERVERS: event-hub:4222
+      GENERATOR_INSTANCES: 1
+      COLLECTOR_INSTANCES: 1
+    ports:
+      - "7710:7710"
+    depends_on:
+      event-hub:
+        condition: service_healthy
+        restart: true
+      event-collector:
+        condition: service_healthy
+        restart: true

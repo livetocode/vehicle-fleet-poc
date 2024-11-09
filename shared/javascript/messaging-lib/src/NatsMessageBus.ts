@@ -1,9 +1,10 @@
 import { JSONCodec, NatsConnection, connect } from "nats";
 import { MessageBus } from "./MessageBus.js";
 import { NatsHubConfig, Stopwatch } from "core-lib";
-import { Logger } from "core-lib";
+import { Logger, sleep } from "core-lib";
 import { EventHandler } from "./EventHandler.js";
 import prom_client from 'prom-client';
+import { gracefulTerminationService } from "./GracefulTerminationService.js";
 
 const message_sent_counter = new prom_client.Counter({
     name: 'vehicles_message_sent_total',
@@ -37,8 +38,27 @@ export class NatsMessageBus implements MessageBus {
     }
 
     async start(): Promise<void> {
-        this.connection = await connect({ servers: this.hub.protocols.nats.servers });
-        this.logger.info('NATS connection is ready.');
+        const servers = process.env.NATS_SERVERS ? process.env.NATS_SERVERS.split(',') : this.hub.protocols.nats.servers;
+        for (let i = 0; i < 30; i++) {
+            try {
+                this.logger.info(`NATS connection attempt #${i} on servers ${servers}`);
+                this.connection = await connect({ servers });
+                this.logger.info('NATS connection is ready.');
+                gracefulTerminationService.register({
+                    name: 'nats',
+                    priority: 10,
+                    overwrite: false,
+                    handler: async () => {
+                        await this.stop();
+                    }
+                });
+                return;
+            } catch(err: any) {
+                this.logger.error(`Could not connect to NATS server: ${err}`);
+                await sleep(1000);
+            }
+        }
+        throw new Error('Could not connect to NATS server after multiple attemps');
     }
     
     publish(subject: string, message: any): void {

@@ -69,27 +69,50 @@ This is a regular work queue with competing consumers, which is different from t
 
 ### Collecting move commands
 
-```
-generator -(many)-> type:move/topic:commands.move.*   --> collector: aggregate -(many)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
-generator -(once)-> type:flush/topic:commands.flush.* --> collector: flush     -(once)-> persist --> type:aggregate-period-stats/topic:stats --> viewer
+```mermaid
+sequenceDiagram
+    loop generate move events
+        activate collector
+        generator ->> collector: topic:commands.move.*/type:move
+        loop aggregate events
+            collector ->> collector: bufferize, then flush
+            collector ->> viewer: topic:stats/type:aggregate-period-stats
+        end
+        deactivate collector
+    end
+    note right of generator: force a flush at the end of the generation
+    generator ->> collector: topic:commands.flush.*/type:flush
+    collector ->> viewer: topic:stats/type:aggregate-period-stats
 ```
 
 ### Querying move commands
 
 #### Serialized processing
 
-```
-viewer -(once)-> type:vehicle-query/topic:query.vehicles --> queryer: search (1) -(many)-> type:vehicle-query-result/topic:query.vehicles.results --> viewer
-                                                                             (2) -(once)-> type:vehicle-query-result-stats/topic:query.vehicles.results --> viewer
+```mermaid
+sequenceDiagram
+    viewer ->>+ queryer: topic:query.vehicles/type:vehicle-query
+    loop read event files
+        loop for each matching position
+            queryer ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
+        end
+    end
+    queryer ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
 ```
 
 #### Parallel processing
 
-```
-viewer -(once)-> type:vehicle-query/topic:query.vehicles --> queryer: search (1) -(many)-> type:vehicle-query-partition/topic:query.vehicles.partitions --> querier
-                                                                             (2) -(many)-> type:vehicle-query-partition-result-stats/inbox --> querier
-                                                                             (3) -(many)-> type:vehicle-query-result/topic:query.vehicles.results --> viewer
-                                                                             (4) -(once)-> type:vehicle-query-result-stats/topic:query.vehicles.results --> viewer
+```mermaid
+sequenceDiagram
+    viewer ->>+ queryer: topic:query.vehicles/type:vehicle-query
+    par for each matching event file
+        queryer ->>+ queryer-agent: inbox.queryer.*/type:vehicle-query-partition-result-stats
+        loop for each matching position
+            queryer-agent ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
+        end
+        queryer-agent ->>- queryer: topic:inbox.queryer.*/type:vehicle-query-partition-result-stats
+    end
+    queryer ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
 ```
 
 ## Local dev
@@ -252,11 +275,9 @@ TODO
 
 TODO
 
-### Deployment
-
-- Deploy to Kubernetes
-
 # Local development
+
+Note that you can also use Docker for local development if you prefer. Then jump to the next "Deployment/Docker" section.
 
 ## Scripts
 
@@ -304,6 +325,24 @@ npm run preview
 ### generate events
 
 `.venv/bin/python3 scripts/nodejs/start.py`
+
+# Deployment
+
+## Docker 
+
+### build
+
+`bash scripts/nodejs/docker-build.sh`
+
+### run
+
+The following script will start a `docker-compose`. Note that we run a single instance of each component in this mode.
+
+`bash scripts/nodejs/docker-run.sh`
+
+## Kubernetes
+
+TODO
 
 # References
 

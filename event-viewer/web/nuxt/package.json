@@ -1,13 +1,16 @@
 {
   "name": "event-viewer",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "nuxt build",
+    "clean": "rm -rf .next .nuxt .output node_modules",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "update-deps": "ncu -u"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

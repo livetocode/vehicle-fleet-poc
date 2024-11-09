@@ -2,6 +2,7 @@ import { Logger } from 'core-lib';
 import express from 'express';
 import prom_client from 'prom-client';
 import promBundle from 'express-prom-bundle';
+import { gracefulTerminationService } from './GracefulTerminationService.js';
 
 export function createWebServer(port: number, logger: Logger, appName: string) {
     const app = express();
@@ -21,6 +22,14 @@ export function createWebServer(port: number, logger: Logger, appName: string) {
 
     const server = app.listen(port, () => {
         logger.info(`Http server listening on http://localhost:${port} (check ping and metrics endpoints)`);
+    });
+    gracefulTerminationService.register({
+        name: 'web-server',
+        priority: 20,
+        overwrite: false,
+        handler: async () => {
+            server.close();
+        }
     });
     return server;    
 }

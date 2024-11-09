@@ -7,7 +7,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist node_modules",
+    "update-deps": "ncu -u"
   },
   "keywords": [],
   "author": "",

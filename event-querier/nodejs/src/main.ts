@@ -6,7 +6,12 @@ import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
-    return YAML.parse(file);
+    const result: Config = YAML.parse(file);
+    const instances = process.env.QUERIER_INSTANCES;
+    if (instances && parseInt(instances) > 0) {
+        result.querier.instances = parseInt(instances);
+    }
+    return result;
 }
 
 function createLogger(logging: LoggingConfig, name: string): Logger {
