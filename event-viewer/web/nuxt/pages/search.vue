@@ -5,7 +5,7 @@
 </script>
 <template>
   <div>
-    <VehicleQuerier />  
+    <VehicleFinder />  
     <VehicleViewer mode="search" class="viewer" />
   </div>
 </template>

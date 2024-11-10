@@ -7,9 +7,9 @@ import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
     const result: Config = YAML.parse(file);
-    const instances = process.env.QUERIER_INSTANCES;
+    const instances = process.env.FINDER_INSTANCES;
     if (instances && parseInt(instances) > 0) {
-        result.querier.instances = parseInt(instances);
+        result.finder.instances = parseInt(instances);
     }
     return result;
 }
@@ -23,10 +23,10 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
 
 async function main() {
     const config = loadConfig('../../config.yaml');    
-    const querierIndex = parseInt(process.env.QUERIER_INDEX || '0');
-    const logger =  createLogger(config.querier.logging, `Querier #${querierIndex}`);
+    const finderIndex = parseInt(process.env.FINDER_INDEX || '0');
+    const logger =  createLogger(config.finder.logging, `Finder #${finderIndex}`);
 
-    const messageBus = createMessageBus(config.hub, 'querier', logger);
+    const messageBus = createMessageBus(config.hub, 'finder', logger);
     await messageBus.start();
     
     const vehicleQueryHandler = new VehicleQueryHandler(
@@ -37,12 +37,12 @@ async function main() {
     messageBus.registerHandlers(vehicleQueryHandler);
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
-    const server = createWebServer(httpPortOverride ?? config.querier.httpPort, logger, 'querier');
-    if (config.querier.parallelSearch) {
-        messageBus.watch(`query.vehicles.partitions`, 'vehicle-querier-partitions').catch(console.error);
+    const server = createWebServer(httpPortOverride ?? config.finder.httpPort, logger, 'finder');
+    if (config.finder.parallelSearch) {
+        messageBus.watch(`query.vehicles.partitions`, 'vehicle-finder-partitions').catch(console.error);
         messageBus.watch(messageBus.privateInboxName).catch(console.error);
     }    
-    await messageBus.watch(`query.vehicles`, 'vehicle-querier');
+    await messageBus.watch(`query.vehicles`, 'vehicle-finder');
     server.close();
 }
 

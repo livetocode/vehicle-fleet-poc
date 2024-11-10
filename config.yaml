@@ -75,7 +75,7 @@ collector:
     # - csv
     # - arrow
 
-querier:
+finder:
   logging:
     enabled: true
     level: info

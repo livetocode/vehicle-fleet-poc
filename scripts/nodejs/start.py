@@ -74,12 +74,12 @@ wait_for_processes_to_complete(processes)
 
 step("Execution complete")
 
-if config['querier']['autoStart']:
-    step("Start queriers")
-    QUERIER_COUNT = config['querier']['instances']
-    for idx in range(QUERIER_COUNT):
-        processes.append(start_background_nodejs_app("event-querier/nodejs", env = { 
-            'QUERIER_INDEX': str(idx),
+if config['finder']['autoStart']:
+    step("Start finders")
+    FINDER_COUNT = config['finder']['instances']
+    for idx in range(FINDER_COUNT):
+        processes.append(start_background_nodejs_app("event-finder/nodejs", env = { 
+            'FINDER_INDEX': str(idx),
             'PATH': os.environ['PATH'],
             'NODE_HTTP_PORT': str(next_http_port),
         }))

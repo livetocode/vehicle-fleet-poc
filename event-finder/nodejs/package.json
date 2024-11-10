@@ -1,5 +1,5 @@
 {
-  "name": "event-querier",
+  "name": "event-finder",
   "version": "1.0.0",
   "description": "Client that will receive queries and publish matching locations",
   "type": "module",

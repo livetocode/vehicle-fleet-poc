@@ -38,28 +38,28 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                 |                            |                |                 | by the collector, some stats on the chunk|
 |                         |                 |                            |                |                 | will be sent to the viewer.              |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| query.vehicles          | vehicle-querier | vehicle-query              | viewer         | querier         | A client is querying the persisted data. |
-|                         |                 |                            |                |                 | The querier will filter the chunks based |
+| query.vehicles          | vehicle-finder  | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
+|                         |                 |                            |                |                 | The finder will filter the chunks based  |
 |                         |                 |                            |                |                 | on the time period and the geohashes of  |
 |                         |                 |                            |                |                 | the polygon filter.                      |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-|query.vehicles.partitions| vehicle-querier-| vehicle-query-partition    | querier        | querier         | The querier is delegating the file       |
-|                         | partitions      |                            |                |                 | processing to the cluster of queriers.   |
+|query.vehicles.partitions| vehicle-finder- | vehicle-query-partition    | finder         | finder          | The finder is delegating the file        |
+|                         | partitions      |                            |                |                 | processing to the cluster of finders.    |
 |                         |                 |                            |                |                 | The response will be sent using the      |
 |                         |                 |                            |                |                 | vehicle-query-partition-result-stats evt |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result       | querier        | viewer          | While parsing the chunks, the querier    |
+| inbox.<UID>             |                 | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
 |                         |                 |                            |                |                 | will send all the move commands that     |
 |                         |                 |                            |                |                 | match the criteria. The viewer will then |
 |                         |                 |                            |                |                 | be able to replay them.                  |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result-stats | querier        | viewer          | Once the query is complete, the querier  |
+| inbox.<UID>             |                 | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
 |                         |                 |                            |                |                 | will send some stats to the viewer, to   |
 |                         |                 |                            |                |                 | measure the performance and processing   |
 |                         |                 |                            |                |                 | that was required.                       |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result-stats | querier        | querier         | This is a partial result sent back to    |
-|                         |                 |                            |                |                 | the querier that delegated the           |
+| inbox.<UID>             |                 | vehicle-query-result-stats | finder         | finder          | This is a partial result sent back to    |
+|                         |                 |                            |                |                 | the finder that delegated the            |
 |                         |                 |                            |                |                 | processing.                              |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 ```
@@ -91,28 +91,28 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    viewer ->>+ queryer: topic:query.vehicles/type:vehicle-query
+    viewer ->>+ finder: topic:query.vehicles/type:vehicle-query
     loop read event files
         loop for each matching position
-            queryer ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
+            finder ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
         end
     end
-    queryer ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
+    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
 ```
 
 #### Parallel processing
 
 ```mermaid
 sequenceDiagram
-    viewer ->>+ queryer: topic:query.vehicles/type:vehicle-query
+    viewer ->>+ finder: topic:query.vehicles/type:vehicle-query
     par for each matching event file
-        queryer ->>+ queryer-agent: inbox.queryer.*/type:vehicle-query-partition-result-stats
+        finder ->>+ finder-agent: inbox.finder.*/type:vehicle-query-partition-result-stats
         loop for each matching position
-            queryer-agent ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
+            finder-agent ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
         end
-        queryer-agent ->>- queryer: topic:inbox.queryer.*/type:vehicle-query-partition-result-stats
+        finder-agent ->>- finder: topic:inbox.finder.*/type:vehicle-query-partition-result-stats
     end
-    queryer ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
+    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
 ```
 
 ## Local dev
@@ -138,7 +138,7 @@ sequenceDiagram
     - timeout
     - ttl
     - time filters (time range)
-    - geoloc filters (polygons)
+    - geoloc filters (polygons) using GeoJSON
     - data filters (vehicle type)
 
 
@@ -154,7 +154,7 @@ sequenceDiagram
                               |      |
                         +-----+      +-----+
                         |                  |
-                  Event collector       Event querier
+                  Event collector       Event finder
                    |    |                  |
         +----------+  writes             reads
         |               |                  |
@@ -172,7 +172,7 @@ sequenceDiagram
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: Typescript NodeJS, https://pola.rs/, Parquet format, S3, geohash
 - Event Store: In memory, DuckDB
-- Event Querier: Typescript NodeJS, geohash, turf
+- Event finder: Typescript NodeJS, geohash, turf
 
 ## Cloud
 
@@ -185,7 +185,7 @@ sequenceDiagram
                                            |         + NuxtJS
 Event Generator ==> Event Hub -------------+         + PowerBI
                      + Azure Event Hubs    |
-                                           +----> Event Collector -------> Event Aggregate Store <------ Event querier
+                                           +----> Event Collector -------> Event Aggregate Store <------ Event finder
                                                     + Azure Synapse            + Azure Blob                 + Azure Stream Analytics
 ```
 
@@ -197,7 +197,7 @@ Event Generator ==> Event Hub -------------+         + PowerBI
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: [Azure Synapse Analytics](https://azure.microsoft.com/fr-fr/products/synapse-analytics/)
 - Event Store: Azure Event Hubs
-- Event Querier: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
+- Event finder: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
 
 ### AWS
 
@@ -208,7 +208,7 @@ Event Generator ==> Event Hub -------------+         + PowerBI
                                            |         + NuxtJS
 Event Generator ==> Event Hub -------------+         
                      + AWS Eventbridge     |
-                                           +----> Event Collector -------> Event Aggregate Store <------ Event querier
+                                           +----> Event Collector -------> Event Aggregate Store <------ Event finder
                                                   + Amazon Data Firehose       + AWS S3                     + Amazon Athena
 ```
 
@@ -220,7 +220,7 @@ Event Generator ==> Event Hub -------------+
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: [Amazon Data firehose](https://aws.amazon.com/firehose/)
 - Event Store: Amazon Eventbridge
-- Event Querier: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
+- Event finder: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
 
 ## File formats
 

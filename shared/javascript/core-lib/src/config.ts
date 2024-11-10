@@ -137,7 +137,7 @@ export interface CollectorConfig {
     output: OutputConfig;
 }  
 
-export interface QuerierConfig {
+export interface FinderConfig {
     logging: LoggingConfig;
     instances: number;
     httpPort: number;
@@ -157,6 +157,6 @@ export interface Config {
     partitioning: PartitioningConfig;
     generator: GeneratorConfig;
     collector: CollectorConfig;  
-    querier: QuerierConfig;
+    finder: FinderConfig;
     viewer: ViewerConfig;
 }

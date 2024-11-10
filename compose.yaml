@@ -45,14 +45,14 @@ services:
         condition: service_healthy
         restart: true
 
-  event-querier:
+  event-finder:
     build:
       dockerfile: .docker/nodejs.Dockerfile
       args:
-        APP: querier
+        APP: finder
     environment:
       NATS_SERVERS: event-hub:4222
-      QUERIER_INSTANCES: 1
+      FINDER_INSTANCES: 1
     ports:
       - "7730:7730"
     volumes:

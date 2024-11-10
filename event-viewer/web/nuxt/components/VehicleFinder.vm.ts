@@ -3,7 +3,7 @@ import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
-export class VehicleQuerierViewModel {
+export class VehicleFinderViewModel {
     public statValues = ref<StatValue[]>([]);
     public vehicleIds = ref<number[]>([]);
     public resultCount = ref<number>(0);

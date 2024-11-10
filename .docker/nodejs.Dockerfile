@@ -1,7 +1,7 @@
 # select the app to build:
 # - collector
 # - generator
-# - querier
+# - finder
 # - viewer
 ARG APP=collector
 
@@ -70,16 +70,16 @@ RUN npm run compile
 CMD ["node", "dist/main.js"] 
 
 #-----------------------------------------------------------------------------------
-FROM base AS app-querier
+FROM base AS app-finder
 #-----------------------------------------------------------------------------------
 EXPOSE 7730
-WORKDIR /apps/event-querier/nodejs
+WORKDIR /apps/event-finder/nodejs
 
-COPY --chown=node:node event-querier/nodejs/package.json event-querier/nodejs/package-lock.json* ./
+COPY --chown=node:node event-finder/nodejs/package.json event-finder/nodejs/package-lock.json* ./
 
 RUN npm ci --include dev && rm -rf ~/.npm
 
-COPY --chown=node:node event-querier/nodejs ./
+COPY --chown=node:node event-finder/nodejs ./
 
 RUN npm run compile
 

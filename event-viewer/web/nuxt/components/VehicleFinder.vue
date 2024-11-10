@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, inject } from 'vue';
-import { VehicleQuerierViewModel } from './VehicleQuerier.vm';
+import { VehicleFinderViewModel } from './VehicleFinder.vm';
 import { type MessageBus } from '../utils/messaging';
 
 const appConfig = useAppConfig();
@@ -9,7 +9,7 @@ const logger = createLogger(appConfig.viewer.logging, 'querier');
 const props = defineProps({
 });
 const messageBus = inject<MessageBus>('messageBus');
-const _vm = new VehicleQuerierViewModel(appConfig, messageBus, logger);
+const _vm = new VehicleFinderViewModel(appConfig, messageBus, logger);
 
 onMounted(() => {
   _vm.init().catch(console.error);

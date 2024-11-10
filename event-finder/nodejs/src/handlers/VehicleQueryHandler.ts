@@ -32,9 +32,9 @@ export class VehicleQueryContext {
             throw new Error('fromDate must be less than toDate');
         }
         this.polygon = gpsCoordinatesToPolyon(event.polygon);
-        this.timeout = event.timeout ?? this.config.querier.defaultTimeoutInMS;
-        this.parallelize = event.parallelize ?? this.config.querier.parallelSearch;
-        this.useChunking = event.useChunking ?? this.config.querier.useChunking;
+        this.timeout = event.timeout ?? this.config.finder.defaultTimeoutInMS;
+        this.parallelize = event.parallelize ?? this.config.finder.parallelSearch;
+        this.useChunking = event.useChunking ?? this.config.finder.useChunking;
     }
 
     hasTimedOut(): boolean {
@@ -102,7 +102,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
             const ctx = new VehicleQueryContext(this.config, event);
             const geohashes = this.createGeohashes(ctx.polygon);
             if (ctx.parallelize && ctx.useChunking) {
-                for (const filenames of chunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.querier.instances)) {
+                for (const filenames of chunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
                     for (const filename of filenames) {
                         this.processFile(ctx, filename);
                         if (ctx.shouldAbort()) {
@@ -298,13 +298,13 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         }
         let dataFolder = this.config.collector.output.folder;
         if (this.config.collector.output.flatLayout === false) {
-            dataFolder = path.join(dataFolder, this.config.querier.dataFormat);
+            dataFolder = path.join(dataFolder, this.config.finder.dataFormat);
             const commonRoots = findCommonRootParts(fromDate, toDate);
             for (const commonRoot of commonRoots) {
                 dataFolder = path.join(dataFolder, commonRoot);
             }
         }
-        const fileExt = `.${this.config.querier.dataFormat}`;
+        const fileExt = `.${this.config.finder.dataFormat}`;
         for (const { file, directory } of readAllFiles(dataFolder)) {
             if (file.name.endsWith(fileExt) && file.name >= fromPrefix && file.name < toPrefix) {
                 const otherSegments = file.name.substring(fromPrefix.length + 1).split('-');
@@ -319,7 +319,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
     private *searchFile(ctx: VehicleQueryContext, filename: string) {
         this.logger.debug('search file ', filename);
         let df: pl.DataFrame;
-        switch(this.config.querier.dataFormat) {
+        switch(this.config.finder.dataFormat) {
             case 'parquet':
                 df = pl.readParquet(filename);
                 break;
@@ -333,7 +333,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                 df = pl.readIPC(filename);
                 break;
             default:
-                throw new Error(`Unsupported file format: ${this.config.querier.dataFormat}`);
+                throw new Error(`Unsupported file format: ${this.config.finder.dataFormat}`);
         }
         const fstats = fs.statSync(filename);
         ctx.processedBytes += fstats.size;
