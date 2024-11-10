@@ -17,14 +17,14 @@
     "core-lib": "file:../../../shared/javascript/core-lib",
     "latlon-geohash": "^2.0.0",
     "nats.ws": "^1.29.2",
-    "nuxt": "^3.13.2",
-    "pixi.js": "^8.5.1",
+    "nuxt": "^3.14.159",
+    "pixi.js": "^8.5.2",
     "vue": "^3.5.12",
     "vue-router": "^4.4.5",
     "yaml": "^2.6.0"
   },
   "devDependencies": {
     "vite-plugin-vuetify": "^2.0.4",
-    "vuetify": "^3.7.3"
+    "vuetify": "^3.7.4"
   }
 }
