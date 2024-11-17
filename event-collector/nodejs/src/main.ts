@@ -94,7 +94,7 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
 
 async function main() {
     const config = loadConfig('../../config.yaml');    
-    const collectorIndex = parseInt(process.env.COLLECTOR_INDEX || '0');
+    const collectorIndex = parseInt(process.env.INSTANCE_INDEX || '0');
     const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
     
     const messageBus = createMessageBus(config.hub, 'collector', logger);

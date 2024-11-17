@@ -2,7 +2,11 @@ import os
 import yaml
 import time
 import shutil
+import requests
 import subprocess
+from collections import deque
+
+next_http_port = 7800;
 
 def read_config():
     with open('config.yaml', 'r') as file:
@@ -33,6 +37,37 @@ def wait_for_processes_to_complete(processes):
         if processes:
             time.sleep(0.1)
 
+def wait_for_instances_to_be_ready(instances):
+    time.sleep(1)
+    current_instances = deque(instances)
+    while current_instances:
+        process, http_port = current_instances.popleft()
+        if process.poll() is not None:
+            raise Exception(f"Instance localhost:{http_port} exited with {process.returncode}")
+        try:
+            print(f"pinging http://localhost:{http_port}...")
+            requests.get(f"http://localhost:{http_port}/ping")
+            print("   ping succeeded")
+        except:
+            print("   ping failed")
+            current_instances.append((process, http_port))
+            time.sleep(0.2)
+    print("All instances are ready")
+
+def start_nodejs_instances(folder: str, instances: int):
+    global next_http_port
+    services = []
+    for idx in range(instances):
+        process = start_background_nodejs_app(folder, env = { 
+            'INSTANCE_INDEX': str(idx),
+            'PATH': os.environ['PATH'],
+            'NODE_HTTP_PORT': str(next_http_port),
+        })
+        services.append((process, next_http_port))
+        next_http_port += 1
+    wait_for_instances_to_be_ready(services)
+    return services
+
 config = read_config()
 
 step("build shared libraries...")
@@ -42,49 +77,18 @@ compile_nodejs_lib("shared/javascript/messaging-lib")
 step("Cleanup data")
 delete_folder("output")
 
-processes = []
-next_http_port = 7700;
+services = []
 
 step("Start collectors")
-COLLECTOR_COUNT = config['collector']['instances']
-for idx in range(COLLECTOR_COUNT):
-    processes.append(start_background_nodejs_app("event-collector/nodejs", env = { 
-        'COLLECTOR_INDEX': str(idx),
-        'PATH': os.environ['PATH'],
-        'NODE_HTTP_PORT': str(next_http_port),
-    }))
-    next_http_port += 1
-print("Wait for collectors to be ready...")
-time.sleep(2)
-processes = [process for process in processes if process.poll() is None]
-if not processes:
-    raise Exception("Collectors failed to execute")
+services += start_nodejs_instances("event-collector/nodejs", config['collector']['instances'])
 
 step("Start generators")
-GENERATOR_COUNT = config['generator']['instances']
-for idx in range(GENERATOR_COUNT):
-    processes.append(start_background_nodejs_app("event-generator/nodejs", env = { 
-        'GENERATOR_INDEX': str(idx), 
-        'PATH': os.environ['PATH'],
-        'NODE_HTTP_PORT': str(next_http_port),
-    }))
-    next_http_port += 1
+services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
 
-wait_for_processes_to_complete(processes)
+step("Start finders")
+services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
 
-step("Execution complete")
-
-if config['finder']['autoStart']:
-    step("Start finders")
-    FINDER_COUNT = config['finder']['instances']
-    for idx in range(FINDER_COUNT):
-        processes.append(start_background_nodejs_app("event-finder/nodejs", env = { 
-            'FINDER_INDEX': str(idx),
-            'PATH': os.environ['PATH'],
-            'NODE_HTTP_PORT': str(next_http_port),
-        }))
-        next_http_port += 1
-
-    wait_for_processes_to_complete(processes)
-
-
+print("")
+print("Waiting for processes to complete...")
+print([http_port for _, http_port in services])
+wait_for_processes_to_complete([process for process, _ in services])

@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Polygon, Sprite } from 'pixi.js';
-import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type VehicleQuery, type VehicleQueryResult } from 'core-lib';
+import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult } from 'core-lib';
 import { EventHandler, LambdaEventHandler } from '../utils/messaging';
 import Geohash from 'latlon-geohash';
 
@@ -38,6 +38,7 @@ export class VehicleViewerViewModel {
     private _moveHandler?: EventHandler;
     private _queryHandler?: EventHandler;
     private _queryResultHandler?: EventHandler;
+    private _resetStatsHandler?: EventHandler;
     private host: any;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger, private mode: string) {
@@ -85,7 +86,8 @@ export class VehicleViewerViewModel {
         });
         if (this.mode === 'tracking') {
             this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-            this._messageBus.registerHandlers(this._moveHandler);
+            this._resetStatsHandler = new LambdaEventHandler(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
+            this._messageBus.registerHandlers(this._moveHandler, this._resetStatsHandler);
         } else if (this.mode === 'search') {
             this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
             this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
@@ -100,6 +102,10 @@ export class VehicleViewerViewModel {
         if (this._moveHandler) {
             this._messageBus?.unregisterHandler(this._moveHandler);
             this._moveHandler = undefined;
+        }
+        if (this._resetStatsHandler) {
+            this._messageBus?.unregisterHandler(this._resetStatsHandler);
+            this._resetStatsHandler = undefined;
         }
         if (this._queryHandler) {
             this._messageBus?.unregisterHandler(this._queryHandler);
@@ -121,6 +127,10 @@ export class VehicleViewerViewModel {
         this.onMoveVehicle(cmd);
     }
     
+    private onResetStats(ev: ResetAggregatePeriodStats) {
+        this.reset(true);
+    }
+
     private onProcessQuery(res: VehicleQuery) {
         this.logger.debug('Received query', res);
         this.reset(true);

@@ -1,5 +1,40 @@
 import { GpsCoordinates, IRect, Point } from "./geometry.js";
 
+export interface StartGenerationCommand {
+    type: 'start-generation';
+    replyTo: string;
+    requestId: string;
+    vehicleCount: number;
+    vehicleTypes: string[];
+    maxNumberOfEvents: number;
+    refreshIntervalInSecs: number;
+    realtime: boolean;
+    sendFlush: boolean;
+    startDate?: string;
+}
+
+export interface GeneratePartitionCommand {
+    type: 'generate-partition';
+    replyTo: string;
+    subRequestId: string;
+    startDate: string;
+    maxNumberOfEvents: number;
+    request: StartGenerationCommand;
+}
+
+export interface GeneratePartitionStats {
+    type: 'generate-partition-stats';
+    requestId: string;
+    subRequestId: string;
+    generatedEventCount: number;
+    elapsedTimeInMS: number;
+}
+
+export interface GenerationStats {
+    type: 'generation-stats';
+    requestId: string;
+    elapsedTimeInMS: number;
+}
 
 export interface MoveCommand {
     type: 'move';

@@ -1,4 +1,4 @@
-import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Logger, type ResetAggregatePeriodStats } from "core-lib";
+import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand } from "core-lib";
 import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
@@ -66,6 +66,13 @@ class AggregatedStat {
 
 export class VehicleTrackingViewModel {
     public statValues = ref<StatValue[]>([]);
+    public generationParameters: {
+        vehicleCount: number;
+        vehicleTypes: string[];
+        maxNumberOfEvents: number;
+        refreshIntervalInSecs: number;
+        realtime: boolean;
+    };
     private events = ref<AggregatePeriodStats[]>([]);
     private totalEventCount = 0;
     private totalTimePartitionCount = 0;
@@ -81,8 +88,15 @@ export class VehicleTrackingViewModel {
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
     private _nextEventStatsId = 1;
     
-    constructor(private _messageBus: MessageBus, private logger: Logger) {
+    constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         this.statValues.value = this.createStats();
+        this.generationParameters = {
+            vehicleCount: this.config.generator.vehicleCount,
+            vehicleTypes: this.config.generator.vehicleTypes,
+            maxNumberOfEvents: this.config.generator.maxNumberOfEvents,
+            refreshIntervalInSecs: this.config.generator.refreshIntervalInSecs,
+            realtime: this.config.generator.realtime,
+        };
     }
 
     async init(): Promise<void> {
@@ -106,6 +120,29 @@ export class VehicleTrackingViewModel {
             this._messageBus?.unregisterHandler(this._resetStatsHandler);
             this._resetStatsHandler = undefined;
         }
+    }
+
+    startGeneration(data: { 
+        vehicleCount: number;
+        vehicleTypes: string[];
+        maxNumberOfEvents: number;
+        refreshIntervalInSecs: number;
+        realtime: boolean;    
+    }) {
+        const request: StartGenerationCommand = {
+            type: 'start-generation',
+            replyTo: this._messageBus.privateInboxName,
+            requestId: crypto.randomUUID(),
+            vehicleCount: data.vehicleCount,
+            vehicleTypes: data.vehicleTypes,
+            maxNumberOfEvents: data.maxNumberOfEvents,
+            refreshIntervalInSecs: data.refreshIntervalInSecs,
+            realtime: data.realtime,
+            sendFlush: this.config.generator.sendFlush,
+            startDate: this.config.generator.startDate,        
+        }
+        this.logger.info('Starting generation', request);
+        this._messageBus.publish('generation', request);
     }
 
     formatStats(ev: AggregatePeriodStats) {

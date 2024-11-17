@@ -299,7 +299,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         let dataFolder = this.config.collector.output.folder;
         if (this.config.collector.output.flatLayout === false) {
             dataFolder = path.join(dataFolder, this.config.finder.dataFormat);
-            const commonRoots = findCommonRootParts(fromDate, toDate);
+            const commonRoots = findCommonAncestorDirectory(fromDate, toDate);
             for (const commonRoot of commonRoots) {
                 dataFolder = path.join(dataFolder, commonRoot);
             }
@@ -398,7 +398,7 @@ export function* readAllFiles(directory: string): Generator<{ file: fs.Dirent; d
     }
 }
 
-export function findCommonRootParts(d1: Date, d2: Date) {
+export function findCommonAncestorDirectory(d1: Date, d2: Date) {
     const dp1 = dateToUtcParts(d1);
     const dp2 = dateToUtcParts(d2);
     const result: string[] = [];

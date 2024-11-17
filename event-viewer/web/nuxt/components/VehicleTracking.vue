@@ -9,7 +9,8 @@ const logger = createLogger(appConfig.viewer.logging, 'viewer');
 const props = defineProps({
 });
 const messageBus = inject<MessageBus>('messageBus');
-const _vm = new VehicleTrackingViewModel(messageBus, logger);
+const _vm = new VehicleTrackingViewModel(appConfig, messageBus, logger);
+const _generationParameters = _vm.generationParameters;
 
 onMounted(() => {
   _vm.init().catch(console.error);
@@ -24,7 +25,17 @@ onUnmounted(() => {
 <template>
   <div class="stat-area d-flex align-center justify-space-between">
     <owl-stats :stats="_vm.statValues.value" />
-    <DataPartitionsDialog :partitions="_vm.events.value"  />
+    <div class="d-flex align-center ga-4">
+      <StartGenerationDialog
+        @on-accept="(data) => _vm.startGeneration(data)"  
+        :vehicleCount="_generationParameters.vehicleCount"
+        :vehicleTypes="_generationParameters.vehicleTypes"
+        :maxNumberOfEvents="_generationParameters.maxNumberOfEvents"
+        :refreshIntervalInSecs="_generationParameters.refreshIntervalInSecs"
+        :realtime="_generationParameters.realtime"
+      />
+      <DataPartitionsDialog :partitions="_vm.events.value"  />
+    </div>    
   </div>
 </template>
 <style scoped>

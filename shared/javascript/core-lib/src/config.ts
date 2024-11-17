@@ -142,7 +142,6 @@ export interface FinderConfig {
     instances: number;
     httpPort: number;
     defaultTimeoutInMS: number;
-    autoStart: boolean;
     dataFormat: string;
     parallelSearch: boolean;
     useChunking: boolean;

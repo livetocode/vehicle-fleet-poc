@@ -88,7 +88,7 @@ export function closeGracefully(
     };
 }
 
-const logger = new ConsoleLogger("GracefulTermination", "debug");
+const logger = new ConsoleLogger("GracefulTermination", "info");
 export const gracefulTerminationService = new GracefulTerminationService(logger);
 
 process.once('SIGINT', closeGracefully(logger, gracefulTerminationService, process.kill));

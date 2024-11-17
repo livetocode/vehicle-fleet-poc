@@ -23,7 +23,7 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
 
 async function main() {
     const config = loadConfig('../../config.yaml');    
-    const finderIndex = parseInt(process.env.FINDER_INDEX || '0');
+    const finderIndex = parseInt(process.env.INSTANCE_INDEX || '0');
     const logger =  createLogger(config.finder.logging, `Finder #${finderIndex}`);
 
     const messageBus = createMessageBus(config.hub, 'finder', logger);

@@ -1,6 +1,5 @@
 import { Rect, Size, Range } from "core-lib";
 import { Region, Vehicle, Zone, getRandomDirection, getRandomRangeValue, VehicleState, rotateClockwise, getRandomBounds } from "./types.js";
-import { calcCount } from "./utils.js";
 
 export interface MoveCommand {
     region: Region;
@@ -110,4 +109,12 @@ export class Engine {
     }
 }
 
+function calcCount(total: number, segment: number) {
+    let count = Math.trunc(total / segment);
+    const mod = total % segment;
+    if (mod !== 0) {
+        count += 1;
+    }
+    return count;
+}
 

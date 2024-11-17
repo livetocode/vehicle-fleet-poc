@@ -81,7 +81,6 @@ finder:
     level: info
   instances: 5
   httpPort: 7730
-  autoStart: true
   defaultTimeoutInMS: 30000
   dataFormat: parquet
   parallelSearch: true
