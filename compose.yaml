@@ -1,7 +1,11 @@
 services:
   event-hub:
+    image: livetocode/vehicle-fleet-poc-event-hub:latest
     build:
       dockerfile: event-hub/Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
     ports:
       - "4222:4222"
       - "4243:4243"
@@ -20,8 +24,12 @@ services:
       start_interval: 5s
 
   event-collector:
+    image: livetocode/vehicle-fleet-poc-event-collector:latest
     build:
       dockerfile: .docker/nodejs.Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
       args:
         APP: collector
     environment:
@@ -30,6 +38,9 @@ services:
     ports:
       - "7720:7720"
     volumes:
+      - type: bind
+        source: ./config.yaml
+        target: /apps/config.yaml
       - type: bind
         source: ./output
         target: /apps/output
@@ -46,8 +57,12 @@ services:
         restart: true
 
   event-finder:
+    image: livetocode/vehicle-fleet-poc-event-finder:latest
     build:
       dockerfile: .docker/nodejs.Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
       args:
         APP: finder
     environment:
@@ -57,6 +72,9 @@ services:
       - "7730:7730"
     volumes:
       - type: bind
+        source: ./config.yaml
+        target: /apps/config.yaml
+      - type: bind
         source: ./output
         target: /apps/output
     depends_on:
@@ -65,8 +83,12 @@ services:
         restart: true
 
   event-viewer:
+    image: livetocode/vehicle-fleet-poc-event-viewer:latest
     build:
       dockerfile: .docker/nodejs.Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
       args:
         APP: viewer
     ports:
@@ -77,8 +99,12 @@ services:
         restart: true
 
   event-generator:
+    image: livetocode/vehicle-fleet-poc-event-generator:latest
     build:
       dockerfile: .docker/nodejs.Dockerfile
+      platforms:
+        - "linux/amd64"
+        - "linux/arm64"
       args:
         APP: generator
     environment:
@@ -87,6 +113,13 @@ services:
       COLLECTOR_INSTANCES: 1
     ports:
       - "7710:7710"
+    volumes:
+      - type: bind
+        source: ./config.yaml
+        target: /apps/config.yaml
+      - type: bind
+        source: ./output
+        target: /apps/output
     depends_on:
       event-hub:
         condition: service_healthy

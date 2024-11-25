@@ -30,11 +30,20 @@ export interface MessageBus {
     unregisterHandler(handler: EventHandler): void;
 }
 
+export function randomUUID() {
+    // Note that if we don't serve the site over https, the crypto.randomUUID() would not exist!
+    // See https://stackoverflow.com/questions/74911304/crypto-module-not-loading-randomuuid-when-viewing-a-local-network-ip-address
+    if (window.crypto && (window.crypto as any).randomUUID) {
+        return crypto.randomUUID();
+    }
+    return new Date().getTime().toString();
+}
+
 export class NatsMessageBus implements MessageBus {
     private connection?: NatsConnection;
     private codec = JSONCodec();
     private handlers = new Map<string, EventHandler[]>();
-    private uid = crypto.randomUUID();
+    private uid = randomUUID();
 
     constructor(private hub: NatsHubConfig, private appName: string, private logger: Logger) {
     }
@@ -44,8 +53,14 @@ export class NatsMessageBus implements MessageBus {
     }
 
     async start(): Promise<void> {
-        this.logger.info('NATS connecting...');
-        this.connection = await connect({ servers: this.hub.protocols.websockets.servers });
+        let servers = this.hub.protocols.websockets.servers;
+        const runtimeConfig = useRuntimeConfig();
+        const serversOverride = runtimeConfig.public.natsServers
+        if (serversOverride.length > 0) {
+            servers = serversOverride;
+        }
+        this.logger.info(`NATS connecting to ${servers}...`);
+        this.connection = await connect({ servers });
         this.logger.info('NATS connection is ready.');
     }
     

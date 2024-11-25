@@ -24,6 +24,13 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | Topic                   | Consumer Group  | Event Type                 | Produced by    | Consumed by     | Usage                                    |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation              | generators      | start-generation           | viewer         | generator       | The viewer will initiate a generation    |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation.agent.*      |generation-agents| generate-partition         | generator      | generator       | The generator will partition its work    |
+|                         |                 |                            |                |                 | with its agents.                         |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.generator.*       | generators      | generate-partition-stats   | viewer         | generator       | The viewer will initiate a generation    |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | commands.move.*         |                 | move                       | generator      | collector       | The collector will agregate the move     |
 |                         |                 |                            |                |                 | commands and persist them as a chunk.    |
 |                         |                 |                            |                +-----------------+------------------------------------------+
@@ -48,18 +55,18 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                 |                            |                |                 | The response will be sent using the      |
 |                         |                 |                            |                |                 | vehicle-query-partition-result-stats evt |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
+| inbox.viewer.<UID>      |                 | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
 |                         |                 |                            |                |                 | will send all the move commands that     |
 |                         |                 |                            |                |                 | match the criteria. The viewer will then |
 |                         |                 |                            |                |                 | be able to replay them.                  |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
+| inbox.viewer.<UID>      |                 | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
 |                         |                 |                            |                |                 | will send some stats to the viewer, to   |
 |                         |                 |                            |                |                 | measure the performance and processing   |
 |                         |                 |                            |                |                 | that was required.                       |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.<UID>             |                 | vehicle-query-result-stats | finder         | finder          | This is a partial result sent back to    |
-|                         |                 |                            |                |                 | the finder that delegated the            |
+| inbox.finder.<UID>      |                 | vehicle-query-             | finder         | finder          | This is a partial result sent back to    |
+|                         |                 | partition-result-stats     |                |                 | the finder that delegated the            |
 |                         |                 |                            |                |                 | processing.                              |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 ```
@@ -71,18 +78,24 @@ This is a regular work queue with competing consumers, which is different from t
 
 ```mermaid
 sequenceDiagram
+    viewer ->>+ generator: topic:generation/type:start-generation
+    activate generator-agent
+    generator ->> generator-agent: topic:generation-agent.*:generate-partition
     loop generate move events
         activate collector
-        generator ->> collector: topic:commands.move.*/type:move
+        generator-agent ->> collector: topic:commands.move.*/type:move
         loop aggregate events
             collector ->> collector: bufferize, then flush
-            collector ->> viewer: topic:stats/type:aggregate-period-stats
+            collector -->> viewer: topic:stats/type:aggregate-period-stats
         end
         deactivate collector
     end
+    generator-agent ->> generator: topic:inbox.generator.*/type:generate-partition-stats
+    deactivate generator-agent
     note right of generator: force a flush at the end of the generation
-    generator ->> collector: topic:commands.flush.*/type:flush
-    collector ->> viewer: topic:stats/type:aggregate-period-stats
+    generator ->>+ collector: topic:commands.flush.*/type:flush
+    collector -->>- viewer: topic:stats/type:aggregate-period-stats
+    generator ->>- viewer: topic:inbox.viewer.*/type:generation-stats
 ```
 
 ### Querying move commands
@@ -342,7 +355,27 @@ The following script will start a `docker-compose`. Note that we run a single in
 
 ## Kubernetes
 
-TODO
+cd deployment/kubernetes
+```shell
+npm i
+npm run synth
+```
+
+Select the right Kubernetes cluster (either with the KUBECONFIG env var, or with a kubectl context).
+
+```shell
+kubectl apply -f dist/*
+```
+
+Wait for everything to be created.
+
+Browse to http://vehicle-fleet-viewer.kube.lab.ile.montreal.qc.ca/
+
+If you want to cleanup the kubernetes resources:
+```shell
+kubectl delete -f dist/0001-vehicles.k8s.yaml
+kubectl delete -f dist/0000-vehicles-ns.k8s.yaml
+```
 
 # References
 

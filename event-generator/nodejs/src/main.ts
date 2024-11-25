@@ -41,6 +41,28 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
     return new ConsoleLogger(name, logging.level);
 }
 
+function getInstanceIndex(): number {
+    const instance_index = process.env.INSTANCE_INDEX;
+    if (typeof instance_index === 'string' && instance_index !== '') {
+        return parseInt(instance_index);
+
+    }
+    const hostname = process.env.HOSTNAME;
+    if (hostname) {
+        const idx = hostname.lastIndexOf('-');
+        if (idx > 0) {
+            const suffix = hostname.substring(idx + 1);
+            if (suffix.length > 0) {
+                const val = parseInt(suffix);
+                if (!Number.isNaN(val)) {
+                    return val;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 async function main() {
     const config = loadConfig('../../config.yaml');
     if (config.partitioning.dataPartition.type === 'collectorIndex') {
@@ -48,7 +70,7 @@ async function main() {
             throw new Error('When you use the collectorIndex data partitioning strategy, you must have the same number of generators and collectors');
         }
     }
-    const generatorIndex = parseInt(process.env.INSTANCE_INDEX || '0');
+    const generatorIndex = getInstanceIndex();
     const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
     const messageBus = createMessageBus(config.hub, 'generator', logger);
     await messageBus.start();

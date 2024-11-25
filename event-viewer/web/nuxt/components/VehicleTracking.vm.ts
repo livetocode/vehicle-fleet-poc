@@ -1,5 +1,5 @@
 import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand } from "core-lib";
-import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
+import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus } from "../utils/messaging";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -132,7 +132,7 @@ export class VehicleTrackingViewModel {
         const request: StartGenerationCommand = {
             type: 'start-generation',
             replyTo: this._messageBus.privateInboxName,
-            requestId: crypto.randomUUID(),
+            requestId: randomUUID(),
             vehicleCount: data.vehicleCount,
             vehicleTypes: data.vehicleTypes,
             maxNumberOfEvents: data.maxNumberOfEvents,

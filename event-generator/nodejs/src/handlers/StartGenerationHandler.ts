@@ -52,7 +52,7 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
                 // TODO: move this to an injected service
                 this.logger.warn('Deleting output folder ', this.config.collector.output.folder);
                 rmSync(this.config.collector.output.folder, { recursive: !this.config.collector.output.flatLayout, force: true});
-                mkdirSync(this.config.collector.output.folder);
+                mkdirSync(this.config.collector.output.folder, { recursive: true });
             }
 
             // partition generation work

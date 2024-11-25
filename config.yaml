@@ -12,7 +12,7 @@ partitioning:
   timePartition:
     aggregationPeriodInMin: 10
     maxCapacity: 100000
-    maxActivePartitions: 2
+    maxActivePartitions: 4
   dataPartition:
     # type: id
     # type: idGroup
@@ -79,7 +79,7 @@ finder:
   logging:
     enabled: true
     level: info
-  instances: 5
+  instances: 3
   httpPort: 7730
   defaultTimeoutInMS: 30000
   dataFormat: parquet

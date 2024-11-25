@@ -1,5 +1,5 @@
 import { roundDecimals, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
-import { LambdaEventHandler, type EventHandler, type MessageBus } from "../utils/messaging";
+import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus } from "../utils/messaging";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -127,7 +127,7 @@ export class VehicleFinderViewModel {
         this.query({
             type: 'vehicle-query',
             replyTo: this._messageBus.privateInboxName,
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             fromDate: period.from,
             toDate: period.to,
             polygon,            

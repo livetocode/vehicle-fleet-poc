@@ -21,9 +21,31 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
     return new ConsoleLogger(name, logging.level);
 }
 
+function getInstanceIndex(): number {
+    const instance_index = process.env.INSTANCE_INDEX;
+    if (typeof instance_index === 'string' && instance_index !== '') {
+        return parseInt(instance_index);
+
+    }
+    const hostname = process.env.HOSTNAME;
+    if (hostname) {
+        const idx = hostname.lastIndexOf('-');
+        if (idx > 0) {
+            const suffix = hostname.substring(idx + 1);
+            if (suffix.length > 0) {
+                const val = parseInt(suffix);
+                if (!Number.isNaN(val)) {
+                    return val;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 async function main() {
     const config = loadConfig('../../config.yaml');    
-    const finderIndex = parseInt(process.env.INSTANCE_INDEX || '0');
+    const finderIndex = getInstanceIndex();
     const logger =  createLogger(config.finder.logging, `Finder #${finderIndex}`);
 
     const messageBus = createMessageBus(config.hub, 'finder', logger);

@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       appName: 'Vehicles tracker',
+      natsServers: [] as string[],
     },
   },
   compatibilityDate: '2024-07-21',

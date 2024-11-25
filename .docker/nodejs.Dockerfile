@@ -15,8 +15,6 @@ ENV NODE_ENV=production
 RUN apk add --update curl && \
     rm -rf /var/cache/apk/*
 
-COPY --chown=node:node config.yaml config.yaml
-
 # Core lib
 WORKDIR /apps/shared/javascript/core-lib
 COPY --chown=node:node shared/javascript/core-lib/package.json shared/javascript/core-lib/package-lock.json ./
@@ -96,6 +94,7 @@ COPY --chown=node:node event-viewer/web/nuxt/package.json event-viewer/web/nuxt/
 RUN npm ci --include dev && rm -rf ~/.npm
 
 COPY --chown=node:node event-viewer/web/nuxt ./
+COPY --chown=node:node config.yaml /apps/config.yaml
 
 RUN npm run build
 
