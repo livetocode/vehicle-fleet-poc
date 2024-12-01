@@ -341,6 +341,13 @@ npm run preview
 
 # Deployment
 
+## Requirements
+
+- docker
+- docker-compose
+- kubectl
+- nodejs
+
 ## Docker 
 
 ### build
@@ -379,7 +386,7 @@ kubectl delete -f dist/0000-vehicles-ns.k8s.yaml
 
 # References
 
-https://medium.com/@igorvgorbenko/geospatial-data-analysis-in-clickhouse-polygons-geohashes-and-h3-indexing-2f55ff100fbe#:~:text=H3%20Indexing,-H3%20indexing&text=Similar%20to%20geohashes%2C%20a%20longer,occupy%20a%20fixed%208%20bytes.
+https://medium.com/@igorvgorbenko/geospatial- data-analysis-in-clickhouse-polygons-geohashes-and-h3-indexing-2f55ff100fbe#:~:text=H3%20Indexing,-H3%20indexing&text=Similar%20to%20geohashes%2C%20a%20longer,occupy%20a%20fixed%208%20bytes.
 
 https://medium.com/data-engineering-chariot/aggregating-files-in-your-data-lake-part-1-ed115b95425c
 https://docs.aws.amazon.com/firehose/latest/dev/dynamic-partitioning.html

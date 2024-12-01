@@ -25,6 +25,49 @@ export class VehiclesChart extends Chart {
   constructor(scope: Construct, id: string, _config: Config, props: ChartProps = { }) {
     super(scope, id, props);
 
+    const hub = this.createEventHub();
+
+    this.createEventViewer(hub.externalServiceName);
+
+    const {sharedConfigVolume } = this.createSharedConfig();    
+
+    const { claim } = this.createSharedVolume();
+  
+    new NatsService(this, 'event-generator', {
+      image: 'livetocode/vehicle-fleet-poc-event-generator:latest',
+      replicas: config.generator.instances,
+      containerPort: config.generator.httpPort,
+      sharedDataPVC: claim,
+      sharedConfig: sharedConfigVolume,
+      envVariables: {
+        'NATS_SERVERS': EnvValue.fromValue(hub.internalServiceName),
+      }
+    });
+
+    new NatsService(this, 'event-collector', {
+      image: 'livetocode/vehicle-fleet-poc-event-collector:latest',
+      replicas: config.collector.instances,
+      containerPort: config.collector.httpPort,
+      sharedDataPVC: claim,
+      sharedConfig: sharedConfigVolume,
+      envVariables: {
+        'NATS_SERVERS': EnvValue.fromValue(hub.internalServiceName),
+      }
+    });
+
+    new NatsService(this, 'event-finder', {
+      image: 'livetocode/vehicle-fleet-poc-event-finder:latest',
+      replicas: config.finder.instances,
+      containerPort: config.finder.httpPort,
+      sharedDataPVC: claim,
+      sharedConfig: sharedConfigVolume,
+      envVariables: {
+        'NATS_SERVERS': EnvValue.fromValue(hub.internalServiceName),
+      }
+    });
+  }
+
+  createEventHub() {
     const hubConfigMap = new ConfigMap(this, 'event-hub-config');
     hubConfigMap.addFile(`${__dirname}/../../event-hub/config.txt`);
     const hubConfigVolume = Volume.fromConfigMap(this, 'event-hub-config-vol', hubConfigMap);    
@@ -69,11 +112,13 @@ export class VehiclesChart extends Chart {
     const hubService = hub.exposeViaService({serviceType: ServiceType.CLUSTER_IP});
     const hubIngress = new Ingress(this, 'hub-ingress');
     hubIngress.addHostRule(hubHost, '/', IngressBackend.fromService(hubService, { port: 4243 }));
+    return {
+      internalServiceName: `${hubService.name}:4222`,
+      externalServiceName: hubHost,
+    }
+  }
 
-    const sharedConfigMap = new ConfigMap(this, 'event-shared-config');
-    sharedConfigMap.addFile(`${__dirname}/../../config.yaml`);
-    const sharedConfigVolume = Volume.fromConfigMap(this, 'event-shared-config-vol', sharedConfigMap);    
-
+  createEventViewer(hubHost: string) {
     const viewer = new Deployment(this, 'event-viewer', {
       replicas: 1,
       // volumes: [sharedConfigVolume],
@@ -111,45 +156,23 @@ export class VehiclesChart extends Chart {
     const viewerService = viewer.exposeViaService({serviceType: ServiceType.CLUSTER_IP});    
     const viewerIngress = new Ingress(this, 'viewer-ingress');
     viewerIngress.addHostRule('vehicle-fleet-viewer.kube.lab.ile.montreal.qc.ca', '/', IngressBackend.fromService(viewerService));
+  }
 
+  createSharedConfig() {
+    const sharedConfigMap = new ConfigMap(this, 'event-shared-config');
+    sharedConfigMap.addFile(`${__dirname}/../../config.yaml`);
+    const sharedConfigVolume = Volume.fromConfigMap(this, 'event-shared-config-vol', sharedConfigMap);
+    return { sharedConfigVolume };
+  }
+
+  createSharedVolume() {
     const accessModes = [PersistentVolumeAccessMode.READ_WRITE_MANY];
     const claim = new PersistentVolumeClaim(this, 'claim', {
       storage: Size.gibibytes(15),
       accessModes,
+      // storageClassName: 'csi-rbd-sc-hdd-generic',      
     });
-  
-    new NatsService(this, 'event-generator', {
-      image: 'livetocode/vehicle-fleet-poc-event-generator:latest',
-      replicas: config.generator.instances,
-      containerPort: config.generator.httpPort,
-      sharedDataPVC: claim,
-      sharedConfig: sharedConfigVolume,
-      envVariables: {
-        'NATS_SERVERS': EnvValue.fromValue(`${hubService.name}:4222`),
-      }
-    });
-
-    new NatsService(this, 'event-collector', {
-      image: 'livetocode/vehicle-fleet-poc-event-collector:latest',
-      replicas: config.collector.instances,
-      containerPort: config.collector.httpPort,
-      sharedDataPVC: claim,
-      sharedConfig: sharedConfigVolume,
-      envVariables: {
-        'NATS_SERVERS': EnvValue.fromValue(`${hubService.name}:4222`),
-      }
-    });
-
-    new NatsService(this, 'event-finder', {
-      image: 'livetocode/vehicle-fleet-poc-event-finder:latest',
-      replicas: config.finder.instances,
-      containerPort: config.finder.httpPort,
-      sharedDataPVC: claim,
-      sharedConfig: sharedConfigVolume,
-      envVariables: {
-        'NATS_SERVERS': EnvValue.fromValue(`${hubService.name}:4222`),
-      }
-    });
+    return { claim };
   }
 }
 

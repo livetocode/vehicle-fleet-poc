@@ -1,6 +1,6 @@
 import { Construct } from 'constructs';
 import { Cpu, EnvValue, IPersistentVolumeClaim, Probe, StatefulSet, Volume, VolumeMount } from 'cdk8s-plus-28';
-import { Size } from 'cdk8s';
+import { Duration, Size } from 'cdk8s';
 
 export interface NatsServiceOptions {
   /** The Docker image to use for this service. */
@@ -60,7 +60,7 @@ export class NatsService extends Construct {
 
     new StatefulSet(this, 'statefulset', {
       replicas,
-      metadata: {
+      podMetadata: {
         annotations: {
           'prometheus.io/scrape': 'true',
           'prometheus.io/path': '/metrics',
@@ -76,7 +76,10 @@ export class NatsService extends Construct {
           name: 'web',
           image: options.image,
           portNumber: containerPort,
-          liveness: Probe.fromHttpGet('/ping'),
+          liveness: Probe.fromHttpGet('/ping', {
+            timeoutSeconds: Duration.seconds(15),
+            failureThreshold: 4,
+          }),
           envVariables: options.envVariables,
           securityContext: {
             ensureNonRoot: false,
@@ -87,8 +90,8 @@ export class NatsService extends Construct {
               limit: Cpu.millis(500),
             },
             memory: {
-              request: Size.mebibytes(100),
-              limit: Size.mebibytes(500),
+              request: Size.mebibytes(50),
+              limit: Size.mebibytes(600),
             },
           },
           volumeMounts: [
