@@ -26,6 +26,9 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | generation              | generators      | start-generation           | viewer         | generator       | The viewer will initiate a generation    |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation.broadcast    |                 | stop-generation            | viewer         | generator       | The viewer will cancel any active        |
+|                         |                 |                            |                |                 | generation before starting a new one.    |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | generation.agent.*      |generation-agents| generate-partition         | generator      | generator       | The generator will partition its work    |
 |                         |                 |                            |                |                 | with its agents.                         |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
@@ -44,6 +47,9 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 | stats                   |                 | aggregate-period-stats     | collector      | viewer          | Every time a chunk of data is persisted  |
 |                         |                 |                            |                |                 | by the collector, some stats on the chunk|
 |                         |                 |                            |                |                 | will be sent to the viewer.              |
++-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
+| stats                   |                 |reset-aggregate-period-stats| generator      | viewer          | Clear the map in the viewer when a new   |
+|                         |                 |                            |                |                 | generation begins.                       |
 +-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
 | query.vehicles          | vehicle-finder  | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
 |                         |                 |                            |                |                 | The finder will filter the chunks based  |

@@ -13,6 +13,10 @@ export interface StartGenerationCommand {
     startDate?: string;
 }
 
+export interface StopGenerationCommand {
+    type: 'stop-generation';
+}
+
 export interface GeneratePartitionCommand {
     type: 'generate-partition';
     replyTo: string;

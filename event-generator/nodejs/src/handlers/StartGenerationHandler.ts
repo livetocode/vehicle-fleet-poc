@@ -1,13 +1,13 @@
-import { addOffsetToCoordinates, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GpsCoordinates, KM, Logger, MoveCommand, Rect, sleep, StartGenerationCommand, Stopwatch } from "core-lib";
+import { addOffsetToCoordinates, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GpsCoordinates, KM, Logger, MoveCommand, Rect, ResetAggregatePeriodStats, sleep, StartGenerationCommand, StopGenerationCommand, Stopwatch } from "core-lib";
 import { GenericEventHandler, MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
-import { mkdirSync, rmdirSync, rmSync } from "fs";
+import { mkdirSync, rmSync } from "fs";
 
-// TODO: allow cancelling the generation
 
-export class StartGenerationHandler extends GenericEventHandler<StartGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats> {
+export class StartGenerationHandler extends GenericEventHandler<StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats> {
     private subGenerators = new Map<string, Set<string>>();
+    private stopGenerationRequested = false;
 
     constructor(
         private config: Config,
@@ -20,12 +20,15 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
     }
 
     get eventTypes(): string[] {
-        return ['start-generation', 'generate-partition', 'generate-partition-stats'];
+        return ['start-generation', 'stop-generation', 'generate-partition', 'generate-partition-stats'];
     }
     
-    protected processTypedEvent(event: StartGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats): Promise<void> {
+    protected processTypedEvent(event: StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats): Promise<void> {
         if (event.type === 'start-generation') {
             return this.processStart(event);
+        }
+        if (event.type === 'stop-generation') {
+            return this.processStop(event);
         }
         if (event.type === 'generate-partition') {
             return this.processPartition(event);
@@ -45,11 +48,12 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
         }
         try {
             // reset stats
-            this.messageBus.publish(`stats`, { type: 'reset-aggregate-period-stats' });
+            this.messageBus.publish(`stats`, { type: 'reset-aggregate-period-stats' } as ResetAggregatePeriodStats);
+            //await sleep(1000);
 
             // delete existing events
             if (this.config.collector.output.type === 'file') {
-                // TODO: move this to an injected service
+                // TODO: send a message to the collectors
                 this.logger.warn('Deleting output folder ', this.config.collector.output.folder);
                 rmSync(this.config.collector.output.folder, { recursive: !this.config.collector.output.flatLayout, force: true});
                 mkdirSync(this.config.collector.output.folder, { recursive: true });
@@ -103,6 +107,12 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
             this.subGenerators.delete(event.requestId);
         }
     }
+    
+    protected async processStop(event: StopGenerationCommand): Promise<void> {
+        this.logger.warn('Stop generation request', event);
+        // this.subGenerators.clear();
+        this.stopGenerationRequested = true;
+    }
 
     protected async processPartitionStats(event: GeneratePartitionStats): Promise<void> {
         let subGenerators = this.subGenerators.get(event.requestId);
@@ -112,6 +122,7 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
     }
 
     protected async processPartition(event: GeneratePartitionCommand): Promise<void> {
+        this.stopGenerationRequested = false;
         const vehicleCount = event.request.vehicleCount;
         const refreshIntervalInSecs = event.request.refreshIntervalInSecs;
         const realtime = event.request.realtime;
@@ -199,14 +210,22 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
                         accumulatedWaitInMS += distributedRefreshIntervalInMS;
                     }
                 }
-            }
-            if (realtime) {
-                const delta = refreshIntervalInMS - accumulatedWaitInMS;
-                if (delta > 0) {
-                    await sleep(delta);
+                if (this.stopGenerationRequested) {
+                    this.logger.warn('Sub-generator should stop immediatly!');
+                    done = true;
+                    this.stopGenerationRequested = false;
+                    break;
                 }
-            } else {
-                await sleep(1);
+            }
+            if (!done) {
+                if (realtime) {
+                    const delta = refreshIntervalInMS - accumulatedWaitInMS;
+                    if (delta > 0) {
+                        await sleep(delta);
+                    }
+                } else {
+                    await sleep(1);
+                }    
             }
         }
         watch.stop();

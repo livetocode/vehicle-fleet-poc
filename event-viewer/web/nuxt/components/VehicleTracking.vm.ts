@@ -1,4 +1,4 @@
-import { formatBytes, formatCounts, roundDecimals, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand } from "core-lib";
+import { formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand } from "core-lib";
 import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus } from "../utils/messaging";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
@@ -129,20 +129,24 @@ export class VehicleTrackingViewModel {
         refreshIntervalInSecs: number;
         realtime: boolean;    
     }) {
-        const request: StartGenerationCommand = {
-            type: 'start-generation',
-            replyTo: this._messageBus.privateInboxName,
-            requestId: randomUUID(),
-            vehicleCount: data.vehicleCount,
-            vehicleTypes: data.vehicleTypes,
-            maxNumberOfEvents: data.maxNumberOfEvents,
-            refreshIntervalInSecs: data.refreshIntervalInSecs,
-            realtime: data.realtime,
-            sendFlush: this.config.generator.sendFlush,
-            startDate: this.config.generator.startDate,        
-        }
-        this.logger.info('Starting generation', request);
-        this._messageBus.publish('generation', request);
+        this.logger.info('Cancelling any active generation...');
+        this._messageBus.publish('generation.broadcast', { type: 'stop-generation' } as StopGenerationCommand );
+        sleep(1000).then(() => {
+            const request: StartGenerationCommand = {
+                type: 'start-generation',
+                replyTo: this._messageBus.privateInboxName,
+                requestId: randomUUID(),
+                vehicleCount: data.vehicleCount,
+                vehicleTypes: data.vehicleTypes,
+                maxNumberOfEvents: data.maxNumberOfEvents,
+                refreshIntervalInSecs: data.refreshIntervalInSecs,
+                realtime: data.realtime,
+                sendFlush: this.config.generator.sendFlush,
+                startDate: this.config.generator.startDate,        
+            }
+            this.logger.info('Starting generation', request);
+            this._messageBus.publish('generation', request);
+        });
     }
 
     formatStats(ev: AggregatePeriodStats) {
@@ -217,6 +221,7 @@ export class VehicleTrackingViewModel {
         this._timePartitions.clear();
         this._memoryStat.clear();
         this._loadAverageStat.clear();
+        this.statValues.value = this.createStats();
     }
 
     private onProcessStats(ev: AggregatePeriodStats): void {

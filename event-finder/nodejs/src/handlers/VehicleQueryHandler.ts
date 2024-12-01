@@ -304,15 +304,19 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                 dataFolder = path.join(dataFolder, commonRoot);
             }
         }
-        const fileExt = `.${this.config.finder.dataFormat}`;
-        for (const { file, directory } of readAllFiles(dataFolder)) {
-            if (file.name.endsWith(fileExt) && file.name >= fromPrefix && file.name < toPrefix) {
-                const otherSegments = file.name.substring(fromPrefix.length + 1).split('-');
-                const fileGeohash = otherSegments[0];
-                if (geohashes.has(fileGeohash)) {
-                    yield path.join(directory, file.name);
+        if (fs.existsSync(dataFolder)) {
+            const fileExt = `.${this.config.finder.dataFormat}`;
+            for (const { file, directory } of readAllFiles(dataFolder)) {
+                if (file.name.endsWith(fileExt) && file.name >= fromPrefix && file.name < toPrefix) {
+                    const otherSegments = file.name.substring(fromPrefix.length + 1).split('-');
+                    const fileGeohash = otherSegments[0];
+                    if (geohashes.has(fileGeohash)) {
+                        yield path.join(directory, file.name);
+                    }
                 }
-            }
+            }    
+        } else {
+            this.logger.warn(`Folder "${dataFolder}" does not exist!`);
         }
     }
 

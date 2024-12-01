@@ -89,6 +89,7 @@ async function main() {
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, 'generator');
     messageBus.watch(messageBus.privateInboxName).catch(console.error);
+    messageBus.watch('generation.broadcast').catch(console.error);
     messageBus.watch(`generation.agent.${generatorIndex}`, 'generation-agents').catch(console.error);
     await messageBus.watch(`generation`, 'generators');
     server.close();
