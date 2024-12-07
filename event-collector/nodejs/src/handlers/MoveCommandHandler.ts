@@ -1,4 +1,4 @@
-import { GenericEventHandler } from "messaging-lib";
+import { Counter, GenericEventHandler } from "messaging-lib";
 import { AggregatePeriodStats, CollectorConfig, Command, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { Accumulator } from "../core/data/Accumulator.js";
@@ -8,6 +8,30 @@ import { MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
 import { getProcessStats } from "../core/diagnostics/processStats.js";
+
+const vehicles_collector_partitions_total_counter = new Counter({
+    name: 'vehicles_collector_partitions_total',
+    help: 'number of partitions persisted by the event collector',
+    labelNames: ['is_partial'],
+});
+
+const vehicles_collector_partitions_objects_total_counter = new Counter({
+    name: 'vehicles_collector_partitions_objects_total',
+    help: 'number of objects in the partitions persisted by the event collector',
+    labelNames: ['is_partial'],
+});
+
+const vehicles_collector_partitions_duration_secs_total_counter = new Counter({
+    name: 'vehicles_collector_partitions_duration_secs_total',
+    help: 'Elapsed time in seconds when persisting partitions aggregated by the event collector',
+    labelNames: ['is_partial'],
+});
+
+const vehicles_collector_partitions_size_counter = new Counter({
+    name: 'vehicles_collector_partitions_size',
+    help: 'storage size of the partitions persisted by the event collector, in bytes',
+    labelNames: ['is_partial'],
+});
 
 export interface PersistedMoveCommand {
     timestamp: Date;
@@ -147,12 +171,20 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         let subPartitionCount = 0;
         for (const { groupKey, groupItems } of splitter.enumerate()) {
             const sortedItems = groupItems.map(x => x.event).sort(compareVehicles);
+            const watch2 = new Stopwatch();
+            watch2.start();
             const groupWriteStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
+            watch2.stop();
             partitionStats.push(...groupWriteStats);
             subPartitionCount++;
             for (const file of groupWriteStats) {
                 formats.add(file.format);
             }
+            vehicles_collector_partitions_total_counter.inc({ is_partial: isPartial.toString()});
+            vehicles_collector_partitions_objects_total_counter.inc({ is_partial: isPartial.toString()}, sortedItems.length);
+            vehicles_collector_partitions_duration_secs_total_counter.inc({ is_partial: isPartial.toString() }, watch2.elapsedTimeInSecs());
+            const size = groupWriteStats.map(x => x.size).reduce((a, b) => a + b, 0);
+            vehicles_collector_partitions_size_counter.inc({ is_partial: isPartial.toString() }, size);
         }
         watch.stop();
         this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);

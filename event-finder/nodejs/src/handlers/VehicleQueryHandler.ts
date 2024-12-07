@@ -1,4 +1,4 @@
-import { GenericEventHandler } from "messaging-lib";
+import { Counter, GenericEventHandler } from "messaging-lib";
 import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, TimeRange, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, chunks } from 'core-lib';
 import { MessageBus } from "messaging-lib";
 import fs from 'fs';
@@ -7,6 +7,24 @@ import pl from 'nodejs-polars';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
 import * as turf from '@turf/turf';
+
+const vehicles_search_processed_events_total_counter = new Counter({
+    name: 'vehicles_search_processed_events_total',
+    help: 'number of events processed during a search by the event finder',
+    labelNames: [],
+});
+
+const vehicles_search_selected_events_total_counter = new Counter({
+    name: 'vehicles_search_selected_events_total',
+    help: 'number of events selected during a search by the event finder',
+    labelNames: [],
+});
+
+const vehicles_search_processed_bytes_total_counter = new Counter({
+    name: 'vehicles_search_processed_bytes_total',
+    help: 'number of bytes processed during a search by the event finder',
+    labelNames: [],
+});
 
 export class VehicleQueryContext {
     processedFilesCount = 0;
@@ -341,6 +359,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         }
         const fstats = fs.statSync(filename);
         ctx.processedBytes += fstats.size;
+        vehicles_search_processed_bytes_total_counter.inc(fstats.size);
         const colNames = df.columns;
         const idx_timestamp = colNames.indexOf('timestamp');
         const idx_vehicleId = colNames.indexOf('vehicleId');
@@ -353,6 +372,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         const idx_direction = colNames.indexOf('direction');
         for (const row of df.rows()) {
             ctx.processedRecordCount += 1;
+            vehicles_search_processed_events_total_counter.inc();
             const timestamp = row[idx_timestamp];
             const vehicleId = row[idx_vehicleId];
             const vehicleType = row[idx_vehicleType];
@@ -367,6 +387,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                 const isInsidePolygon = turf.booleanContains(ctx.polygon, pos);
                 const isValidVehicle = ctx.event.vehicleTypes.length === 0 || ctx.event.vehicleTypes.includes(vehicleType);
                 if (isInsidePolygon && isValidVehicle) {
+                    vehicles_search_selected_events_total_counter.inc();
                     const ev: VehicleQueryResult = {
                         type: 'vehicle-query-result',
                         queryId: ctx.event.id,
