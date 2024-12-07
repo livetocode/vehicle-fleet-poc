@@ -75,8 +75,16 @@ export class VehiclesChart extends Chart {
     const hub = new Deployment(this, 'event-hub', {
       replicas: 1,
       volumes: [hubConfigVolume],
+      podMetadata: {
+        annotations: {
+          'prometheus.io/scrape': 'true',
+          'prometheus.io/path': '/metrics',
+          'prometheus.io/port': '7777',
+        },
+      },
       containers: [ 
         { 
+          name: 'nats-server',
           image: 'livetocode/vehicle-fleet-poc-event-hub:latest',
           liveness: Probe.fromCommand(["curl", "-f", "http://localhost:8222/varz"]),
           securityContext: {
@@ -105,6 +113,17 @@ export class VehiclesChart extends Chart {
               limit: Size.gibibytes(1),
             },
           },
+        },
+        {
+          name: 'prom-exporter',
+          image: 'natsio/prometheus-nats-exporter:latest',
+          ports: [
+            { name: 'prometheus', number: 7777, protocol: Protocol.TCP },
+          ],
+          securityContext: {
+            ensureNonRoot: false,
+          },
+          args: ['-varz', '-jsz=all', 'http://localhost:8222'],
         },
       ],
     });
