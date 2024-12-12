@@ -3,6 +3,7 @@ import YAML from 'yaml';
 import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
+import { createDataFrameRepository } from 'data-lib';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -51,10 +52,14 @@ async function main() {
     const messageBus = createMessageBus(config.hub, 'finder', logger);
     await messageBus.start();
     
+    const repo = createDataFrameRepository(config.collector.output);
+    await repo.init();
+
     const vehicleQueryHandler = new VehicleQueryHandler(
         config,
         logger,
-        messageBus, 
+        messageBus,
+        repo,
     );
     messageBus.registerHandlers(vehicleQueryHandler);
 

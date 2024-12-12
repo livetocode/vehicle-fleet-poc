@@ -3,20 +3,17 @@ import YAML from 'yaml';
 import { MoveCommandHandler, PersistedMoveCommand } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
-import { ParquetFileWriter } from "./core/persistence/formats/ParquetFileWriter.js";
-import { JsonFileWriter } from "./core/persistence/formats/JsonFileWriter.js";
-import { CsvFileWriter } from "./core/persistence/formats/CsvFileWriter.js";
-import { ArrowFileWriter } from "./core/persistence/formats/ArrowFileWriter.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
 import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
-import { FileWriter } from './core/persistence/formats/FileWriter.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
 import { NoOpAggregateStore } from './core/persistence/NoOpAggregateStore.js';
 import { IdDataPartitionStrategy } from './core/data/IdDataPartitionStrategy.js';
 import { GeohashDataPartitionStrategy } from './core/data/GeohashDataPartitionStrategy.js';
 import { IdGroupDataPartitionStrategy } from './core/data/IdGroupDataPartitionStrategy.js';
+import { createDataFrameRepository, DataFrameFormat, DataFrameRepository, stringToFormat } from 'data-lib';
+import { ClearVehiclesDataHandler } from './handlers/ClearVehiclesDataHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -42,33 +39,17 @@ function createEventStore(config: EventStoreConfig) {
     }
 }
 
-function createAggregateStore(config: CollectorConfig, logger: Logger): AggregateStore<PersistedMoveCommand> {
-    if (config.output.type === 'noop') {
+function createAggregateStore(config: CollectorConfig, logger: Logger, repo: DataFrameRepository): AggregateStore<PersistedMoveCommand> {
+    if (config.output.storage.type === 'noop') {
         return new NoOpAggregateStore();
     }
-    const formats: FileWriter[] = [];
-    if (config.output.type === 'file' && config.output.formats) {
-        if (config.output.formats.includes('json')) {
-            formats.push(new JsonFileWriter(false));
-        }
-        if (config.output.formats.includes('csv')) {
-            formats.push(new CsvFileWriter());
-        }
-        if (config.output.formats.includes('parquet')) {
-            formats.push(new ParquetFileWriter());
-        }
-        if (config.output.formats.includes('arrow')) {
-            formats.push(new ArrowFileWriter());
-        }
-    } else {
-        throw new Error(`Unknown output type '${config.output.type}'`);
-    }
-    let aggregateStore: AggregateStore<PersistedMoveCommand>;
-    if (config.output.type === 'file') {
-        aggregateStore = new FileAggregateStore<PersistedMoveCommand>(logger, config.output.folder, config.output.flatLayout, formats);
-     } else {
-        throw new Error(`Unknown output type '${(config.output as any).type}'`);
-     }
+    let formats: DataFrameFormat[] = config.output.formats.map(stringToFormat);
+    const aggregateStore = new FileAggregateStore<PersistedMoveCommand>(
+        logger, 
+        config.output.overwriteExistingFiles, 
+        config.output.flatLayout, 
+        formats, 
+        repo);
     return aggregateStore;
 }
 
@@ -124,9 +105,12 @@ async function main() {
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
 
-    const aggregateStore = createAggregateStore(config.collector, logger);
-    await aggregateStore.init();
+    const repo = createDataFrameRepository(config.collector.output);
+    await repo.init();
+
+    const aggregateStore = createAggregateStore(config.collector, logger, repo);
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition, collectorIndex);
+
     
     const moveCommandHandler = new MoveCommandHandler(
         config,
@@ -138,10 +122,14 @@ async function main() {
         collectorIndex, 
     );
     await moveCommandHandler.init();
-    messageBus.registerHandlers(moveCommandHandler);
+
+    const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, messageBus, repo);
+
+    messageBus.registerHandlers(moveCommandHandler, clearVehiclesDataHandler);
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, 'collector');
+    messageBus.watch(`requests.collector`, `requests-collector`).catch(console.error);
     await messageBus.watch(`commands.*.${collectorIndex}`);
     server.close();
 }

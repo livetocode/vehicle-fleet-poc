@@ -35,6 +35,7 @@ services:
     environment:
       NATS_SERVERS: event-hub:4222
       COLLECTOR_INSTANCES: 1
+      VEHICLES_AZURE_STORAGE_CONNECTION_STRING: ${VEHICLES_AZURE_STORAGE_CONNECTION_STRING}
     ports:
       - "7720:7720"
     volumes:
@@ -68,6 +69,7 @@ services:
     environment:
       NATS_SERVERS: event-hub:4222
       FINDER_INSTANCES: 1
+      VEHICLES_AZURE_STORAGE_CONNECTION_STRING: ${VEHICLES_AZURE_STORAGE_CONNECTION_STRING}
     ports:
       - "7730:7730"
     volumes:

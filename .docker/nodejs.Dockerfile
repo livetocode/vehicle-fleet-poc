@@ -35,6 +35,16 @@ COPY --chown=node:node shared/javascript/messaging-lib ./
 
 RUN npm run compile
 
+# Data lib
+WORKDIR /apps/shared/javascript/data-lib
+COPY --chown=node:node shared/javascript/data-lib/package.json shared/javascript/data-lib/package-lock.json* ./
+
+RUN npm ci --include dev && rm -rf ~/.npm
+
+COPY --chown=node:node shared/javascript/data-lib ./
+
+RUN npm run compile
+
 #-----------------------------------------------------------------------------------
 FROM base AS app-generator
 #-----------------------------------------------------------------------------------

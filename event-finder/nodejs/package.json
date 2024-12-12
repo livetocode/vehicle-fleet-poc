@@ -25,6 +25,7 @@
     "@types/geojson": "^7946.0.14",
     "apache-arrow": "^18.0.0",
     "core-lib": "file:../../shared/javascript/core-lib",
+    "data-lib": "file:../../shared/javascript/data-lib",
     "duckdb-async": "^1.1.1",
     "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",

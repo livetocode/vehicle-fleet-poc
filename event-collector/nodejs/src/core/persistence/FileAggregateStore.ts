@@ -1,55 +1,43 @@
 import { AggregateStore } from "./AggregateStore.js";
-import fs from 'fs/promises';
 import { DataPartitionStats, Logger, Stopwatch, TimeRange, dateToUtcParts } from "core-lib";
 import path from 'path';
-import { FileWriter } from "./formats/FileWriter.js";
 import { pathToFileURL } from 'node:url';
+import { DataFrameFormat, DataFrameRepository } from "data-lib";
+import { DataFrame } from "nodejs-polars";
 
 export class FileAggregateStore<T> implements AggregateStore<T> {
     constructor(
         private logger: Logger,
-        private folder: string, 
+        private overwriteExistingFiles: boolean,
         private flatLayout: boolean,
-        private formats: FileWriter[]
+        private formats: DataFrameFormat[],
+        private repo: DataFrameRepository,
     ) {}
-
-    async init(): Promise<void> {        
-        await fs.mkdir(this.folder, { recursive: true });
-    }
 
     async write(range: TimeRange, partitionKey: string, events: T[]): Promise<DataPartitionStats[]> {
         const stats: DataPartitionStats[] = [];
         for (const format of this.formats) {
-            const ext = format.extension;
             const fromParts = dateToUtcParts(range.fromTime);
             let filename: string;
             if (this.flatLayout) {
-                filename = path.join(
-                    this.folder,
-                    `${fromParts.join('-')}-${partitionKey}.${ext}`);
+                filename = `${fromParts.join('-')}-${partitionKey}.${format}`;
             } else {
                 filename = path.join(
-                    this.folder, 
-                    ext,
                     ...fromParts,
-                    `${fromParts.join('-')}-${partitionKey}.${ext}`);    
+                    `${fromParts.join('-')}-${partitionKey}.${format}`);    
             }
-            if (this.flatLayout === false) {
-                await fs.mkdir(path.dirname(filename), { recursive: true });
-            }
-            try {
-                await fs.access(filename);
+            if (this.overwriteExistingFiles === false && await this.repo.exists(filename)) {
                 this.logger.warn(`file ${filename} already exists!`);
-            } catch {
+            } else {
                 const watch = new Stopwatch();
                 watch.start();
-                await format.write(filename, events);
+                const df = DataFrame(events, { inferSchemaLength: 1 });
+                const item = await this.repo.write(df, filename);
                 watch.stop();
-                const fstats = await fs.stat(filename);
                 stats.push({
                     url: pathToFileURL(filename).toString(),
-                    format: ext,
-                    size: fstats.size,
+                    format,
+                    size: item.size,
                     itemCount: events.length,
                     partitionKey: partitionKey,
                     elapsedTimeInMS: watch.elapsedTimeInMS(),

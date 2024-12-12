@@ -24,7 +24,7 @@ generator:
   logging:
     enabled: true
     level: debug
-  instances: 2
+  instances: 1
   httpPort: 7710
   vehicleCount: 1500
   maxNumberOfEvents: 5000000
@@ -60,26 +60,29 @@ collector:
   logging:
     enabled: true
     level: debug
-  instances: 5
+  instances: 4
   httpPort: 7720
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb
   output:
-    # type: noop
-    type: file
-    folder: ../../output/data
-    flatLayout: false
+    overwriteExistingFiles: false
+    flatLayout: true
     formats:
     - parquet
     # - csv
     # - arrow
+    storage:
+      # type: noop
+      # type: s3
+      type: file
+      folder: ../../output/data
 
 finder:
   logging:
     enabled: true
     level: info
-  instances: 3
+  instances: 4
   httpPort: 7730
   defaultTimeoutInMS: 30000
   dataFormat: parquet

@@ -1,12 +1,11 @@
 import { Counter, GenericEventHandler } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, TimeRange, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, chunks } from 'core-lib';
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks } from 'core-lib';
 import { MessageBus } from "messaging-lib";
-import fs from 'fs';
 import path from 'path';
-import pl from 'nodejs-polars';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
 import * as turf from '@turf/turf';
+import { DataFrameRepository, ListOptions, DataFrameDescriptor, stringToFormat } from "data-lib";
 
 const vehicles_search_processed_events_total_counter = new Counter({
     name: 'vehicles_search_processed_events_total',
@@ -85,6 +84,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         private config: Config,
         private logger: Logger,
         private messageBus: MessageBus,
+        private repo: DataFrameRepository,
     ) {
         super();
     }
@@ -120,9 +120,9 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
             const ctx = new VehicleQueryContext(this.config, event);
             const geohashes = this.createGeohashes(ctx.polygon);
             if (ctx.parallelize && ctx.useChunking) {
-                for (const filenames of chunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
+                for await  (const filenames of asyncChunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
                     for (const filename of filenames) {
-                        this.processFile(ctx, filename);
+                        await this.processFile(ctx, filename);
                         if (ctx.shouldAbort()) {
                             break;
                         }
@@ -133,16 +133,16 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                     }
                 }    
             } else if (ctx.parallelize && !ctx.useChunking) {
-                for (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
-                    this.processFile(ctx, filename);
+                for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
+                    await this.processFile(ctx, filename);
                     if (ctx.shouldAbort()) {
                         break;
                     }
                 }
                 await this.waitForSubQueries(ctx);    
             } else { // serialize
-                for (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
-                    this.processFile(ctx, filename);
+                for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
+                    await this.processFile(ctx, filename);
                     if (ctx.shouldAbort()) {
                         break;
                     }
@@ -172,7 +172,7 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
     private async processQueryPartition(event: VehicleQueryPartition): Promise<void> {
         this.logger.debug('Received query partition', event);
         const ctx = new VehicleQueryContext(this.config, event.query);
-        await this.executeProcessFile(ctx, event.filename);
+        await this.executeProcessFile(ctx, event.filename, event.filesize);
         ctx.watch.stop();
         const stats: VehicleQueryPartitionResultStats = {
             type: 'vehicle-query-partition-result-stats',
@@ -220,16 +220,16 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         }
     }
     
-    private processFile(ctx: VehicleQueryContext, filename: string) {
+    private processFile(ctx: VehicleQueryContext, item: DataFrameDescriptor) {
         ctx.processedFilesCount += 1;
         if (ctx.parallelize) {
-            return this.requestProcessFile(ctx, filename);
+            return this.requestProcessFile(ctx, item);
         } else {
-            return this.executeProcessFile(ctx, filename);
+            return this.executeProcessFile(ctx, item.name, item.size);
         }
     }
     
-    private requestProcessFile(ctx: VehicleQueryContext, filename: string) {
+    private async requestProcessFile(ctx: VehicleQueryContext, item: DataFrameDescriptor) {
         ctx.checkIfLimitWasReached();
         ctx.checkTimeout();
         if (ctx.shouldAbort()) {
@@ -243,7 +243,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                 limit: ctx.event.limit ? ctx.event.limit - ctx.selectedRecordCount : undefined,
             },
             partitionQueryId: crypto.randomUUID(), 
-            filename,
+            filename: item.name,
+            filesize: item.size,
             replyTo: this.messageBus.privateInboxName,
 
         };
@@ -256,8 +257,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         this.messageBus.publish('query.vehicles.partitions', subQuery);
     }
 
-    private executeProcessFile(ctx: VehicleQueryContext, filename: string) {
-        for (const res of this.searchFile(ctx, filename)) {
+    private async executeProcessFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
+        for await (const res of this.searchFile(ctx, filename, filesize)) {
             this.messageBus.publish(ctx.event.replyTo, res);
             ctx.selectedRecordCount += 1;
             ctx.distinctVehicles.add(res.vehicleId);
@@ -306,60 +307,37 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         return new Set<string>();
     }
 
-    private *enumerateFiles(fromDate: Date, toDate: Date, geohashes: Set<string>) {
+    private async *enumerateFiles(fromDate: Date, toDate: Date, geohashes: Set<string>) {
         const periodInMin = this.config.partitioning.timePartition.aggregationPeriodInMin;
         const fromPrefix = calcTimeWindow(fromDate, periodInMin).toString();
         const toRange = calcTimeWindow(toDate, periodInMin);
         const toPrefix = dateToUtcParts(toRange.untilTime).join('-');
-        if (this.config.collector.output.type !== 'file') {
-            throw new Error('Expected output type to be "file"');
-        }
-        let dataFolder = this.config.collector.output.folder;
-        if (this.config.collector.output.flatLayout === false) {
-            dataFolder = path.join(dataFolder, this.config.finder.dataFormat);
+        const flatLayout = this.config.collector.output.flatLayout;
+        const listOptions: ListOptions = {
+            fromPrefix,
+            toPrefix,
+            format: stringToFormat(this.config.finder.dataFormat),
+        };
+        if (flatLayout === false) {
             const commonRoots = findCommonAncestorDirectory(fromDate, toDate);
-            for (const commonRoot of commonRoots) {
-                dataFolder = path.join(dataFolder, commonRoot);
-            }
+            listOptions.subFolder = commonRoots.reduce((a, b) => path.join(a, b), '');
         }
-        if (fs.existsSync(dataFolder)) {
-            const fileExt = `.${this.config.finder.dataFormat}`;
-            for (const { file, directory } of readAllFiles(dataFolder)) {
-                if (file.name.endsWith(fileExt) && file.name >= fromPrefix && file.name < toPrefix) {
-                    const otherSegments = file.name.substring(fromPrefix.length + 1).split('-');
-                    const fileGeohash = otherSegments[0];
-                    if (geohashes.has(fileGeohash)) {
-                        yield path.join(directory, file.name);
-                    }
-                }
-            }    
-        } else {
-            this.logger.warn(`Folder "${dataFolder}" does not exist!`);
+
+        for await (const item of this.repo.list(listOptions)) {
+            const segments = path.basename(item.name).split('-');
+            const fileGeohash = segments[5];
+            if (geohashes.has(fileGeohash)) {
+                yield item;
+            }
         }
     }
 
-    private *searchFile(ctx: VehicleQueryContext, filename: string) {
+    private async *searchFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
         this.logger.debug('search file ', filename);
-        let df: pl.DataFrame;
-        switch(this.config.finder.dataFormat) {
-            case 'parquet':
-                df = pl.readParquet(filename);
-                break;
-            case 'csv':
-                df = pl.readCSV(filename);
-                break;
-            case 'json':
-                df = pl.readJSON(filename);
-                break;
-            case 'arrow':
-                df = pl.readIPC(filename);
-                break;
-            default:
-                throw new Error(`Unsupported file format: ${this.config.finder.dataFormat}`);
-        }
-        const fstats = fs.statSync(filename);
-        ctx.processedBytes += fstats.size;
-        vehicles_search_processed_bytes_total_counter.inc(fstats.size);
+        const df = await this.repo.read(filename);
+
+        ctx.processedBytes += filesize;
+        vehicles_search_processed_bytes_total_counter.inc(filesize);
         const colNames = df.columns;
         const idx_timestamp = colNames.indexOf('timestamp');
         const idx_vehicleId = colNames.indexOf('vehicleId');
@@ -407,19 +385,6 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
                 }
             }
         }
-    }
-}
-
-export function* readAllFiles(directory: string): Generator<{ file: fs.Dirent; directory: string }> {
-    const files = fs.readdirSync(directory, { withFileTypes: true });
-    files.sort((a, b) => a.name.localeCompare(b.name));
-  
-    for (const file of files) {
-      if (file.isDirectory()) {
-        yield* readAllFiles(path.join(directory, file.name));
-      } else {
-        yield { file, directory };
-      }
     }
 }
 

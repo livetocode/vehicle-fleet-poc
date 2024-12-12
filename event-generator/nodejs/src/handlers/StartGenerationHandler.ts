@@ -1,13 +1,13 @@
-import { addOffsetToCoordinates, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GpsCoordinates, KM, Logger, MoveCommand, Rect, ResetAggregatePeriodStats, sleep, StartGenerationCommand, StopGenerationCommand, Stopwatch } from "core-lib";
+import { addOffsetToCoordinates, ClearVehiclesData, ClearVehiclesDataResult, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GpsCoordinates, KM, Logger, MoveCommand, Rect, ResetAggregatePeriodStats, sleep, StartGenerationCommand, StopGenerationCommand, Stopwatch } from "core-lib";
 import { GenericEventHandler, MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
-import { mkdirSync, rmSync } from "fs";
 
 
-export class StartGenerationHandler extends GenericEventHandler<StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats> {
+export class StartGenerationHandler extends GenericEventHandler<StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats | ClearVehiclesDataResult> {
     private subGenerators = new Map<string, Set<string>>();
     private stopGenerationRequested = false;
+    private pendingClearRequests = new Map<string, ClearVehiclesDataResult | null>();
 
     constructor(
         private config: Config,
@@ -20,10 +20,10 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
     }
 
     get eventTypes(): string[] {
-        return ['start-generation', 'stop-generation', 'generate-partition', 'generate-partition-stats'];
+        return ['start-generation', 'stop-generation', 'generate-partition', 'generate-partition-stats', 'clear-vehicles-data-result'];
     }
     
-    protected processTypedEvent(event: StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats): Promise<void> {
+    protected processTypedEvent(event: StartGenerationCommand | StopGenerationCommand | GeneratePartitionCommand | GeneratePartitionStats | ClearVehiclesDataResult): Promise<void> {
         if (event.type === 'start-generation') {
             return this.processStart(event);
         }
@@ -36,28 +36,36 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
         if (event.type === 'generate-partition-stats') {
             return this.processPartitionStats(event);
         }
+        if (event.type === 'clear-vehicles-data-result') {
+            return this.processClearDataResponse(event);
+        }
         throw new Error(`Unexpected event type "${(event as any).type}"`);
     }
 
     protected async processStart(event: StartGenerationCommand): Promise<void> {
         this.logger.info('Received event', event);
-        let subGenerators = this.subGenerators.get(event.requestId);
+        let subGenerators = this.subGenerators.get(event.id);
         if (!subGenerators) {
             subGenerators = new Set<string>();
-            this.subGenerators.set(event.requestId, subGenerators);
+            this.subGenerators.set(event.id, subGenerators);
         }
         try {
             // reset stats
             this.messageBus.publish(`stats`, { type: 'reset-aggregate-period-stats' } as ResetAggregatePeriodStats);
-            //await sleep(1000);
 
             // delete existing events
-            if (this.config.collector.output.type === 'file') {
-                // TODO: send a message to the collectors
-                this.logger.warn('Deleting output folder ', this.config.collector.output.folder);
-                rmSync(this.config.collector.output.folder, { recursive: !this.config.collector.output.flatLayout, force: true});
-                mkdirSync(this.config.collector.output.folder, { recursive: true });
+            const clearRequest: ClearVehiclesData = {
+                type: 'clear-vehicles-data', 
+                id: crypto.randomUUID(),
+                replyTo: this.messageBus.privateInboxName,
+            };
+            this.messageBus.publish(`requests.collector`, clearRequest);
+            this.pendingClearRequests.set(clearRequest.id, null);
+            const clearResponse = await this.waitForClearResponse(clearRequest);
+            if (!clearResponse.success) {
+                throw new Error('Collector could not clear the data!');
             }
+            this.logger.info('Existing data has been cleared by a collector.');
 
             // partition generation work
             const startDate = getStartDate(event, this.config.generator.startDate);
@@ -99,12 +107,12 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
             // send response stats
             const stats: GenerationStats = {
                 type: 'generation-stats',
-                requestId: event.requestId,
+                requestId: event.id,
                 elapsedTimeInMS: watch.elapsedTimeInMS(),
             };
             this.messageBus.publish(event.replyTo, stats);
         } finally {
-            this.subGenerators.delete(event.requestId);
+            this.subGenerators.delete(event.id);
         }
     }
     
@@ -112,6 +120,12 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
         this.logger.warn('Stop generation request', event);
         // this.subGenerators.clear();
         this.stopGenerationRequested = true;
+    }
+
+    protected async processClearDataResponse(event: ClearVehiclesDataResult) {
+        if (this.pendingClearRequests.has(event.requestId)) {
+            this.pendingClearRequests.set(event.requestId, event);
+        }
     }
 
     protected async processPartitionStats(event: GeneratePartitionStats): Promise<void> {
@@ -232,12 +246,25 @@ export class StartGenerationHandler extends GenericEventHandler<StartGenerationC
         this.logger.info(`Done generating ${eventCount} out of ${event.request.maxNumberOfEvents} events in ${watch.elapsedTimeAsString()}`);
         const stats: GeneratePartitionStats = {
             type: 'generate-partition-stats',
-            requestId: event.request.requestId,
+            requestId: event.request.id,
             subRequestId: event.subRequestId,
             generatedEventCount: eventCount,
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         };
         this.messageBus.publish(event.replyTo, stats);
+    }
+
+    private async waitForClearResponse(request: ClearVehiclesData): Promise<ClearVehiclesDataResult> {
+        while(true) {
+            await sleep(100);
+            const result = this.pendingClearRequests.get(request.id);
+            if (result === undefined) {
+                throw new Error(`There is no pending request ID '${request.id}'`);
+            }
+            if (result !== null) {
+                return result;
+            }
+        }
     }
 }
 

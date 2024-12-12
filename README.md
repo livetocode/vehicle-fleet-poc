@@ -21,60 +21,67 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 ## Messages
 
 ```
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| Topic                   | Consumer Group  | Event Type                 | Produced by    | Consumed by     | Usage                                    |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation              | generators      | start-generation           | viewer         | generator       | The viewer will initiate a generation    |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation.broadcast    |                 | stop-generation            | viewer         | generator       | The viewer will cancel any active        |
-|                         |                 |                            |                |                 | generation before starting a new one.    |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation.agent.*      |generation-agents| generate-partition         | generator      | generator       | The generator will partition its work    |
-|                         |                 |                            |                |                 | with its agents.                         |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.generator.*       | generators      | generate-partition-stats   | viewer         | generator       | The viewer will initiate a generation    |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| commands.move.*         |                 | move                       | generator      | collector       | The collector will agregate the move     |
-|                         |                 |                            |                |                 | commands and persist them as a chunk.    |
-|                         |                 |                            |                +-----------------+------------------------------------------+
-|                         |                 |                            |                | viewer          | The viewer will display the move of      |
-|                         |                 |                            |                |                 | each vehicle.                            |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| commands.flush.*        |                 | flush                      | generator      | collector       | At the end of the generation, a flush    |
-|                         |                 |                            |                |                 | command is sent to force the collectors  |
-|                         |                 |                            |                |                 | to write the accumulated data.           |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| stats                   |                 | aggregate-period-stats     | collector      | viewer          | Every time a chunk of data is persisted  |
-|                         |                 |                            |                |                 | by the collector, some stats on the chunk|
-|                         |                 |                            |                |                 | will be sent to the viewer.              |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| stats                   |                 |reset-aggregate-period-stats| generator      | viewer          | Clear the map in the viewer when a new   |
-|                         |                 |                            |                |                 | generation begins.                       |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| query.vehicles          | vehicle-finder  | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
-|                         |                 |                            |                |                 | The finder will filter the chunks based  |
-|                         |                 |                            |                |                 | on the time period and the geohashes of  |
-|                         |                 |                            |                |                 | the polygon filter.                      |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-|query.vehicles.partitions| vehicle-finder- | vehicle-query-partition    | finder         | finder          | The finder is delegating the file        |
-|                         | partitions      |                            |                |                 | processing to the cluster of finders.    |
-|                         |                 |                            |                |                 | The response will be sent using the      |
-|                         |                 |                            |                |                 | vehicle-query-partition-result-stats evt |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.viewer.<UID>      |                 | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
-|                         |                 |                            |                |                 | will send all the move commands that     |
-|                         |                 |                            |                |                 | match the criteria. The viewer will then |
-|                         |                 |                            |                |                 | be able to replay them.                  |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.viewer.<UID>      |                 | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
-|                         |                 |                            |                |                 | will send some stats to the viewer, to   |
-|                         |                 |                            |                |                 | measure the performance and processing   |
-|                         |                 |                            |                |                 | that was required.                       |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.finder.<UID>      |                 | vehicle-query-             | finder         | finder          | This is a partial result sent back to    |
-|                         |                 | partition-result-stats     |                |                 | the finder that delegated the            |
-|                         |                 |                            |                |                 | processing.                              |
-+-------------------------+-----------------+----------------------------+----------------+-----------------+------------------------------------------+
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| Topic                   | Consumer Group   | Event Type                 | Produced by    | Consumed by     | Usage                                    |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation              | generators       | start-generation           | viewer         | generator       | The viewer will initiate a generation    |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation.broadcast    |                  | stop-generation            | viewer         | generator       | The viewer will cancel any active        |
+|                         |                  |                            |                |                 | generation before starting a new one.    |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| generation.agent.*      |generation-agents | generate-partition         | generator      | generator       | The generator will partition its work    |
+|                         |                  |                            |                |                 | with its agents.                         |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| requests.collector      |requests-collector| clear-vehicles-data        | generator      | collector       | The generator will ask the collector to  |
+|                         |                  |                            |                |                 | clear all the files before starting the  |
+|                         |                  |                            |                |                 | generation.                              |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.generator.*       | generators       | generate-partition-stats   | viewer         | generator       | The viewer will initiate a generation    |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.generator.*       | generators       | clear-vehicles-data-result | collector      | generator       | The collector will report on the         |
+|                         |                  |                            |                |                 | completion of the destruction.           |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| commands.move.*         |                  | move                       | generator      | collector       | The collector will agregate the move     |
+|                         |                  |                            |                |                 | commands and persist them as a chunk.    |
+|                         |                  |                            |                +-----------------+------------------------------------------+
+|                         |                  |                            |                | viewer          | The viewer will display the move of      |
+|                         |                  |                            |                |                 | each vehicle.                            |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| commands.flush.*        |                  | flush                      | generator      | collector       | At the end of the generation, a flush    |
+|                         |                  |                            |                |                 | command is sent to force the collectors  |
+|                         |                  |                            |                |                 | to write the accumulated data.           |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| stats                   |                  | aggregate-period-stats     | collector      | viewer          | Every time a chunk of data is persisted  |
+|                         |                  |                            |                |                 | by the collector, some stats on the chunk|
+|                         |                  |                            |                |                 | will be sent to the viewer.              |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| stats                   |                  |reset-aggregate-period-stats| generator      | viewer          | Clear the map in the viewer when a new   |
+|                         |                  |                            |                |                 | generation begins.                       |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| query.vehicles          | vehicle-finder   | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
+|                         |                  |                            |                |                 | The finder will filter the chunks based  |
+|                         |                  |                            |                |                 | on the time period and the geohashes of  |
+|                         |                  |                            |                |                 | the polygon filter.                      |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+|query.vehicles.partitions| vehicle-finder-  | vehicle-query-partition    | finder         | finder          | The finder is delegating the file        |
+|                         | partitions       |                            |                |                 | processing to the cluster of finders.    |
+|                         |                  |                            |                |                 | The response will be sent using the      |
+|                         |                  |                            |                |                 | vehicle-query-partition-result-stats evt |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.viewer.<UID>      |                  | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
+|                         |                  |                            |                |                 | will send all the move commands that     |
+|                         |                  |                            |                |                 | match the criteria. The viewer will then |
+|                         |                  |                            |                |                 | be able to replay them.                  |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.viewer.<UID>      |                  | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
+|                         |                  |                            |                |                 | will send some stats to the viewer, to   |
+|                         |                  |                            |                |                 | measure the performance and processing   |
+|                         |                  |                            |                |                 | that was required.                       |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
+| inbox.finder.<UID>      |                  | vehicle-query-             | finder         | finder          | This is a partial result sent back to    |
+|                         |                  | partition-result-stats     |                |                 | the finder that delegated the            |
+|                         |                  |                            |                |                 | processing.                              |
++-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
 ```
 
 Note that when a consumer uses a "consumer group" name, it means that the message will be handled only once by a member of the group.

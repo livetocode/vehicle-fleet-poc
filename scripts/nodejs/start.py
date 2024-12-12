@@ -31,6 +31,10 @@ def delete_folder(folder: str):
         print(f"deleting '{folder}'...")
         shutil.rmtree(folder)
 
+def kill_processes(processes):
+    for process in processes:
+        process.kill()
+
 def wait_for_processes_to_complete(processes):
     while processes:
         processes = [process for process in processes if process.poll() is None]
@@ -53,7 +57,7 @@ def wait_for_instances_to_be_ready(instances):
             current_instances.append((process, http_port))
             time.sleep(0.2)
     print("All instances are ready")
-
+    
 def start_nodejs_instances(folder: str, instances: int):
     global next_http_port
     services = []
@@ -62,6 +66,7 @@ def start_nodejs_instances(folder: str, instances: int):
             'INSTANCE_INDEX': str(idx),
             'PATH': os.environ['PATH'],
             'NODE_HTTP_PORT': str(next_http_port),
+            'VEHICLES_AZURE_STORAGE_CONNECTION_STRING': os.environ['VEHICLES_AZURE_STORAGE_CONNECTION_STRING']
         })
         services.append((process, next_http_port))
         next_http_port += 1
@@ -72,23 +77,27 @@ config = read_config()
 
 step("build shared libraries...")
 compile_nodejs_lib("shared/javascript/core-lib")
+compile_nodejs_lib("shared/javascript/data-lib")
 compile_nodejs_lib("shared/javascript/messaging-lib")
 
 step("Cleanup data")
 delete_folder("output")
 
 services = []
+try:
+    step("Start collectors")
+    services += start_nodejs_instances("event-collector/nodejs", config['collector']['instances'])
 
-step("Start collectors")
-services += start_nodejs_instances("event-collector/nodejs", config['collector']['instances'])
+    step("Start generators")
+    services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
 
-step("Start generators")
-services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
+    step("Start finders")
+    services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
 
-step("Start finders")
-services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
-
-print("")
-print("Waiting for processes to complete...")
-print([http_port for _, http_port in services])
-wait_for_processes_to_complete([process for process, _ in services])
+    print("")
+    print("Waiting for processes to complete...")
+    print([http_port for _, http_port in services])
+    wait_for_processes_to_complete([process for process, _ in services])
+except Exception as e:
+    print(e)
+    kill_processes([process for process, _ in services])

@@ -2,12 +2,12 @@ import { GpsCoordinates } from "./geometry";
 
 export type LogLevel = 'info' | 'warn' | 'debug' | 'trace' | 'error';
 
-export interface LoggingConfig {
+export type LoggingConfig = {
     enabled: boolean;
     level: LogLevel;
 }
 
-export interface NatsHubConfig {
+export type NatsHubConfig = {
     type: 'nats';
     protocols: {
         nats: {
@@ -19,22 +19,22 @@ export interface NatsHubConfig {
     }
 }
 
-export interface RabbitHubConfig {
+export type RabbitHubConfig = {
     type: 'rabbit';
     // todo: define other properties
 }
 
 export type HubConfig = NatsHubConfig | RabbitHubConfig;
 
-export interface NoopEventStoreConfig {
+export type NoopEventStoreConfig = {
     type: 'noop';
 }
 
-export interface InMemoryEventStoreConfig {
+export type InMemoryEventStoreConfig = {
     type: 'memory';
 }
 
-export interface DuckDbEventStoreConfig {
+export type DuckDbEventStoreConfig = {
     type: 'duckdb';
 }
 
@@ -44,21 +44,21 @@ export type EventStoreConfig =
   | DuckDbEventStoreConfig;
 
 
-export interface GeohashDataPartitionStrategyConfig {
+export type GeohashDataPartitionStrategyConfig = {
     type: 'geohash';
     hashLength: number;
 }
 
-export interface IdDataPartitionStrategyConfig {
+export type IdDataPartitionStrategyConfig = {
     type: 'id';
 }
 
-export interface IdGroupDataPartitionStrategyConfig {
+export type IdGroupDataPartitionStrategyConfig = {
     type: 'idGroup';
     groupSize: number;
 }
 
-export interface CollectorIndexDataPartitionStrategyConfig {
+export type CollectorIndexDataPartitionStrategyConfig = {
     type: 'collectorIndex';
 }
 
@@ -90,7 +90,7 @@ export type ZoneSize = {
     heightInKm: number;
 }
 
-export interface GeneratorConfig {
+export type GeneratorConfig = {
     logging: LoggingConfig;
     instances: number;
     httpPort: number;
@@ -106,29 +106,32 @@ export interface GeneratorConfig {
     zoneSize: ZoneSize;
 }
 
-export interface FileOutputConfig {
+export type FileStorageConfig = {
     type: 'file';
     folder: string;
-    flatLayout: boolean;
-    formats: string[];
 }
 
-export interface NoOpOutputConfig {
+export type NoOpStorageConfig = {
     type: 'noop';
 }
 
-export interface S3OutputConfig {
+export type S3StorageConfig = {
     type: 's3';
-    formats: string[];
-    // TODO: define properties for S3
 }
 
-export type OutputConfig = 
-    | FileOutputConfig 
-    | NoOpOutputConfig
-    | S3OutputConfig;
+export type StorageConfig = 
+    | FileStorageConfig 
+    | NoOpStorageConfig
+    | S3StorageConfig;
 
-export interface CollectorConfig {
+export type OutputConfig = {
+    overwriteExistingFiles: boolean;
+    flatLayout: boolean;
+    formats: string[];
+    storage: StorageConfig;
+}
+
+export type CollectorConfig = {
     logging: LoggingConfig;
     instances: number;
     httpPort: number;
@@ -137,7 +140,7 @@ export interface CollectorConfig {
     output: OutputConfig;
 }  
 
-export interface FinderConfig {
+export type FinderConfig = {
     logging: LoggingConfig;
     instances: number;
     httpPort: number;
@@ -147,11 +150,11 @@ export interface FinderConfig {
     useChunking: boolean;
 }
 
-export interface ViewerConfig {
+export type ViewerConfig = {
     logging: LoggingConfig;
 }
 
-export interface Config {
+export type Config = {
     hub: HubConfig;
     partitioning: PartitioningConfig;
     generator: GeneratorConfig;

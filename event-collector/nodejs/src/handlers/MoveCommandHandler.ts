@@ -1,5 +1,5 @@
 import { Counter, GenericEventHandler } from "messaging-lib";
-import { AggregatePeriodStats, CollectorConfig, Command, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { Accumulator } from "../core/data/Accumulator.js";
 import { Splitter } from "../core/data/Splitter.js";
@@ -54,7 +54,7 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand | FlushC
         private logger: Logger,
         private messageBus: MessageBus,
         private eventStore: EventStore<PersistedMoveCommand>,
-        aggregateStore: AggregateStore<PersistedMoveCommand>,
+        aggregateStore: AggregateStore<PersistedMoveCommand>,        
         private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
         private collectorIndex: number,
     ) {

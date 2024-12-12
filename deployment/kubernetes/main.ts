@@ -7,7 +7,7 @@ import { parse as parseYaml } from 'yaml';
 import { ConfigMap, Cpu, Deployment, EnvValue, Ingress, IngressBackend, PersistentVolumeAccessMode, PersistentVolumeClaim, Probe, Protocol, ServiceType, Volume } from 'cdk8s-plus-28';
 import { NatsService } from './nats-service';
 
-function loadConfig(filename: string): Config {
+export function loadConfig(filename: string): Config {
   const file = readFileSync(filename, 'utf8')
   const result: Config = parseYaml(file);
   const generatorInstances = process.env.GENERATOR_INSTANCES;
@@ -22,7 +22,7 @@ function loadConfig(filename: string): Config {
 }
 
 export class VehiclesChart extends Chart {
-  constructor(scope: Construct, id: string, _config: Config, props: ChartProps = { }) {
+  constructor(scope: Construct, id: string, private config: Config, props: ChartProps = { }) {
     super(scope, id, props);
 
     const hub = this.createEventHub();
@@ -35,8 +35,8 @@ export class VehiclesChart extends Chart {
   
     new NatsService(this, 'event-generator', {
       image: 'livetocode/vehicle-fleet-poc-event-generator:latest',
-      replicas: config.generator.instances,
-      containerPort: config.generator.httpPort,
+      replicas: this.config.generator.instances,
+      containerPort: this.config.generator.httpPort,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
@@ -44,25 +44,29 @@ export class VehiclesChart extends Chart {
       }
     });
 
+    const outputEnvVars = this.createOutputEnvVars();
+
     new NatsService(this, 'event-collector', {
       image: 'livetocode/vehicle-fleet-poc-event-collector:latest',
-      replicas: config.collector.instances,
-      containerPort: config.collector.httpPort,
+      replicas: this.config.collector.instances,
+      containerPort: this.config.collector.httpPort,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
         'NATS_SERVERS': EnvValue.fromValue(hub.internalServiceName),
+        ...outputEnvVars,
       }
     });
 
     new NatsService(this, 'event-finder', {
       image: 'livetocode/vehicle-fleet-poc-event-finder:latest',
-      replicas: config.finder.instances,
-      containerPort: config.finder.httpPort,
+      replicas: this.config.finder.instances,
+      containerPort: this.config.finder.httpPort,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
         'NATS_SERVERS': EnvValue.fromValue(hub.internalServiceName),
+        ...outputEnvVars,
       }
     });
   }
@@ -185,13 +189,27 @@ export class VehiclesChart extends Chart {
   }
 
   createSharedVolume() {
-    const accessModes = [PersistentVolumeAccessMode.READ_WRITE_MANY];
-    const claim = new PersistentVolumeClaim(this, 'claim', {
-      storage: Size.gibibytes(15),
-      accessModes,
-      // storageClassName: 'csi-rbd-sc-hdd-generic',      
-    });
-    return { claim };
+    if (this.config.collector.output.storage.type === 'file') {
+      const accessModes = [PersistentVolumeAccessMode.READ_WRITE_MANY];
+      const claim = new PersistentVolumeClaim(this, 'claim', {
+        storage: Size.gibibytes(15),
+        accessModes,
+        // storageClassName: 'csi-rbd-sc-hdd-generic',      
+      });
+      return { claim };  
+    }
+    return { claim: undefined };
+  }
+  createOutputEnvVars() {
+    const result: {
+      [name: string]: EnvValue;
+    } = {};
+    if (this.config.collector.output.storage.type === 's3') {
+      if (process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING) {
+        result['VEHICLES_AZURE_STORAGE_CONNECTION_STRING'] = EnvValue.fromValue(process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING);
+      }
+    }
+    return result;    
   }
 }
 
