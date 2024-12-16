@@ -212,9 +212,122 @@ sequenceDiagram
 Event Generator ==> Event Hub -------------+         + PowerBI
                      + Azure Event Hubs    |
                                            +----> Event Collector -------> Event Aggregate Store <------ Event finder
-                                                    + Azure Synapse            + Azure Blob                 + Azure Stream Analytics
+                                                  + Azure Stream Analytics      + Azure Blob                 + Azure Synapse
 ```
 
+#### Event aggregation
+
+#### Querying
+
+##### Create a new Azure Synapse Analytics resource
+
+You should create a Blob storage account with the following attributes:
+- Azure Blob Storage or Azure Data Lake Storage Gen 2
+- Enable hierarchical namespace = true
+
+Then you can create your new Azure Synapse Analytics resource and use the previously created Storage Account.
+
+##### Configure the external data source 
+
+See also the tutorial that demonstrates all the steps: https://www.youtube.com/watch?v=WMSF_ScBKDY
+
+- Go to your Azure Synapse portal.
+- Select the "Develop" section.
+- click the "+" button and select "SQL script"
+- name it "configure_db"
+- paste the following script and execute it:
+
+```sql
+CREATE DATABASE vehicles;
+GO;
+
+USE vehicles;
+
+-- You should generate a new password
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<REDACTED>';
+
+CREATE DATABASE SCOPED CREDENTIAL VehicleDataCredential
+WITH
+    IDENTITY = 'SHARED ACCESS SIGNATURE',
+    -- you should copy the SAS token configured for your Storage Account, in the "Shared access signature"
+    SECRET = 'sv=2022-11-02&ss=b&srt=co&sp=rlf&se=2024-12-31T22:42:44Z&st=2024-12-15T14:42:44Z&spr=https&sig=<REDACTED>';
+
+create external data source VehicleDataEvents with ( 
+    -- you should replace morganvehicledata with the name of your Storage Account.
+    location = 'wasbs://events@morganvehicledata.blob.core.windows.net',
+    CREDENTIAL = VehicleDataCredential  
+);
+
+GO;
+```
+
+##### Create queries
+
+###### Filter data and get stats
+
+- Go to your Azure Synapse portal.
+- Select the "Develop" section.
+- click the "+" button and select "SQL script"
+- name it "events_per_file"
+- paste the following script and execute it:
+
+```sql
+use vehicles;
+
+SELECT ev.filename() as filename, COUNT(*) as event_count
+FROM  
+    OPENROWSET(
+        BULK '2024-01-01-*-*-*-*.parquet',
+        DATA_SOURCE = 'VehicleDataEvents',
+        FORMAT='PARQUET'
+    ) AS ev
+WHERE
+    ev.filepath(1) in ('05', '06', '07')
+    AND ev.filepath(3) in ('f257v', 'f25k6', 'f25se', 'f25ss')
+    AND ev.timestamp >= '2024-01-01T05:05:00'
+    AND ev.timestamp < '2024-01-01T07:05:00'
+GROUP BY
+  ev.filename()
+ORDER BY
+  1
+```
+
+###### Filter data and get events
+
+- Go to your Azure Synapse portal.
+- Select the "Develop" section.
+- click the "+" button and select "SQL script"
+- name it "get_events"
+- paste the following script and execute it:
+
+```sql
+use vehicles;
+
+SELECT ev.*
+FROM  
+    OPENROWSET(
+        BULK '2024-01-01-*-*-*-*.parquet',
+        DATA_SOURCE = 'VehicleDataEvents',
+        FORMAT='PARQUET'
+    ) AS ev
+WHERE
+    ev.filepath(1) in ('05', '06', '07')
+    AND ev.filepath(3) in ('f257v', 'f25k6', 'f25se', 'f25ss')
+    AND ev.timestamp >= '2024-01-01T05:05:00'
+    AND ev.timestamp < '2024-01-01T07:05:00'
+ORDER BY
+  ev.timestamp
+```
+
+##### References
+
+https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/query-parquet-files
+https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/query-specific-files
+https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/tutorial-data-analyst
+
+##### TODO
+
+Use a service principal and/or workload identities instead of SAS tokens.
 
 #### Technologies:
 
