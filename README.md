@@ -263,6 +263,8 @@ GO;
 
 ##### Create queries
 
+The strategy is to use the right BULK filter in order to only select the files containing the data, based on the time range and geohash list.
+
 ###### Filter data and get stats
 
 - Go to your Azure Synapse portal.
