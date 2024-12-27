@@ -1,4 +1,4 @@
-import { JSONCodec, NatsConnection, connect } from "nats";
+import { JSONCodec, Msg, NatsConnection, connect } from "nats";
 import { MessageBus } from "./MessageBus.js";
 import { NatsHubConfig, Stopwatch } from "core-lib";
 import { Logger, sleep } from "core-lib";
@@ -29,6 +29,7 @@ export class NatsMessageBus implements MessageBus {
     private codec = JSONCodec();
     private handlers = new Map<string, EventHandler[]>();
     private uid = crypto.randomUUID();
+    private _watch = new Stopwatch();
 
     constructor(private hub: NatsHubConfig, private appName: string, private logger: Logger) {
     }
@@ -52,6 +53,7 @@ export class NatsMessageBus implements MessageBus {
                         await this.stop();
                     }
                 });
+                this._watch.restart();
                 return;
             } catch(err: any) {
                 this.logger.error(`Could not connect to NATS server: ${err}`);
@@ -72,11 +74,23 @@ export class NatsMessageBus implements MessageBus {
     async stop(): Promise<void> {
         if (this.connection) {
             await this.connection.drain();
+            const stats = this.connection.stats();
             this.connection = undefined;
+            this._watch.stop();
+            this.logger.info(`NATS connection closed after processing `, stats.inMsgs, " messages in ", this._watch.elapsedTimeAsString());
         }
     }
-    
-    async watch(subject: string, consumerGroupName?: string): Promise<void> {
+
+    async waitForClose(): Promise<void> {
+        if (this.connection) {
+            const result = await this.connection.closed();
+            if (result) {
+                this.logger.error('Closed with error', result);
+            }
+        }
+    }
+
+    subscribe(subject: string, consumerGroupName?: string): void {
         if (!this.connection) {
             throw new Error('Expected MessageBus to be started');
         }
@@ -84,49 +98,19 @@ export class NatsMessageBus implements MessageBus {
             throw new Error('Expected MessageBus to have registered event handlers');
         }
 
-        this.logger.info(`NATS is listening to '${subject}' messages${ consumerGroupName ? ` for group '${consumerGroupName}'` : ''}...`);
-        const sub = this.connection.subscribe(subject, { queue: consumerGroupName });
-        const watch = new Stopwatch();
-        watch.start();
-        let messageCount = 0;
-        for await (const m of sub) {
-            messageCount++;
-            const data: any = this.codec.decode(m.data);
-            const handlers = this.handlers.get(data.type);
-            if (handlers) {
-                for (const handler of handlers) {
-                    const msgProcessingWatch = new Stopwatch();
-                    msgProcessingWatch.start();
-                    let status = 'unknown';
-                    try {
-                        await handler.process(data);
-                        status = 'success';
-                    } catch(err) {
-                        status = 'error';
-                        this.logger.error('NATS handler failed to process command', data, err);
-                    }
-                    msgProcessingWatch.stop();
-                    message_received_counter.inc({
-                        subject: this.normalizeSubject(subject), 
-                        message_type: data.type ?? 'unknown',
-                        status,
+        this.logger.info(`NATS subscribed to '${subject}'${ consumerGroupName ? ` for group '${consumerGroupName}'` : ''}`);
+        this.connection.subscribe(subject, { 
+            queue: consumerGroupName,
+            callback: (err, msg) => {
+                if (err) {
+                    this.logger.error(`Subscription callback failed`, err);
+                } else {
+                    this.dispatchMessage(subject, msg).catch(err => {
+                        this.logger.error('dispatchMessage failed', err);
                     });
-                    message_received_duration_msec.set({
-                        subject: this.normalizeSubject(subject), 
-                        message_type: data.type ?? 'unknown',
-                        status,
-                    }, msgProcessingWatch.elapsedTimeInMS());
-                }                
-            } else {
-                message_received_counter.inc({
-                    subject: this.normalizeSubject(subject), 
-                    message_type: data.type ?? 'unknown',
-                    status: 'ignored',
-                });
-            }
-        }
-        watch.stop();
-        this.logger.info(`NATS subscription for '${subject}' closed after processing `, messageCount, " messages in ", watch.elapsedTimeAsString());
+                }
+            },
+        });
     }
     
     registerHandlers(...handlers: EventHandler[]) {
@@ -148,6 +132,42 @@ export class NatsMessageBus implements MessageBus {
             return subject.slice(0, idx);
         }
         return subject;
+    }
+
+    private async dispatchMessage(subject: string, msg: Msg) {
+        const data: any = this.codec.decode(msg.data);
+        const handlers = this.handlers.get(data.type);
+        if (handlers) {
+            for (const handler of handlers) {
+                const watch = new Stopwatch();
+                watch.start();
+                let status = 'unknown';
+                try {
+                    await handler.process(data);
+                    status = 'success';
+                } catch(err) {
+                    status = 'error';
+                    this.logger.error('NATS handler failed to process command', data, err);
+                }
+                watch.stop();
+                message_received_counter.inc({
+                    subject: this.normalizeSubject(subject), 
+                    message_type: data.type ?? 'unknown',
+                    status,
+                });
+                message_received_duration_msec.set({
+                    subject: this.normalizeSubject(subject), 
+                    message_type: data.type ?? 'unknown',
+                    status,
+                }, watch.elapsedTimeInMS());
+            }                
+        } else {
+            message_received_counter.inc({
+                subject: this.normalizeSubject(subject), 
+                message_type: data.type ?? 'unknown',
+                status: 'ignored',
+            });
+        }
     }
 }
 

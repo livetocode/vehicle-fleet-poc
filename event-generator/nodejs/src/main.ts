@@ -86,12 +86,15 @@ async function main() {
 
     messageBus.registerHandlers(startGenerationHandler);
 
+    messageBus.subscribe(messageBus.privateInboxName);
+    messageBus.subscribe('generation.broadcast');
+    messageBus.subscribe(`generation.agent.${generatorIndex}`, 'generation-agents');
+    messageBus.subscribe(`generation`, 'generators');
+
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, 'generator');
-    messageBus.watch(messageBus.privateInboxName).catch(console.error);
-    messageBus.watch('generation.broadcast').catch(console.error);
-    messageBus.watch(`generation.agent.${generatorIndex}`, 'generation-agents').catch(console.error);
-    await messageBus.watch(`generation`, 'generators');
+
+    await messageBus.waitForClose();
     server.close();
 }
 

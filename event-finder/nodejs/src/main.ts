@@ -63,13 +63,16 @@ async function main() {
     );
     messageBus.registerHandlers(vehicleQueryHandler);
 
+    if (config.finder.parallelSearch) {
+        messageBus.subscribe(`query.vehicles.partitions`, 'vehicle-finder-partitions');
+        messageBus.subscribe(messageBus.privateInboxName);
+    }    
+    messageBus.subscribe(`query.vehicles`, 'vehicle-finder');
+
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.finder.httpPort, logger, 'finder');
-    if (config.finder.parallelSearch) {
-        messageBus.watch(`query.vehicles.partitions`, 'vehicle-finder-partitions').catch(console.error);
-        messageBus.watch(messageBus.privateInboxName).catch(console.error);
-    }    
-    await messageBus.watch(`query.vehicles`, 'vehicle-finder');
+
+    await messageBus.waitForClose();
     server.close();
 }
 

@@ -127,10 +127,13 @@ async function main() {
 
     messageBus.registerHandlers(moveCommandHandler, clearVehiclesDataHandler);
 
+    messageBus.subscribe(`requests.collector`, `requests-collector`);
+    messageBus.subscribe(`commands.*.${collectorIndex}`);
+
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, 'collector');
-    messageBus.watch(`requests.collector`, `requests-collector`).catch(console.error);
-    await messageBus.watch(`commands.*.${collectorIndex}`);
+
+    await messageBus.waitForClose();
     server.close();
 }
 
