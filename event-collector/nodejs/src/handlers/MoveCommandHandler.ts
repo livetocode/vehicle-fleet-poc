@@ -1,13 +1,12 @@
 import { Counter, GenericEventHandler } from "messaging-lib";
 import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
-import { Accumulator } from "../core/data/Accumulator.js";
-import { Splitter } from "../core/data/Splitter.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
 import { getProcessStats } from "../core/diagnostics/processStats.js";
+import { Accumulator, Splitter } from "data-lib";
 
 const vehicles_collector_partitions_total_counter = new Counter({
     name: 'vehicles_collector_partitions_total',
