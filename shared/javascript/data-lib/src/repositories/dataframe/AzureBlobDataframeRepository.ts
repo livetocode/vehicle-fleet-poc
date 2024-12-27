@@ -9,19 +9,12 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     private blobServiceClient: BlobServiceClient;
     private containerClients = new Map<string, ContainerClient>();
 
-    constructor() {
-        const VEHICLES_AZURE_STORAGE_CONNECTION_STRING = 
-        process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING;
-      
-      if (!VEHICLES_AZURE_STORAGE_CONNECTION_STRING) {
-        throw Error('Azure Storage Connection string not found: VEHICLES_AZURE_STORAGE_CONNECTION_STRING');
-      }
-      
-      this.blobServiceClient = BlobServiceClient.fromConnectionString(VEHICLES_AZURE_STORAGE_CONNECTION_STRING);        
+    constructor(connectionString: string, private containerName: string) {      
+      this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);        
     }
 
     async init(): Promise<void> {
-        await this.getContainerClient('events');
+        await this.getContainerClient(this.containerName);
     }
 
     async clear(): Promise<void> {
@@ -32,7 +25,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     }
 
     async *list(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
-        const container = await this.getContainerClient('events');
+        const container = await this.getContainerClient(this.containerName);
         const prefix = findCommonRoot(options.fromPrefix, options.toPrefix);
         for await (const blob of container.listBlobsFlat({ prefix })) {
             const format = detectFormat(blob.name);
@@ -47,7 +40,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     }
 
     async exists(name: string): Promise<boolean> {
-        const container = await this.getContainerClient('events');
+        const container = await this.getContainerClient(this.containerName);
         const blobName = path.basename(name).toLowerCase();
         const blockBlobClient = container.getBlockBlobClient(blobName);
         return await blockBlobClient.exists();
@@ -55,7 +48,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
 
     async read(name: string): Promise<DataFrame> {
         const format = detectFormat(name);
-        const container = await this.getContainerClient('events');
+        const container = await this.getContainerClient(this.containerName);
         const blockBlobClient = container.getBlockBlobClient(name);
         const data = await blockBlobClient.downloadToBuffer();
         return bufferToDataframe(data, format);
@@ -63,7 +56,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
 
     async write(df: DataFrame, name: string): Promise<DataFrameDescriptor> {
         const format = detectFormat(name);
-        const container = await this.getContainerClient('events');
+        const container = await this.getContainerClient(this.containerName);
         const blobName = name.toLowerCase();
         const blockBlobClient = container.getBlockBlobClient(blobName);
         const data = dataframeToBuffer(df, format);

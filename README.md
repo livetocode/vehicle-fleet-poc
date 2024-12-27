@@ -204,6 +204,8 @@ sequenceDiagram
 
 ### Azure
 
+Inspired by https://learn.microsoft.com/en-us/azure/stream-analytics/event-hubs-parquet-capture-tutorial
+
 #### Diagram
 
 ```
@@ -216,6 +218,10 @@ Event Generator ==> Event Hub -------------+         + PowerBI
 ```
 
 #### Event aggregation
+
+See https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-capture-overview
+and https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-capture-enable-through-portal
+and https://learn.microsoft.com/en-us/azure/stream-analytics/event-hubs-parquet-capture-tutorial
 
 #### Querying
 
@@ -336,9 +342,9 @@ Use a service principal and/or workload identities instead of SAS tokens.
 - Event Hub: [Azure Event Hubs](https://azure.microsoft.com/fr-fr/products/event-hubs/)
 - Event Generator: Typescript NodeJS
 - Event Viewer: Nuxt server, Typescript, PixiJS
-- Event Collector: [Azure Synapse Analytics](https://azure.microsoft.com/fr-fr/products/synapse-analytics/)
+- Event Collector: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
 - Event Store: Azure Event Hubs
-- Event finder: [Azure Stream Analytics](https://azure.microsoft.com/fr-fr/products/stream-analytics/)
+- Event Finder: [Azure Synapse Analytics](https://azure.microsoft.com/fr-fr/products/synapse-analytics/)
 
 ### AWS
 

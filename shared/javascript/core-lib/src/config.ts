@@ -119,10 +119,17 @@ export type S3StorageConfig = {
     type: 's3';
 }
 
+export type AzureBlobStorageConfig = {
+    type: 'azure-blob';
+    connectionString?: string;
+    containerName: string;
+}
+
 export type StorageConfig = 
     | FileStorageConfig 
     | NoOpStorageConfig
-    | S3StorageConfig;
+    | S3StorageConfig
+    | AzureBlobStorageConfig;
 
 export type OutputConfig = {
     overwriteExistingFiles: boolean;
