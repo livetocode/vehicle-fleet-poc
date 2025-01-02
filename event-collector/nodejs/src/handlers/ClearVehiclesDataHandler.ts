@@ -1,6 +1,5 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Logger } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, GenericEventHandler, Logger, MessageBus } from "core-lib";
 import { DataFrameRepository } from "data-lib";
-import { GenericEventHandler, MessageBus } from "messaging-lib";
 
 export class ClearVehiclesDataHandler extends GenericEventHandler<ClearVehiclesData> {
     constructor(

@@ -1,8 +1,7 @@
-import { Counter, GenericEventHandler } from "messaging-lib";
-import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, Logger, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { Counter } from "messaging-lib";
+import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, GenericEventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
-import { MessageBus } from "messaging-lib";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
 import { getProcessStats } from "../core/diagnostics/processStats.js";

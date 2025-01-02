@@ -1,24 +1,11 @@
-import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection } from "nats.ws";
-import type {MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
-import { type MessageBusDriver, MessageBus, isRequest, isResponse, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
-import type { Logger } from "core-lib";
-
-export class NatsMessageBus extends MessageBus {
-
-    constructor(appName: string, logger: Logger) {
-        const driver = new NatsMessageBusDriver(
-            (msg) => this.dispatchMessage(msg),
-            (req, res) => this.envelopeReply(req, res),
-            logger,
-        );
-        super(appName, logger, new NoopMessageBusMetrics(), driver);
-    }
-}
+import { Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
+import { JSONCodec, Msg, MsgHdrs, NatsConnection, connect } from "nats";
+import { gracefulTerminationService } from "./GracefulTerminationService.js";
 
 export class NatsMessageBusDriver implements MessageBusDriver {
     private connection?: NatsConnection;
     private codec = JSONCodec();
-    private _watch = new Stopwatch();
+    private watch = new Stopwatch();
 
     constructor (
         public readonly onReceiveMessage: ReceiveMessageCallback, 
@@ -27,13 +14,21 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     ) {}
 
     async start(connectionString: string): Promise<void> {
-        const servers = connectionString.split(',');
+        const servers = (process.env.NATS_SERVERS ?? connectionString).split(',');
         for (let i = 0; i < 30; i++) {
             try {
                 this.logger.info(`NATS connection attempt #${i} on servers ${servers}`);
                 this.connection = await connect({ servers });
                 this.logger.info('NATS connection is ready.');
-                this._watch.restart();
+                gracefulTerminationService.register({
+                    name: 'nats',
+                    priority: 10,
+                    overwrite: false,
+                    handler: async () => {
+                        await this.stop();
+                    }
+                });
+                this.watch.restart();
                 return;
             } catch(err: any) {
                 this.logger.error(`Could not connect to NATS server: ${err}`);
@@ -42,14 +37,14 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         }
         throw new Error('Could not connect to NATS server after multiple attemps');
     }
-
+    
     async stop(): Promise<void> {
         if (this.connection) {
             await this.connection.drain();
             const stats = this.connection.stats();
             this.connection = undefined;
-            this._watch.stop();
-            this.logger.info(`NATS connection closed after processing `, stats.inMsgs, " messages in ", this._watch.elapsedTimeAsString());
+            this.watch.stop();
+            this.logger.info(`NATS connection closed after processing `, stats.inMsgs, " messages in ", this.watch.elapsedTimeAsString());
         }
     }
 
@@ -61,7 +56,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
             }
         }
     }
-
+    
     subscribe(subscription: Subscription): void {
         if (!this.connection) {
             throw new Error('Expected MessageBus to be started');
@@ -81,7 +76,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
                 }
             },
         });
-    }    
+    }
     
     publish(msg: MessageEnvelope): void {
         this.connection?.publish(msg.subject, this.codec.encode(msg.body));
@@ -98,8 +93,9 @@ export class NatsMessageBusDriver implements MessageBusDriver {
                 onReplyTo(this, replyMsg);
             }
         };
-    }
+    }    
 }
+
 
 function convertFromMsgHdrs(source?: MsgHdrs): MessageHeaders {
     const result: MessageHeaders = {};
@@ -110,3 +106,4 @@ function convertFromMsgHdrs(source?: MsgHdrs): MessageHeaders {
     }
     return result;
 }
+

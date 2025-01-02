@@ -1,4 +1,4 @@
-import { LogLevel } from "./config";
+import { LogLevel } from "./config.js";
 
 export interface Logger {
     trace(...args: any[]): void;

@@ -49,8 +49,7 @@ async function main() {
     const finderIndex = getInstanceIndex();
     const logger =  createLogger(config.finder.logging, `Finder #${finderIndex}`);
 
-    const messageBus = createMessageBus(config.hub, 'finder', logger);
-    await messageBus.start();
+    const messageBus = await createMessageBus(config.hub, 'finder', logger);
     
     const repo = createDataFrameRepository(config.collector.output);
     await repo.init();
@@ -65,7 +64,6 @@ async function main() {
 
     if (config.finder.parallelSearch) {
         messageBus.subscribe(`query.vehicles.partitions`, 'vehicle-finder-partitions');
-        messageBus.subscribe(messageBus.privateInboxName);
     }    
     messageBus.subscribe(`query.vehicles`, 'vehicle-finder');
 

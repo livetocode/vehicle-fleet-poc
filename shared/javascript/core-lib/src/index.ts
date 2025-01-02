@@ -8,3 +8,4 @@ export * from './logger.js';
 export * from './stopwatch.js';
 export * from './text.js';
 export * from './collections.js';
+export * from './messaging/index.js';

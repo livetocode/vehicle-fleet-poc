@@ -1,5 +1,4 @@
-import { roundDecimals, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
-import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus } from "../utils/messaging";
+import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 

@@ -89,6 +89,12 @@ export class Stopwatch {
         return !!this._end;
     }
 
+    public static startNew() {
+        const result = new Stopwatch();
+        result.start();
+        return result;
+    }
+
     public start() {
         if (this.isStarted()) {
             throw new Error('You can start an already started watch!');

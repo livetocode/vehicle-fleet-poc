@@ -1,6 +1,5 @@
-import { Application, Assets, Container, Graphics, Polygon, Sprite } from 'pixi.js';
-import { addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult } from 'core-lib';
-import { EventHandler, LambdaEventHandler } from '../utils/messaging';
+import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
+import { EventHandler, LambdaEventHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
 import Geohash from 'latlon-geohash';
 
 export interface AssetRef {

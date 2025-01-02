@@ -1,10 +1,11 @@
-import { Command } from "core-lib";
 import { EventHandler } from "./EventHandler.js";
 
 export abstract class GenericEventHandler<T> extends EventHandler {
 
-    process(event: Command): Promise<void> {
-        return this.processTypedEvent(event as any);
+    abstract get eventTypes(): string[];
+
+    process(event: any): Promise<void> {
+        return this.processTypedEvent(event);
     }
 
     protected abstract processTypedEvent(event: T): Promise<void>;

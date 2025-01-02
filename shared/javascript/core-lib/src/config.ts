@@ -1,4 +1,4 @@
-import { GpsCoordinates } from "./geometry";
+import { GpsCoordinates } from "./geometry.js";
 
 export type LogLevel = 'info' | 'warn' | 'debug' | 'trace' | 'error';
 

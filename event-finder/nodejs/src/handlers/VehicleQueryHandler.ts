@@ -1,6 +1,5 @@
-import { Counter, GenericEventHandler } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks } from 'core-lib';
-import { MessageBus } from "messaging-lib";
+import { Counter } from "messaging-lib";
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, GenericEventHandler, MessageBus } from 'core-lib';
 import path from 'path';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";

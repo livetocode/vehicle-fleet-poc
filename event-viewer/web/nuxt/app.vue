@@ -1,21 +1,26 @@
 <script setup>
-  import { ConsoleLogger } from 'core-lib';
   const appConfig = useAppConfig();
   const logger = createLogger(appConfig.viewer.logging, 'viewer');
   logger.info('App is initializing...');
   if (appConfig.hub.type !== 'nats') {
     throw new Error('Expected a NATS hub');
   }
-  const messageBus = new NatsMessageBus(appConfig.hub, 'viewer', logger);
+  let servers = appConfig.hub.protocols.websockets.servers;
+  const runtimeConfig = useRuntimeConfig();
+  const serversOverride = runtimeConfig.public.natsServers
+  if (serversOverride.length > 0) {
+      servers = serversOverride;
+  }
+  const connectionString = servers.join(',');
+
+  const messageBus = new NatsMessageBus('viewer', logger);
   provide('messageBus', messageBus);
 
 onMounted(() => {
   logger.debug('App is mounting...');
-  messageBus.start().then(() => {
-    messageBus.watch('commands.move.*').catch(console.error);
-    messageBus.watch('stats').catch(console.error);
-    messageBus.watch(messageBus.privateInboxName).catch(console.error);
-  }).catch(console.error);
+  messageBus.subscribe('commands.move.*');
+  messageBus.subscribe('stats');
+  messageBus.start(connectionString).catch(console.error);
   logger.debug('App is mounted');
 });
 

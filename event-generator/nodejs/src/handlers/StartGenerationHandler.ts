@@ -1,5 +1,4 @@
-import { addOffsetToCoordinates, ClearVehiclesData, ClearVehiclesDataResult, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GpsCoordinates, KM, Logger, MoveCommand, Rect, ResetAggregatePeriodStats, sleep, StartGenerationCommand, StopGenerationCommand, Stopwatch } from "core-lib";
-import { GenericEventHandler, MessageBus } from "messaging-lib";
+import { addOffsetToCoordinates, ClearVehiclesData, ClearVehiclesDataResult, computeHashNumber, Config, FlushCommand, formatPoint, GeneratePartitionCommand, GeneratePartitionStats, GenerationStats, GeneratorConfig, GenericEventHandler, GpsCoordinates, KM, Logger, MessageBus, MoveCommand, Rect, ResetAggregatePeriodStats, sleep, StartGenerationCommand, StopGenerationCommand, Stopwatch } from "core-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 

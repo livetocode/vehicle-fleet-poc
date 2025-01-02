@@ -1,15 +1,15 @@
 import { GpsCoordinates, IRect, Point } from "./geometry.js";
 
-export interface Request {
+export interface MyRequest {
     id: string;
     replyTo: string;
 }
 
-export interface Response {
+export interface MyResponse {
     requestId: string;
 }
 
-export interface StartGenerationCommand extends Request {
+export interface StartGenerationCommand extends MyRequest {
     type: 'start-generation';
     vehicleCount: number;
     vehicleTypes: string[];
@@ -41,7 +41,7 @@ export interface GeneratePartitionStats {
     elapsedTimeInMS: number;
 }
 
-export interface GenerationStats extends Response {
+export interface GenerationStats extends MyResponse {
     type: 'generation-stats';
     elapsedTimeInMS: number;
 }
@@ -109,7 +109,7 @@ export interface ResetAggregatePeriodStats {
     type: 'reset-aggregate-period-stats',
 }
 
-export interface VehicleQuery extends Request {
+export interface VehicleQuery extends MyRequest {
     type: 'vehicle-query';
     fromDate: string;
     toDate: string;
@@ -163,11 +163,11 @@ export interface VehicleQueryPartitionResultStats {
     distinctVehicleIds: string[];
 }
 
-export interface ClearVehiclesData extends Request {
+export interface ClearVehiclesData extends MyRequest {
     type: 'clear-vehicles-data';
 }
 
-export interface ClearVehiclesDataResult extends Response {
+export interface ClearVehiclesDataResult extends MyResponse {
     type: 'clear-vehicles-data-result';
     success: boolean;
 }

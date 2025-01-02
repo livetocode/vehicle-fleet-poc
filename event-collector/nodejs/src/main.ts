@@ -100,8 +100,8 @@ async function main() {
     const collectorIndex = getInstanceIndex();
     const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
     
-    const messageBus = createMessageBus(config.hub, 'collector', logger);
-    await messageBus.start();
+    const messageBus = await createMessageBus(config.hub, 'collector', logger);
+    
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
 

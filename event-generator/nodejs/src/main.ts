@@ -72,8 +72,7 @@ async function main() {
     }
     const generatorIndex = getInstanceIndex();
     const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
-    const messageBus = createMessageBus(config.hub, 'generator', logger);
-    await messageBus.start();
+    const messageBus = await createMessageBus(config.hub, 'generator', logger);
 
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
     const startGenerationHandler = new StartGenerationHandler(
@@ -86,14 +85,13 @@ async function main() {
 
     messageBus.registerHandlers(startGenerationHandler);
 
-    messageBus.subscribe(messageBus.privateInboxName);
     messageBus.subscribe('generation.broadcast');
     messageBus.subscribe(`generation.agent.${generatorIndex}`, 'generation-agents');
     messageBus.subscribe(`generation`, 'generators');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, 'generator');
-
+    
     await messageBus.waitForClose();
     server.close();
 }
