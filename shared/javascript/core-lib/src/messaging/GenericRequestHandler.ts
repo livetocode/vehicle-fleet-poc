@@ -10,7 +10,12 @@ export abstract class GenericRequestHandler<TRequestBody extends TypedMessage, T
     }
     
     protected async processTypedEvent(event: Request<TRequestBody>): Promise<void> {
-        // TODO: check if request has expired or should abort before processing
+        if (event.expiresAt) {
+            const expiredAt = new Date(event.expiresAt);
+            if (expiredAt < new Date()) {
+                return;
+            }
+        }
         try {
             const resp = await this.processRequest(event);
             this.messageBus.reply(event, {

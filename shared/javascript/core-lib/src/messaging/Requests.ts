@@ -1,4 +1,4 @@
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { MessageEnvelope, MessageHeaders } from "./MessageEnvelope.js";
 
 export type TypedMessage = {
     type: string;
@@ -12,12 +12,12 @@ export type Request<TBody extends TypedMessage = TypedMessage> = {
     body: TBody
 }
 
-export type AbortRequest = Request<{
-    type: 'abort-request';
+export type CancelRequest = Request<{
+    type: 'cancel-request';
     requestId: string;
 }>;
 
-// TODO: AbortResponse
+// TODO: CancelResponse
 
 export type ResponseSuccess<TBody = any> = {
     id: string;
@@ -39,11 +39,13 @@ export type Response = ResponseSuccess | ResponseError;
 
 export type RequestOptions = {
     subject: string;
+    id?: string;
     limit?: number;
     timeout?: number;
+    headers?: MessageHeaders;
 }
 
-export type RequestOptionsPair = [Request<{ type: string }>, RequestOptions];
+export type RequestOptionsPair = [TypedMessage, RequestOptions];
 
 export class RequestTimeoutError extends Error {
     constructor(public requests: string[], message: string, options?: ErrorOptions) {
@@ -75,9 +77,9 @@ export function isResponse(msg: MessageEnvelope): msg is MessageEnvelope<Respons
     return false;
 }
 
-export function isAbortRequest(msg: MessageEnvelope): msg is MessageEnvelope<AbortRequest> { 
+export function isCancelRequest(msg: MessageEnvelope): msg is MessageEnvelope<CancelRequest> { 
     const body = msg.body;
-    if (body.type === 'abort-request') {
+    if (body.type === 'cancel-request') {
         return body.id &&
             body.requestId;
     }

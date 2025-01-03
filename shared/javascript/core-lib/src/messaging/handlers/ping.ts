@@ -1,5 +1,4 @@
 import { Logger } from "../../logger.js";
-import { randomUUID } from "../../utils.js";
 import { GenericRequestHandler } from "../GenericRequestHandler.js";
 import { MessageBus } from "../MessageBus.js";
 import { Request, RequestTimeoutError, Response, ResponseSuccess } from "../Requests.js";
@@ -12,6 +11,10 @@ export type PingResponse = {
     type: 'pong';
     appName: string;
 };
+
+function isPingResponse(resp: any) : resp is PingResponse {
+    return resp.type === 'pong';
+}
 
 export class PingRequestHandler extends GenericRequestHandler<PingRequest, PingResponse> {
     
@@ -44,13 +47,8 @@ export class PingService {
 }
 
     async *ping(): AsyncGenerator<PingResponse> {
-        const req: Request<PingRequest> = {
-            type: 'request',
-            id: randomUUID(),
-            replyTo: this.messageBus.privateInboxName,
-            body: {
-                type: 'ping',
-            }
+        const req: PingRequest = {
+            type: 'ping',
         };
         try {
             this.logger.debug('Sending ping request...');
@@ -61,8 +59,11 @@ export class PingService {
                 limit: 1000,
             })) {
                 this.logger.debug('Received pong response', resp.body);
-                if (resp.body.type === 'response-success' && resp.body.body.type === 'pong') {
-                    yield resp.body.body;
+                if (resp.body.type === 'response-success') {
+                    const respBody = resp.body.body;
+                    if (isPingResponse(respBody)) {
+                        yield respBody;
+                    }
                 }
             }
         } catch(err) {

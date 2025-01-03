@@ -1,5 +1,5 @@
 import { EventHandler } from "./EventHandler.js";
-import { Request, Response, RequestOptions, RequestOptionsPair, isResponse, isAbortRequest, AbortRequest, isRequest } from './Requests.js';
+import { Request, Response, RequestOptions, RequestOptionsPair, isResponse, isCancelRequest, CancelRequest, isRequest, TypedMessage } from './Requests.js';
 import { ResponseMatcher } from "./ResponseMatcher.js";
 import { MessageEnvelope } from "./MessageEnvelope.js";
 import { Logger } from "../logger.js";
@@ -62,10 +62,16 @@ export class MessageBus {
             subject,
             body: message,
             headers: {},
-            reply: () => {},
+            reply(_resp) {
+                throw new Error('not implemented for undefined messages');
+            },
         }
-        this.driver.publish(envelope);
-        this.metrics.publish(normalizeSubject(subject), message.type ?? 'unknown');
+        this.publishEnvelope(envelope);
+    }
+    
+    publishEnvelope(message: MessageEnvelope): void {
+        this.driver.publish(message);
+        this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
     }
 
     registerHandlers(...handlers: EventHandler[]) {
@@ -93,14 +99,14 @@ export class MessageBus {
         }
     }
 
-    async request(request: Request, options: RequestOptions): Promise<MessageEnvelope<Response>> {
+    async request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>> {
         for await (const resp of this.requestMany(request, options)) {
             return resp;
         }
         throw new Error('no response');
     }
 
-    async *requestMany(request: Request, options: RequestOptions): AsyncGenerator<MessageEnvelope<Response>> {
+    async *requestMany(request: TypedMessage, options: RequestOptions): AsyncGenerator<MessageEnvelope<Response>> {
         for await (const resp of this.requestBatch([[request, options]])) {
             yield resp;
         }
@@ -110,8 +116,9 @@ export class MessageBus {
         const matcher = this.acquireResponseMatcher();
         try {
             for (const [req, opt] of requests) {
-                matcher.register(req.id, opt);
-                this.publish(opt.subject, req);
+                const envelope = this.createRequestEnvelope(req, opt)
+                matcher.register(envelope.body.id, opt);
+                this.publishEnvelope(envelope);
             }
             while (!matcher.isDone) {
                 for (const resp of matcher.getMatches()) {
@@ -146,8 +153,8 @@ export class MessageBus {
     }
     
     protected async dispatchMessage(msg: MessageEnvelope) {
-        if (isAbortRequest(msg)) {
-            this.notifyAbortRequest(msg);
+        if (isCancelRequest(msg)) {
+            this.notifyCancelRequest(msg);
             return;
         }
         if (isResponse(msg)) {
@@ -182,6 +189,34 @@ export class MessageBus {
         }
     }
 
+    private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): MessageEnvelope<Request> {
+        if (opt.limit !== undefined) {
+            if (opt.limit < 1) {
+                throw new Error(`limit should be greater than zero, but received: ${opt.limit}`);
+            }
+        }
+        if (opt.timeout !== undefined) {
+            if (opt.timeout < 1) {
+                throw new Error(`timeout should be greater than zero, but received: ${opt.timeout}`);
+            }
+        }
+        const onReplyTo = this.driver.onReplyTo;
+        return {
+            headers: opt.headers ?? {},
+            subject: opt.subject,
+            body: {
+                type: 'request',
+                id: opt.id ?? randomUUID(),
+                replyTo: this.privateInboxName,
+                expiresAt: computeExpiresAt(opt.timeout),
+                body: req,    
+            },
+            reply(replyMsg) {
+                onReplyTo(this, replyMsg);
+            },
+        }
+    }
+
     private processResponse(msg: MessageEnvelope<Response>) {
         for (const responseMatcher of this.responseMatchers) {
             if (responseMatcher.match(msg)) {
@@ -190,7 +225,7 @@ export class MessageBus {
         }
     }
 
-    private notifyAbortRequest(msg: MessageEnvelope<AbortRequest>) {
+    private notifyCancelRequest(msg: MessageEnvelope<CancelRequest>) {
         // find message envelope beeing processed by a handler
         // msgToAbort.shouldAbort = true
         throw new Error("not implemented");
@@ -218,3 +253,10 @@ function normalizeSubject(subject: string) {
     return subject;
 }
 
+function computeExpiresAt(timeout?: number) {
+    if (timeout !== undefined) {
+        const now = new Date();
+        return new Date(now.getTime() + timeout).toISOString();
+    }
+    return undefined;
+}
