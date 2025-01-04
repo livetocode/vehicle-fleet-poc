@@ -1,4 +1,4 @@
-import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError } from "core-lib";
+import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -134,11 +134,9 @@ export class VehicleTrackingViewModel {
             try {
                 for await (const resp of this._messageBus.cancelMany({ type: 'cancel-request-type', requestType: 'generate-partition' } , { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
                     this.logger.debug('Received stop generation response', resp);
-                    if (resp.body.type === 'response-success') {
-                        if (resp.body.body.type === 'cancel-response') {
-                            if (resp.body.body.found) {
-                                found = true;
-                            }
+                    if (isCancelResponse(resp)) {
+                        if (resp.body.body.found) {
+                            found = true;
                         }
                     }
                 }    

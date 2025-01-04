@@ -112,3 +112,13 @@ export function isCancelRequest(msg: MessageEnvelope): msg is MessageEnvelope<Re
     }
     return false;
 }
+
+export function isCancelResponse(msg: MessageEnvelope): msg is MessageEnvelope<ResponseSuccess<CancelResponse>> { 
+    if (isResponse(msg)) {
+        const body = msg.body.body;
+        if (body.type === 'cancel-response') {
+            return true;
+        }
+    }
+    return false;
+}
