@@ -1,9 +1,7 @@
 import { EventHandler } from "./EventHandler.js";
-import { Request, Response, RequestOptions, RequestOptionsPair, isResponse, isCancelRequest, CancelRequest, isRequest } from './Requests.js';
-import { ResponseMatcher } from "./ResponseMatcher.js";
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
+import { MessageEnvelope, ReplyMessageEnvelope } from "./MessageEnvelope.js";
 import { Logger } from "../logger.js";
-import { Stopwatch } from "../stopwatch.js";
 import { randomUUID, sleep } from "../utils.js";
 import { PingResponse, PingService } from "./handlers/ping.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
@@ -11,6 +9,7 @@ import { MessageBusDriver } from "./MessageBusDriver.js";
 import { TypedMessage } from "./TypedMessage.js";
 import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
+import { MessageDispatcher } from "./MessageDispatcher.js";
 
 export class MessageBus {
     private started = false;
@@ -18,7 +17,8 @@ export class MessageBus {
     private pendingSubscriptions: { subject: string;  consumerGroupName?: string }[] = [];
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
-    private handlers = new EventHandlerRegistry();        
+    private handlers = new EventHandlerRegistry();
+    protected messageDispatcher: MessageDispatcher;        
 
     constructor(
         protected appName: string,
@@ -26,7 +26,9 @@ export class MessageBus {
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
     ) {
+        this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers);
         this.subscribe(this.privateInboxName);
+        this.subscribe('messaging.control.*');
         this.pingService = new PingService(this, logger, appName);
     }
 
@@ -67,7 +69,7 @@ export class MessageBus {
             body: message,
             headers: {},
             reply(_resp) {
-                throw new Error('not implemented for undefined messages');
+                throw new Error('not implemented when publishing a message');
             },
         }
         this.publishEnvelope(envelope);
@@ -127,15 +129,33 @@ export class MessageBus {
         this.publish(request.replyTo, response);
     }
 
+    cancel(request: CancelRequestById, options: Partial<RequestOptions>): Promise<MessageEnvelope<Response>> {
+        const opt: RequestOptions = {
+            ...options,
+            subject: options.subject ?? 'messaging.control.cancel',
+        }
+        return this.request(request, opt);
+    }
+
+    async *cancelMany(request: CancelRequestByType, options: Partial<RequestOptions>): AsyncGenerator<MessageEnvelope<Response>> {
+        const opt: RequestOptions = {
+            ...options,
+            subject: options.subject ?? 'messaging.control.cancel',
+        }
+        for await (const resp of this.requestBatch([[request, opt]])) {
+            yield resp;
+        }
+    }
+
     ping(): AsyncGenerator<PingResponse> {
         return this.pingService.ping();
     }
 
-    protected envelopeReply(request: MessageEnvelope, response: MessageEnvelope): void {
+    protected envelopeReply(request: MessageEnvelope, response: ReplyMessageEnvelope): void {
         if (!isRequest(request)) {
             throw new Error('Cannot reply to message because it is not a request');
         }
-        if (!isResponse(response)) {
+        if (!isReplyResponse(response)) {
             throw new Error('Submitted message is not a response');
         }
         this.reply(request.body, response.body);

@@ -7,7 +7,7 @@ export class NatsMessageBus extends MessageBus {
 
     constructor(appName: string, logger: Logger) {
         const driver = new NatsMessageBusDriver(
-            (msg) => this.dispatchMessage(msg),
+            (msg) => this.messageDispatcher.dispatch(msg),
             (req, res) => this.envelopeReply(req, res),
             logger,
         );

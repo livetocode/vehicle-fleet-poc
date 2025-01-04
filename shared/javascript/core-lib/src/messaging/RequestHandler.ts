@@ -1,16 +1,18 @@
 import { randomUUID } from "../utils.js";
-import { GenericEventHandler } from "./GenericEventHandler.js";
+import { EventHandler } from "./EventHandler.js";
 import { MessageBus } from "./MessageBus.js";
+import { MessageEnvelope } from "./MessageEnvelope.js";
 import { Request } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 
-export abstract class GenericRequestHandler<TRequestBody extends TypedMessage, TResponse> extends GenericEventHandler<Request<TRequestBody>> {
+export abstract class RequestHandler<TRequestBody extends TypedMessage, TResponse> extends EventHandler<Request<TRequestBody>> {
 
     constructor(protected messageBus: MessageBus) {
         super();
     }
     
-    protected async processTypedEvent(event: Request<TRequestBody>): Promise<void> {
+    async process(msg: MessageEnvelope<Request<TRequestBody>>): Promise<void> {
+        const event = msg.body;
         if (event.expiresAt) {
             const expiredAt = new Date(event.expiresAt);
             if (expiredAt < new Date()) {
@@ -18,7 +20,7 @@ export abstract class GenericRequestHandler<TRequestBody extends TypedMessage, T
             }
         }
         try {
-            const resp = await this.processRequest(event);
+            const resp = await this.processRequest(msg);
             this.messageBus.reply(event, {
                 type: 'response-success',
                 id: randomUUID(),
@@ -37,6 +39,6 @@ export abstract class GenericRequestHandler<TRequestBody extends TypedMessage, T
         }
     }
 
-    protected abstract processRequest(req: Request<TRequestBody>): Promise<TResponse>;
+    protected abstract processRequest(req: MessageEnvelope<Request<TRequestBody>>): Promise<TResponse>;
 
 }
