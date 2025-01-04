@@ -130,15 +130,26 @@ export class VehicleTrackingViewModel {
     }) {
         const execute = async () => {
             this.logger.info('Cancelling any active generation...');
-//            for await (const resp of this._messageBus.requestMany({ type: 'stop-generation' } as StopGenerationCommand, { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
+            let found = false;
             try {
                 for await (const resp of this._messageBus.cancelMany({ type: 'cancel-request-type', requestType: 'generate-partition' } , { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
                     this.logger.debug('Received stop generation response', resp);
+                    if (resp.body.type === 'response-success') {
+                        if (resp.body.body.type === 'cancel-response') {
+                            if (resp.body.body.found) {
+                                found = true;
+                            }
+                        }
+                    }
                 }    
             } catch(err) {
                 if (!(err instanceof RequestTimeoutError)) {
                     throw err;
                 }
+            }
+            if (found) {
+                this.logger.info('Found a generation request to cancel. Will wait before starting a new generation...')
+                await sleep(5000);
             }
             const request: StartGenerationCommand = {
                 type: 'start-generation',
