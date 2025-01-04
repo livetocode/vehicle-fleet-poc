@@ -1,21 +1,24 @@
 import { EventHandler } from "./EventHandler.js";
-import { Request, Response, RequestOptions, RequestOptionsPair, isResponse, isCancelRequest, CancelRequest, isRequest, TypedMessage } from './Requests.js';
+import { Request, Response, RequestOptions, RequestOptionsPair, isResponse, isCancelRequest, CancelRequest, isRequest } from './Requests.js';
 import { ResponseMatcher } from "./ResponseMatcher.js";
 import { MessageEnvelope } from "./MessageEnvelope.js";
 import { Logger } from "../logger.js";
 import { Stopwatch } from "../stopwatch.js";
 import { randomUUID, sleep } from "../utils.js";
 import { PingResponse, PingService } from "./handlers/ping.js";
-import { MessageBusMetrics } from "./MessageBusMetrics.js";
+import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageBusDriver } from "./MessageBusDriver.js";
+import { TypedMessage } from "./TypedMessage.js";
+import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
+import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 
 export class MessageBus {
     private started = false;
     private uid = randomUUID();
     private pendingSubscriptions: { subject: string;  consumerGroupName?: string }[] = [];
-    private responseMatchers: ResponseMatcher[] = [];
+    private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
-    private handlers = new Map<string, EventHandler[]>();        
+    private handlers = new EventHandlerRegistry();        
 
     constructor(
         protected appName: string,
@@ -41,6 +44,7 @@ export class MessageBus {
     }
     
     subscribe(subject: string, consumerGroupName?: string): void {
+        // TODO: allow calling subscribe multiple times when the subject contains a star (pattern)
         if (this.started) {
             this.driver.subscribe({ subject, consumerGroupName });
         } else {
@@ -76,27 +80,12 @@ export class MessageBus {
 
     registerHandlers(...handlers: EventHandler[]) {
         for (const handler of handlers) {
-            for (const eventType of handler.eventTypes) {
-                let eventTypeHandlers = this.handlers.get(eventType);
-                if (!eventTypeHandlers) {
-                    eventTypeHandlers = [];
-                    this.handlers.set(eventType, eventTypeHandlers);
-                }
-                eventTypeHandlers.push(handler);
-            }
+            this.handlers.register(handler);
         }
     }
 
     unregisterHandler(handler: EventHandler): void {
-        for (const type of handler.eventTypes) {
-            const handlers = this.handlers.get(type);
-            if (handlers) {
-                const idx = handlers?.indexOf(handler);
-                if (idx >= 0) {
-                    handlers?.splice(idx, 1);
-                }    
-            }
-        }
+        this.handlers.unregister(handler);
     }
 
     async request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>> {
@@ -113,7 +102,7 @@ export class MessageBus {
     }
 
     async *requestBatch(requests: RequestOptionsPair[]): AsyncGenerator<MessageEnvelope<Response>> {
-        const matcher = this.acquireResponseMatcher();
+        const matcher = this.responseMatchers.acquire();
         try {
             for (const [req, opt] of requests) {
                 const envelope = this.createRequestEnvelope(req, opt)
@@ -127,7 +116,7 @@ export class MessageBus {
                 await sleep(100);
             }
         } finally {
-            this.releaseResponseMatcher(matcher);
+            this.responseMatchers.release(matcher);
         }
     }
 
@@ -152,43 +141,6 @@ export class MessageBus {
         this.reply(request.body, response.body);
     }
     
-    protected async dispatchMessage(msg: MessageEnvelope) {
-        if (isCancelRequest(msg)) {
-            this.notifyCancelRequest(msg);
-            return;
-        }
-        if (isResponse(msg)) {
-            this.processResponse(msg);
-            return;
-        }
-        const subject = normalizeSubject(msg.subject);
-        const msgRequest = isRequest(msg) ? msg : undefined;
-        const bodyType = msgRequest ? msgRequest.body.body.type : msg.body.type;
-        const handlers = this.handlers.get(bodyType);
-        if (handlers) {
-            const executeHandler = async (handler: EventHandler) => {
-                const watch = Stopwatch.startNew();
-                let status = 'unknown';
-                try {
-                    await handler.process(msg.body);
-                    status = 'success';
-                } catch(err) {
-                    status = 'error';
-                    this.logger.error('NATS handler failed to process command', msg.body, err);
-                }
-                watch.stop();
-                this.metrics.processMessage(subject, bodyType ?? 'unknown', status, watch.elapsedTimeInMS());
-            }
-            if (handlers.length === 1) {
-                await executeHandler(handlers[0]);
-            } else {
-                await Promise.all(handlers.map(executeHandler));
-            }
-        } else {
-            this.metrics.processMessage(subject, bodyType ?? 'unknown', 'ignored');
-        }
-    }
-
     private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): MessageEnvelope<Request> {
         if (opt.limit !== undefined) {
             if (opt.limit < 1) {
@@ -216,41 +168,6 @@ export class MessageBus {
             },
         }
     }
-
-    private processResponse(msg: MessageEnvelope<Response>) {
-        for (const responseMatcher of this.responseMatchers) {
-            if (responseMatcher.match(msg)) {
-                break;
-            }    
-        }
-    }
-
-    private notifyCancelRequest(msg: MessageEnvelope<CancelRequest>) {
-        // find message envelope beeing processed by a handler
-        // msgToAbort.shouldAbort = true
-        throw new Error("not implemented");
-    }
-
-    private acquireResponseMatcher() {
-        const result = new ResponseMatcher();
-        this.responseMatchers.push(result);
-        return result;
-    }
-
-    private releaseResponseMatcher(matcher: ResponseMatcher) {
-        const idx = this.responseMatchers.indexOf(matcher);
-        if (idx >= 0) {
-            delete this.responseMatchers[idx];
-        }
-    }    
-}
-
-function normalizeSubject(subject: string) {
-    if (subject.startsWith('inbox.')) {
-        const idx = subject.lastIndexOf('.');
-        return subject.slice(0, idx);
-    }
-    return subject;
 }
 
 function computeExpiresAt(timeout?: number) {

@@ -1,7 +1,8 @@
 import { randomUUID } from "../utils.js";
 import { GenericEventHandler } from "./GenericEventHandler.js";
 import { MessageBus } from "./MessageBus.js";
-import { Request, TypedMessage } from "./Requests.js";
+import { Request } from "./Requests.js";
+import { TypedMessage } from "./TypedMessage.js";
 
 export abstract class GenericRequestHandler<TRequestBody extends TypedMessage, TResponse> extends GenericEventHandler<Request<TRequestBody>> {
 

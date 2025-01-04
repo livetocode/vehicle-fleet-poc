@@ -1,6 +1,7 @@
 import { EventHandler } from "./EventHandler.js";
+import { TypedMessage } from "./TypedMessage.js";
 
-export abstract class GenericEventHandler<T> extends EventHandler {
+export abstract class GenericEventHandler<T extends TypedMessage> extends EventHandler {
 
     abstract get eventTypes(): string[];
 

@@ -1,8 +1,5 @@
 import { MessageEnvelope, MessageHeaders } from "./MessageEnvelope.js";
-
-export type TypedMessage = {
-    type: string;
-}
+import { TypedMessage } from "./TypedMessage.js";
 
 export type Request<TBody extends TypedMessage = TypedMessage> = {
     id: string;
@@ -18,7 +15,7 @@ export type CancelRequest = Request<{
 }>;
 
 // TODO: CancelResponse
-
+// TODO: add elapsedTime to responses
 export type ResponseSuccess<TBody = any> = {
     id: string;
     requestId: string;
@@ -45,7 +42,7 @@ export type RequestOptions = {
     headers?: MessageHeaders;
 }
 
-export type RequestOptionsPair = [TypedMessage, RequestOptions];
+export type RequestOptionsPair<TRequest extends TypedMessage = TypedMessage> = [TRequest, RequestOptions];
 
 export class RequestTimeoutError extends Error {
     constructor(public requests: string[], message: string, options?: ErrorOptions) {
