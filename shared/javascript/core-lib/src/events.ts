@@ -9,7 +9,7 @@ export interface MyResponse {
     requestId: string;
 }
 
-export interface StartGenerationCommand extends MyRequest {
+export interface StartGenerationCommand {
     type: 'start-generation';
     vehicleCount: number;
     vehicleTypes: string[];
@@ -20,14 +20,8 @@ export interface StartGenerationCommand extends MyRequest {
     startDate?: string;
 }
 
-export interface StopGenerationCommand {
-    type: 'stop-generation';
-}
-
 export interface GeneratePartitionCommand {
     type: 'generate-partition';
-    replyTo: string;
-    subRequestId: string;
     startDate: string;
     maxNumberOfEvents: number;
     request: StartGenerationCommand;
@@ -35,13 +29,11 @@ export interface GeneratePartitionCommand {
 
 export interface GeneratePartitionStats {
     type: 'generate-partition-stats';
-    requestId: string;
-    subRequestId: string;
     generatedEventCount: number;
     elapsedTimeInMS: number;
 }
 
-export interface GenerationStats extends MyResponse {
+export interface GenerationStats {
     type: 'generation-stats';
     elapsedTimeInMS: number;
 }
@@ -163,11 +155,11 @@ export interface VehicleQueryPartitionResultStats {
     distinctVehicleIds: string[];
 }
 
-export interface ClearVehiclesData extends MyRequest {
+export interface ClearVehiclesData {
     type: 'clear-vehicles-data';
 }
 
-export interface ClearVehiclesDataResult extends MyResponse {
+export interface ClearVehiclesDataResult {
     type: 'clear-vehicles-data-result';
     success: boolean;
 }

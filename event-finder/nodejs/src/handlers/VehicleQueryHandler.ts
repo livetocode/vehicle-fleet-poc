@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, GenericEventHandler, MessageBus } from 'core-lib';
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, EventHandler, MessageBus, MessageEnvelope } from 'core-lib';
 import path from 'path';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
@@ -76,7 +76,7 @@ export class VehicleQueryContext {
     }
 }
 
-export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats> {
+export class VehicleQueryHandler extends EventHandler<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats> {
     subQueryResults = new Map<string, Map<string, VehicleQueryPartitionResultStats | null>>();
 
     constructor(
@@ -96,7 +96,8 @@ export class VehicleQueryHandler extends GenericEventHandler<VehicleQuery | Vehi
         ]; 
     }
 
-    protected async processTypedEvent(event: VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats): Promise<void> {
+    async process(msg: MessageEnvelope<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats>): Promise<void> {
+        const event = msg.body;
         if (event.type === 'vehicle-query') {
             return this.processQuery(event);
         }

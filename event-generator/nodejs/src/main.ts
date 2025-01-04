@@ -6,6 +6,8 @@ import { IdDataPartitionStrategy } from "./data/IdDataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "./data/GeohashDataPartitionStrategy.js";
 import { IdGroupDataPartitionStrategy } from "./data/IdGroupDataPartitionStrategy.js";
 import { StartGenerationHandler } from "./handlers/StartGenerationHandler.js";
+import { GeneratePartitionHandler } from './handlers/GeneratePartitionHandler.js';
+import { StopGenerationHandler } from './handlers/StopGenerationHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -79,11 +81,19 @@ async function main() {
         config,
         logger,
         messageBus,
+    );
+    const stopGenerationHandler = new StopGenerationHandler(
+        messageBus,
+    );
+    const generatePartitionHandler = new GeneratePartitionHandler(
+        config,
+        logger,
+        messageBus,
         generatorIndex,
         dataPartitionStrategy,
     );
 
-    messageBus.registerHandlers(startGenerationHandler);
+    messageBus.registerHandlers(startGenerationHandler, stopGenerationHandler, generatePartitionHandler);
 
     messageBus.subscribe('generation.broadcast');
     messageBus.subscribe(`generation.agent.${generatorIndex}`, 'generation-agents');

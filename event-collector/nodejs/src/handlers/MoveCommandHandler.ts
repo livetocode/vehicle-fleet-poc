@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, GenericEventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber } from 'core-lib';
+import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, EventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber, MessageEnvelope } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
@@ -43,7 +43,7 @@ export interface PersistedMoveCommand {
     direction: string;
 }
 
-export class MoveCommandHandler extends GenericEventHandler<MoveCommand | FlushCommand> {
+export class MoveCommandHandler extends EventHandler<MoveCommand | FlushCommand> {
     private accumulator: MoveCommandAccumulator;
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
@@ -76,7 +76,8 @@ export class MoveCommandHandler extends GenericEventHandler<MoveCommand | FlushC
         await this.restore();
     }
 
-    protected async processTypedEvent(event: MoveCommand | FlushCommand): Promise<void> {
+    async process(msg: MessageEnvelope<MoveCommand | FlushCommand>): Promise<void> {
+        const event = msg.body;
         if (event.type === 'flush') {
             return this.processFlushCommand(event);
         }

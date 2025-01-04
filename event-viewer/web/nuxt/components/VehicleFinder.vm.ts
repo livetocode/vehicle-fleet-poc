@@ -25,11 +25,11 @@ export class VehicleFinderViewModel {
     }
 
     async init(): Promise<void> {
-        this._queryResultHandler = new LambdaEventHandler(
+        this._queryResultHandler = new LambdaEventHandler<VehicleQueryResult>(
             ['vehicle-query-result'], 
             async (ev: any) => { this.onProcessQueryResult(ev); },
         );
-        this._queryResultStatsHandler = new LambdaEventHandler(
+        this._queryResultStatsHandler = new LambdaEventHandler<VehicleQueryResultStats>(
             ['vehicle-query-result-stats'], 
             async (ev: any) => { this.onProcessQueryResultStats(ev); },
         );

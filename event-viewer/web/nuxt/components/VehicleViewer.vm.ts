@@ -84,12 +84,12 @@ export class VehicleViewerViewModel {
             this.animate(time);
         });
         if (this.mode === 'tracking') {
-            this._moveHandler = new LambdaEventHandler(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-            this._resetStatsHandler = new LambdaEventHandler(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
+            this._moveHandler = new LambdaEventHandler<MoveCommand>(['move'], async (ev: any) => { this.onProcessCommand(ev); });
+            this._resetStatsHandler = new LambdaEventHandler<ResetAggregatePeriodStats>(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
             this._messageBus.registerHandlers(this._moveHandler, this._resetStatsHandler);
         } else if (this.mode === 'search') {
-            this._queryHandler = new LambdaEventHandler(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
-            this._queryResultHandler = new LambdaEventHandler(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
+            this._queryHandler = new LambdaEventHandler<VehicleQuery>(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
+            this._queryResultHandler = new LambdaEventHandler<VehicleQueryResult>(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
             this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
         }
         app.renderer.on('resize', () => {

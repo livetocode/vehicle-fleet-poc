@@ -1,4 +1,4 @@
-import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand } from "core-lib";
+import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -99,11 +99,11 @@ export class VehicleTrackingViewModel {
     }
 
     async init(): Promise<void> {
-        this._statsHandler = new LambdaEventHandler(
+        this._statsHandler = new LambdaEventHandler<AggregatePeriodStats>(
             ['aggregate-period-stats'], 
             async (ev: any) => { this.onProcessStats(ev); },
         );
-        this._resetStatsHandler = new LambdaEventHandler(
+        this._resetStatsHandler = new LambdaEventHandler<ResetAggregatePeriodStats>(
             ['reset-aggregate-period-stats'], 
             async (ev: any) => { this.onResetStats(ev); },
         );
@@ -128,13 +128,20 @@ export class VehicleTrackingViewModel {
         refreshIntervalInSecs: number;
         realtime: boolean;    
     }) {
-        this.logger.info('Cancelling any active generation...');
-        this._messageBus.publish('generation.broadcast', { type: 'stop-generation' } as StopGenerationCommand );
-        sleep(1000).then(() => {
+        const execute = async () => {
+            this.logger.info('Cancelling any active generation...');
+//            for await (const resp of this._messageBus.requestMany({ type: 'stop-generation' } as StopGenerationCommand, { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
+            try {
+                for await (const resp of this._messageBus.cancelMany({ type: 'cancel-request-type', requestType: 'generate-partition' } , { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
+                    this.logger.debug('Received stop generation response', resp);
+                }    
+            } catch(err) {
+                if (!(err instanceof RequestTimeoutError)) {
+                    throw err;
+                }
+            }
             const request: StartGenerationCommand = {
                 type: 'start-generation',
-                replyTo: this._messageBus.privateInboxName,
-                requestId: randomUUID(),
                 vehicleCount: data.vehicleCount,
                 vehicleTypes: data.vehicleTypes,
                 maxNumberOfEvents: data.maxNumberOfEvents,
@@ -144,8 +151,17 @@ export class VehicleTrackingViewModel {
                 startDate: this.config.generator.startDate,        
             }
             this.logger.info('Starting generation', request);
-            this._messageBus.publish('generation', request);
-        });
+            const result = await this._messageBus.request(request, { subject: 'generation' });
+            if (result.body.type === 'response-success') {
+                const resp = result.body.body;
+                if (resp.type === 'generation-stats') {
+                    this.logger.info('Generation completed in ', resp.elapsedTimeInMS, ' ms');
+                }
+            } else {
+                this.logger.error('Generation failed', result.body);
+            }
+        };
+        execute().catch(console.error);
     }
 
     formatStats(ev: AggregatePeriodStats) {

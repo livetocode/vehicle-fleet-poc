@@ -1,37 +1,34 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, GenericEventHandler, Logger, MessageBus } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, RequestHandler, Logger, MessageBus, MessageEnvelope, Request } from "core-lib";
 import { DataFrameRepository } from "data-lib";
 
-export class ClearVehiclesDataHandler extends GenericEventHandler<ClearVehiclesData> {
+export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesData, ClearVehiclesDataResult> {
+
     constructor(
         private logger: Logger,
-        private messageBus: MessageBus,
+        messageBus: MessageBus,
         private repo: DataFrameRepository,
     ) {
-        super();
+        super(messageBus);
     }
 
     get eventTypes(): string[] {
         return ['clear-vehicles-data'];
     }
 
-    protected async processTypedEvent(event: ClearVehiclesData): Promise<void> {
-        this.logger.info(event);
+    protected async processRequest(req: MessageEnvelope<Request<ClearVehiclesData>>): Promise<ClearVehiclesDataResult> {
+        this.logger.info("Clearing");
         try {
-            //await this.repo.clear();
-            const resp: ClearVehiclesDataResult = {
+            await this.repo.clear();
+            return {
                 type: 'clear-vehicles-data-result',
-                requestId: event.id,
                 success: true,
             };
-            this.messageBus.publish(event.replyTo, resp);
         } catch(err: any) {
             this.logger.error(err);
-            const resp: ClearVehiclesDataResult = {
+            return {
                 type: 'clear-vehicles-data-result',
-                requestId: event.id,
                 success: false,
             };
-            this.messageBus.publish(event.replyTo, resp);
         }
     }
 }
