@@ -133,7 +133,7 @@ export class VehicleTrackingViewModel {
             let found = false;
             try {
                 for await (const resp of this._messageBus.cancelMany({ type: 'cancel-request-type', requestType: 'generate-partition' } , { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
-                    this.logger.debug('Received stop generation response', resp);
+                    this.logger.debug('Received cancel request response', resp.body);
                     if (isCancelResponse(resp)) {
                         if (resp.body.body.found) {
                             found = true;

@@ -1,32 +1,22 @@
 import { Logger } from "../logger.js";
 import { Stopwatch } from "../stopwatch.js";
-import { randomUUID } from "../utils.js";
-import { EventHandler } from "./EventHandler.js";
+import { ActiveEventHandlers, EventHandler } from "./EventHandler.js";
 import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageEnvelope } from "./MessageEnvelope.js";
-import { Request, Response, CancelRequest, isCancelRequest, isRequest, isResponse, CancelResponse, ResponseSuccess } from "./Requests.js";
+import { Response, isRequest, isResponse } from "./Requests.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 
-type MessageHandlerContext = {
-    msg: MessageEnvelope;
-    handler: EventHandler;
-}
-
 export class MessageDispatcher {
-    private activeHandlers = new Map<string, MessageHandlerContext>();
     constructor (
         private logger: Logger,
         private metrics: MessageBusMetrics,
         private handlers: EventHandlerRegistry,
         private responseMatchers: ResponseMatcherCollection,
+        private activeHandlers: ActiveEventHandlers,
     ) {}
     
     async dispatch(msg: MessageEnvelope) {
-        if (isCancelRequest(msg)) {
-            this.notifyCancelRequest(msg);
-            return;
-        }
         if (isResponse(msg)) {
             this.processResponse(msg);
             return;
@@ -69,41 +59,5 @@ export class MessageDispatcher {
 
     private processResponse(msg: MessageEnvelope<Response>) {
         this.responseMatchers.match(msg);
-    }
-
-    private notifyCancelRequest(msg: MessageEnvelope<Request<CancelRequest>>) {
-        let found = false;
-        const req = msg.body.body;
-        if (req.type === 'cancel-request-id') {
-            const ctx = this.activeHandlers.get(req.requestId);
-            if (ctx) {
-                found = true;
-                ctx.msg.shouldCancel = true;
-            }
-        }
-        if (req.type === 'cancel-request-type') {
-            for (const ctx of this.activeHandlers.values()) {
-                const isSameMessageType = ctx.msg.body.type === req.requestType;
-                const isSameRequestType = isRequest(ctx.msg) && ctx.msg.body.body.type === req.requestType;
-                if (isSameMessageType || isSameRequestType) {
-                    found = true;
-                    ctx.msg.shouldCancel = true;
-                }
-            }
-        }
-        this.logger.warn(`Cancel request: found=${found}`, msg.body);
-        const resp: ResponseSuccess<CancelResponse> = {
-            type: 'response-success',
-            id: randomUUID(),
-            requestId: msg.body.id,
-            body: {
-                type: 'cancel-response',
-                found,
-            }
-        };
-        msg.reply({
-            headers: {},
-            body: resp,
-        })
     }
 }

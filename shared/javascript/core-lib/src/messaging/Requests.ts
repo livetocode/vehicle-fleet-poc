@@ -24,6 +24,7 @@ export type CancelRequest = CancelRequestById | CancelRequestByType;
 export type CancelResponse = {
     type: 'cancel-response';
     found: boolean;
+    appName: string;
 }
 
 // TODO: add elapsedTime to responses

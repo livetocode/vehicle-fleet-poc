@@ -1,4 +1,4 @@
-import { EventHandler } from "./EventHandler.js";
+import { EventHandler, EventHandlerContext } from "./EventHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
 import { MessageEnvelope, ReplyMessageEnvelope } from "./MessageEnvelope.js";
 import { Logger } from "../logger.js";
@@ -10,6 +10,7 @@ import { TypedMessage } from "./TypedMessage.js";
 import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
+import { CancelRequestService } from "./handlers/cancel.js";
 
 export class MessageBus {
     private started = false;
@@ -17,6 +18,7 @@ export class MessageBus {
     private pendingSubscriptions: { subject: string;  consumerGroupName?: string }[] = [];
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
+    private cancelService: CancelRequestService;
     private handlers = new EventHandlerRegistry();
     protected messageDispatcher: MessageDispatcher;        
 
@@ -26,10 +28,12 @@ export class MessageBus {
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
     ) {
-        this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers);
+        const activeEventHandlers = new Map<string, EventHandlerContext>();
+        this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
         this.subscribe('messaging.control.*');
         this.pingService = new PingService(this, logger, appName);
+        this.cancelService = new CancelRequestService(this, logger, appName, activeEventHandlers);
     }
 
     get privateInboxName(): string {
@@ -130,21 +134,11 @@ export class MessageBus {
     }
 
     cancel(request: CancelRequestById, options: Partial<RequestOptions>): Promise<MessageEnvelope<Response>> {
-        const opt: RequestOptions = {
-            ...options,
-            subject: options.subject ?? 'messaging.control.cancel',
-        }
-        return this.request(request, opt);
+        return this.cancelService.cancel(request, options);
     }
 
     async *cancelMany(request: CancelRequestByType, options: Partial<RequestOptions>): AsyncGenerator<MessageEnvelope<Response>> {
-        const opt: RequestOptions = {
-            ...options,
-            subject: options.subject ?? 'messaging.control.cancel',
-        }
-        for await (const resp of this.requestBatch([[request, opt]])) {
-            yield resp;
-        }
+        yield* this.cancelService.cancelMany(request, options);
     }
 
     ping(): AsyncGenerator<PingResponse> {
