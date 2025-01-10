@@ -1,5 +1,5 @@
 import { GeneratePartitionCommand, GeneratePartitionStats, RequestHandler, MessageEnvelope, Request } from "core-lib";
-import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, MessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
+import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
@@ -8,7 +8,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
     constructor(
         private config: Config,
         private logger: Logger,
-        messageBus: MessageBus,
+        messageBus: IMessageBus,
         private generatorIndex: number,
         private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
     ) {
@@ -102,16 +102,16 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
                     done = true;
                     break;
                 }
+                if (req.shouldCancel === true) {
+                    this.logger.warn('Sub-generator should stop immediatly!');
+                    done = true;
+                    break;
+                }
                 if (realtime) {
                     if (idx % distributedRefreshFrequency === 0) {
                         await sleep(distributedRefreshIntervalInMS);
                         accumulatedWaitInMS += distributedRefreshIntervalInMS;
                     }
-                }
-                if (req.shouldCancel === true) {
-                    this.logger.warn('Sub-generator should stop immediatly!');
-                    done = true;
-                    break;
                 }
             }
             if (!done) {

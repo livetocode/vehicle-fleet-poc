@@ -1,6 +1,10 @@
 <script setup>
   const appConfig = useAppConfig();
-  const logger = createLogger(appConfig.viewer.logging, 'viewer');
+  const identity = {
+    name: 'viewer',
+    instance: 0,
+  }
+  const logger = createLogger(appConfig.viewer.logging, identity.name);
   logger.info('App is initializing...');
   if (appConfig.hub.type !== 'nats') {
     throw new Error('Expected a NATS hub');
@@ -13,7 +17,7 @@
   }
   const connectionString = servers.join(',');
 
-  const messageBus = new NatsMessageBus('viewer', logger);
+  const messageBus = new NatsMessageBus(identity, logger);
   provide('messageBus', messageBus);
 
 onMounted(() => {

@@ -39,9 +39,12 @@ export class ResponseMatcher {
     match(msg: MessageEnvelope<Response>): Boolean {
         const ctx = this.requests.get(msg.body.requestId);
         if (ctx) {
-            this.receivedResponses.push(msg);
-            if (ctx.increment() >= (ctx.options.limit ?? 1)) {
-                this.requests.delete(msg.body.requestId);
+            const isValidResp = ctx.options.validator?.(msg.body) ?? true;
+            if (isValidResp) {
+                this.receivedResponses.push(msg);
+                if (ctx.increment() >= (ctx.options.limit ?? 1)) {
+                    this.requests.delete(msg.body.requestId);
+                }
             }
             return true;
         }

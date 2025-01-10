@@ -1,11 +1,11 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, RequestHandler, Logger, MessageBus, MessageEnvelope, Request } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, RequestHandler, Logger, IMessageBus, MessageEnvelope, Request } from "core-lib";
 import { DataFrameRepository } from "data-lib";
 
 export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesData, ClearVehiclesDataResult> {
 
     constructor(
         private logger: Logger,
-        messageBus: MessageBus,
+        messageBus: IMessageBus,
         private repo: DataFrameRepository,
     ) {
         super(messageBus);

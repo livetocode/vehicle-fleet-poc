@@ -1,10 +1,10 @@
-import { Logger } from 'core-lib';
+import { Logger, ServiceIdentity } from 'core-lib';
 import express from 'express';
 import prom_client from 'prom-client';
 import promBundle from 'express-prom-bundle';
 import { gracefulTerminationService } from './GracefulTerminationService.js';
 
-export function createWebServer(port: number, logger: Logger, appName: string) {
+export function createWebServer(port: number, logger: Logger, identity: ServiceIdentity) {
     const app = express();
 
     const metricsMiddleware = promBundle({includeMethod: true});
@@ -12,7 +12,7 @@ export function createWebServer(port: number, logger: Logger, appName: string) {
     
     prom_client.collectDefaultMetrics();
     prom_client.register.setDefaultLabels({
-        app_name: appName,
+        app_name: identity.name,
     });
     
     app.get('/ping', (req, res) => {

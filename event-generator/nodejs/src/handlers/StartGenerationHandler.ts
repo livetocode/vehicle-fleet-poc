@@ -1,4 +1,4 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, MessageBus, MessageEnvelope, MoveCommand, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, MessageEnvelope, MoveCommand, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError } from "core-lib";
 
 
 export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {
@@ -6,7 +6,7 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
     constructor(
         private config: Config,
         private logger: Logger,
-        messageBus: MessageBus,
+        messageBus: IMessageBus,
     ) {
         super(messageBus);
     }
@@ -25,7 +25,11 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         const clearRequest: ClearVehiclesData = {
             type: 'clear-vehicles-data', 
         };
-        const clearResponse = await this.messageBus.request(clearRequest, { subject: `requests.collector`, limit: 1 });
+        const clearResponse = await this.messageBus.request(clearRequest, { 
+            subject: `requests.collector`,
+            parentId: req.body.id,
+            limit: 1,
+        });
         if (clearResponse.body.type === 'response-success') {
             if (clearResponse.body.body.type === 'clear-vehicles-data-result') {
                 const clearResponseBody: ClearVehiclesDataResult = clearResponse.body.body;
@@ -40,6 +44,9 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
             throw new Error('Collector could not clear the data!');
         }
         this.logger.info('Existing data has been cleared by a collector.');
+        if (req.shouldCancel) {
+            throw new RequestCancelledError(req.body.id, `Cancellation requested for ID=${req.body.id}`);
+        }
 
         // create partition requests
         const startDate = getStartDate(event, this.config.generator.startDate);
@@ -57,6 +64,7 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
                 request: event,
             }, {
                 subject: `generation.agent.${i}`,
+                parentId: req.body.id,
                 limit: 1,
             }]);
         }

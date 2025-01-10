@@ -11,10 +11,13 @@ import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
+import { ServiceIdentity } from "./ServiceIdentity.js";
+import { IMessageBus } from "./IMessageBus.js";
 
-export class MessageBus {
+export class MessageBus implements IMessageBus {
     private started = false;
     private uid = randomUUID();
+    private subjects = new Set<string>();
     private pendingSubscriptions: { subject: string;  consumerGroupName?: string }[] = [];
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
@@ -23,7 +26,7 @@ export class MessageBus {
     protected messageDispatcher: MessageDispatcher;        
 
     constructor(
-        protected appName: string,
+        protected identity: ServiceIdentity,
         protected logger: Logger,
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
@@ -31,13 +34,12 @@ export class MessageBus {
         const activeEventHandlers = new Map<string, EventHandlerContext>();
         this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
-        this.subscribe('messaging.control.*');
-        this.pingService = new PingService(this, logger, appName);
-        this.cancelService = new CancelRequestService(this, logger, appName, activeEventHandlers);
+        this.pingService = new PingService(this, logger, identity);
+        this.cancelService = new CancelRequestService(this, logger, identity, activeEventHandlers);
     }
 
     get privateInboxName(): string {
-        return `inbox.${this.appName}.${this.uid}`;
+        return `inbox.${this.identity.name}.${this.uid}`;
     }
 
     async start(connectionString: string): Promise<void> {
@@ -49,15 +51,6 @@ export class MessageBus {
         this.pendingSubscriptions = [];
     }
     
-    subscribe(subject: string, consumerGroupName?: string): void {
-        // TODO: allow calling subscribe multiple times when the subject contains a star (pattern)
-        if (this.started) {
-            this.driver.subscribe({ subject, consumerGroupName });
-        } else {
-            this.pendingSubscriptions.push({ subject, consumerGroupName });
-        }
-    }
-
     async stop(): Promise<void> {
         await this.driver.stop();
         this.started = false;
@@ -65,6 +58,28 @@ export class MessageBus {
 
     waitForClose(): Promise<void> {
         return this.driver.waitForClose();
+    }
+
+    registerHandlers(...handlers: EventHandler[]): void {
+        for (const handler of handlers) {
+            this.handlers.register(handler);
+        }
+    }
+
+    unregisterHandler(handler: EventHandler): void {
+        this.handlers.unregister(handler);
+    }
+
+    subscribe(subject: string, consumerGroupName?: string): void {
+        if (this.subjects.has(subject)) {
+            return;
+        }
+        this.subjects.add(subject);
+        if (this.started) {
+            this.driver.subscribe({ subject, consumerGroupName });
+        } else {
+            this.pendingSubscriptions.push({ subject, consumerGroupName });
+        }
     }
 
     publish(subject: string, message: any): void {
@@ -82,16 +97,6 @@ export class MessageBus {
     publishEnvelope(message: MessageEnvelope): void {
         this.driver.publish(message);
         this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
-    }
-
-    registerHandlers(...handlers: EventHandler[]) {
-        for (const handler of handlers) {
-            this.handlers.register(handler);
-        }
-    }
-
-    unregisterHandler(handler: EventHandler): void {
-        this.handlers.unregister(handler);
     }
 
     async request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>> {
@@ -174,6 +179,8 @@ export class MessageBus {
                 type: 'request',
                 id: opt.id ?? randomUUID(),
                 replyTo: this.privateInboxName,
+                parentId: opt.parentId,
+                timeout: opt.timeout,
                 expiresAt: computeExpiresAt(opt.timeout),
                 body: req,    
             },

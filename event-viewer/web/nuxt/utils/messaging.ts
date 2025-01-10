@@ -1,17 +1,17 @@
 import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection } from "nats.ws";
 import type {MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
 import { type MessageBusDriver, MessageBus, isRequest, isResponse, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
-import type { Logger } from "core-lib";
+import type { Logger, ServiceIdentity } from "core-lib";
 
 export class NatsMessageBus extends MessageBus {
 
-    constructor(appName: string, logger: Logger) {
+    constructor(identity: ServiceIdentity, logger: Logger) {
         const driver = new NatsMessageBusDriver(
             (msg) => this.messageDispatcher.dispatch(msg),
             (req, res) => this.envelopeReply(req, res),
             logger,
         );
-        super(appName, logger, new NoopMessageBusMetrics(), driver);
+        super(identity, logger, new NoopMessageBusMetrics(), driver);
     }
 }
 
@@ -63,25 +63,26 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     }
 
     subscribe(subscription: Subscription): void {
+        this.doSubscribe(subscription).catch(err => {
+            this.logger.error(err);
+        });
+    }    
+
+    private async doSubscribe(subscription: Subscription): Promise<void> {
         if (!this.connection) {
             throw new Error('Expected MessageBus to be started');
         }
 
         this.logger.info(`NATS subscribed to '${subscription.subject}'${ subscription.consumerGroupName ? ` for group '${subscription.consumerGroupName}'` : ''}`);
-        this.connection.subscribe(subscription.subject, { 
-            queue: subscription.consumerGroupName,
-            callback: (err, msg) => {
-                if (err) {
-                    this.logger.error(`Subscription callback failed`, err);
-                } else {
-                    const msgEnv = this.createMessageEnvelope(subscription.subject, msg);
-                    this.onReceiveMessage(msgEnv).catch(err => {
-                        this.logger.error('dispatchMessage failed', err);
-                    });
-                }
-            },
-        });
-    }    
+        for await (const msg of this.connection.subscribe(subscription.subject, { queue: subscription.consumerGroupName })) {
+            const msgEnv = this.createMessageEnvelope(subscription.subject, msg);
+            try {
+                await this.onReceiveMessage(msgEnv);
+            } catch(err) {
+                this.logger.error('onReceiveMessage failed', err);
+            }
+        }
+    }
     
     publish(msg: MessageEnvelope): void {
         this.connection?.publish(msg.subject, this.codec.encode(msg.body));

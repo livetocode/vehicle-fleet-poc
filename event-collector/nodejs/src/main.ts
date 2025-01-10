@@ -4,7 +4,7 @@ import { MoveCommandHandler, PersistedMoveCommand } from "./handlers/MoveCommand
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
-import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger } from 'core-lib';
+import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
@@ -96,12 +96,14 @@ function getInstanceIndex(): number {
 }
 
 async function main() {
-    const config = loadConfig('../../config.yaml');    
+    const config = loadConfig('../../config.yaml');
     const collectorIndex = getInstanceIndex();
-    const logger =  createLogger(config.collector.logging, `Collector #${collectorIndex}`);
-    
-    const messageBus = await createMessageBus(config.hub, 'collector', logger);
-    
+    const identity: ServiceIdentity = {
+        name: 'collector',
+        instance: collectorIndex,
+    }
+    const logger =  createLogger(config.collector.logging, `${identity.name} #${collectorIndex}`);
+        
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
 
@@ -111,6 +113,7 @@ async function main() {
     const aggregateStore = createAggregateStore(config.collector, logger, repo);
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition, collectorIndex);
 
+    const messageBus = await createMessageBus(config.hub, identity, logger);
     
     const moveCommandHandler = new MoveCommandHandler(
         config,
@@ -131,7 +134,7 @@ async function main() {
     messageBus.subscribe(`commands.*.${collectorIndex}`);
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
-    const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, 'collector');
+    const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, identity);
 
     await messageBus.waitForClose();
     server.close();

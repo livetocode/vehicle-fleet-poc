@@ -1,4 +1,4 @@
-import { Config, ConsoleLogger, DataPartitionStrategyConfig, LoggingConfig, Logger, NoopLogger } from 'core-lib';
+import { Config, ConsoleLogger, DataPartitionStrategyConfig, LoggingConfig, Logger, NoopLogger, ServiceIdentity } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
@@ -72,8 +72,12 @@ async function main() {
         }
     }
     const generatorIndex = getInstanceIndex();
-    const logger =  createLogger(config.generator.logging, `Generator #${generatorIndex}`);
-    const messageBus = await createMessageBus(config.hub, 'generator', logger);
+    const identity: ServiceIdentity = {
+        name: 'generator',
+        instance: generatorIndex,
+    }
+    const logger =  createLogger(config.generator.logging, `${identity.name} #${generatorIndex}`);
+    const messageBus = await createMessageBus(config.hub, identity, logger);
 
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
     const startGenerationHandler = new StartGenerationHandler(
@@ -91,12 +95,11 @@ async function main() {
 
     messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler);
 
-    messageBus.subscribe('generation.broadcast');
     messageBus.subscribe(`generation.agent.${generatorIndex}`, 'generation-agents');
     messageBus.subscribe(`generation`, 'generators');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
-    const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, 'generator');
+    const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, identity);
     
     await messageBus.waitForClose();
     server.close();

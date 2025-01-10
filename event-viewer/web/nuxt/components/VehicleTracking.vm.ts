@@ -130,24 +130,29 @@ export class VehicleTrackingViewModel {
     }) {
         const execute = async () => {
             this.logger.info('Cancelling any active generation...');
-            let found = false;
             try {
-                for await (const resp of this._messageBus.cancelMany({ type: 'cancel-request-type', requestType: 'generate-partition' } , { subject: 'generation.broadcast', limit: this.config.generator.instances, timeout: 1000 } )) {
+                for await (const resp of this._messageBus.cancelMany({ 
+                    type: 'cancel-request-type',
+                    requestType: 'start-generation',
+                    serviceName: 'generator',
+                    waitOnCompletion: true,
+                } , { 
+                    limit: this.config.generator.instances, 
+                    timeout: 5000,
+                 } )) {
                     this.logger.debug('Received cancel request response', resp.body);
                     if (isCancelResponse(resp)) {
                         if (resp.body.body.found) {
-                            found = true;
+                            this.logger.info('An active generation has been found and cancelled');
                         }
                     }
                 }    
             } catch(err) {
-                if (!(err instanceof RequestTimeoutError)) {
+                if (err instanceof RequestTimeoutError) {
+                    this.logger.warn('Cancellation timed out', err);
+                } else {
                     throw err;
                 }
-            }
-            if (found) {
-                this.logger.info('Found a generation request to cancel. Will wait before starting a new generation...')
-                await sleep(5000);
             }
             const request: StartGenerationCommand = {
                 type: 'start-generation',

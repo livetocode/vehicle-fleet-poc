@@ -1,13 +1,13 @@
 import { randomUUID } from "../utils.js";
 import { EventHandler } from "./EventHandler.js";
-import { MessageBus } from "./MessageBus.js";
+import { IMessageBus } from "./IMessageBus.js";
 import { MessageEnvelope } from "./MessageEnvelope.js";
-import { Request } from "./Requests.js";
+import { Request, Response, RequestCancelledError } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 
 export abstract class RequestHandler<TRequestBody extends TypedMessage, TResponse> extends EventHandler<Request<TRequestBody>> {
 
-    constructor(protected messageBus: MessageBus) {
+    constructor(protected messageBus: IMessageBus) {
         super();
     }
     
@@ -16,25 +16,42 @@ export abstract class RequestHandler<TRequestBody extends TypedMessage, TRespons
         if (event.expiresAt) {
             const expiredAt = new Date(event.expiresAt);
             if (expiredAt < new Date()) {
+                this.messageBus.reply(event, {
+                    type: 'response-error',
+                    code: 'expired',
+                    id: randomUUID(),
+                    requestId: event.id,
+                });    
                 return;
             }
         }
         try {
-            const resp = await this.processRequest(msg);
-            this.messageBus.reply(event, {
+            const respBody = await this.processRequest(msg);
+            const resp: Response = {
                 type: 'response-success',
                 id: randomUUID(),
                 requestId: event.id,
-                body: resp,
-            });
+                body: respBody,
+            };
+            this.messageBus.reply(event, resp);
         } catch(err : any) {
-            this.messageBus.reply(event, {
-                type: 'response-error',
-                code: 'exception',
-                id: randomUUID(),
-                requestId: event.id,
-                error: err.toString(),
-            });
+            if (err instanceof RequestCancelledError) {
+                this.messageBus.reply(event, {
+                    type: 'response-error',
+                    code: 'cancelled',
+                    id: randomUUID(),
+                    requestId: event.id,
+                    error: err.toString(),
+                });    
+            } else {
+                this.messageBus.reply(event, {
+                    type: 'response-error',
+                    code: 'exception',
+                    id: randomUUID(),
+                    requestId: event.id,
+                    error: err.toString(),
+                });    
+            }
             throw err;
         }
     }

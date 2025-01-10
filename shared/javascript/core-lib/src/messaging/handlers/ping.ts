@@ -1,16 +1,18 @@
 import { Logger } from "../../logger.js";
 import { RequestHandler } from "../RequestHandler.js";
-import { MessageBus } from "../MessageBus.js";
 import { MessageEnvelope } from "../MessageEnvelope.js";
 import { Request, RequestTimeoutError, Response, ResponseSuccess } from "../Requests.js";
+import { ServiceIdentity } from "../ServiceIdentity.js";
+import { IMessageBus } from "../IMessageBus.js";
 
 export type PingRequest = {
     type: 'ping';
+    serviceName?: string;
 };
 
 export type PingResponse = {
     type: 'pong';
-    appName: string;
+    identity: ServiceIdentity;
 };
 
 function isPingResponse(resp: any) : resp is PingResponse {
@@ -19,7 +21,7 @@ function isPingResponse(resp: any) : resp is PingResponse {
 
 export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse> {
     
-    constructor(messageBus: MessageBus, private logger: Logger, public appName: string) {
+    constructor(messageBus: IMessageBus, private logger: Logger, public identity: ServiceIdentity) {
         super(messageBus);
     }
 
@@ -31,7 +33,7 @@ export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse
         this.logger.debug('Sending pong response...');
         return {
             type: 'pong',
-            appName: this.appName,
+            identity: this.identity,
         }
     }
 }
@@ -39,21 +41,22 @@ export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse
 export class PingService {
     private handler: PingRequestHandler;
 
-    constructor(private messageBus: MessageBus, private logger: Logger, appName: string) {
-        this.handler = new PingRequestHandler(messageBus, logger, appName);
+    constructor(private messageBus: IMessageBus, private logger: Logger, identity: ServiceIdentity) {
+        this.handler = new PingRequestHandler(messageBus, logger, identity);
         this.messageBus.registerHandlers(this.handler);
-        // this.messageBus.subscribe('messaging.control.*');
+        this.messageBus.subscribe('messaging.control.*');
 }
 
-    async *ping(): AsyncGenerator<PingResponse> {
+    async *ping(serviceName?: string): AsyncGenerator<PingResponse> {
         const req: PingRequest = {
             type: 'ping',
+            serviceName,
         };
         try {
             this.logger.debug('Sending ping request...');
 
             for await (const resp of this.messageBus.requestMany(req, {
-                subject: 'messaging.control.ping',
+                subject: serviceName ? `messaging.control.ping.${serviceName}` : 'messaging.control.ping',
                 timeout: 5*1000,
                 limit: 1000,
             })) {
