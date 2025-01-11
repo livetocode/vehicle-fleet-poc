@@ -1,6 +1,6 @@
 import { Stopwatch } from "../stopwatch.js";
 import { Response, RequestOptions, RequestTimeoutError } from "./Requests.js";
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 
 export class RequestResponseContext {
     receivedResponseCount = 0;
@@ -15,7 +15,7 @@ export class RequestResponseContext {
 
 export class ResponseMatcher {
     private requests = new Map<string, RequestResponseContext>();
-    private receivedResponses: MessageEnvelope<Response>[] = [];
+    private receivedResponses: IncomingMessageEnvelope<Response>[] = [];
     private watch = Stopwatch.startNew();
     private maxTimeout = 0;
     
@@ -36,7 +36,7 @@ export class ResponseMatcher {
         }
     }
 
-    match(msg: MessageEnvelope<Response>): Boolean {
+    match(msg: IncomingMessageEnvelope<Response>): Boolean {
         const ctx = this.requests.get(msg.body.requestId);
         if (ctx) {
             const isValidResp = ctx.options.validator?.(msg.body) ?? true;
@@ -51,7 +51,7 @@ export class ResponseMatcher {
         return false;
     }
 
-    getMatches(): MessageEnvelope<Response>[] {
+    getMatches(): IncomingMessageEnvelope<Response>[] {
         const result = this.receivedResponses;
         this.receivedResponses = [];
         return result;

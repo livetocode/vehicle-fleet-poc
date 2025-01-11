@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, EventHandler, IMessageBus, MessageEnvelope } from 'core-lib';
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, EventHandler, IMessageBus, IncomingMessageEnvelope } from 'core-lib';
 import path from 'path';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
@@ -96,7 +96,7 @@ export class VehicleQueryHandler extends EventHandler<VehicleQuery | VehicleQuer
         ]; 
     }
 
-    async process(msg: MessageEnvelope<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats>): Promise<void> {
+    async process(msg: IncomingMessageEnvelope<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats>): Promise<void> {
         const event = msg.body;
         if (event.type === 'vehicle-query') {
             return this.processQuery(event);

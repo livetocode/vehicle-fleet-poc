@@ -1,4 +1,4 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, MessageEnvelope, MoveCommand, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError } from "core-lib";
 
 
 export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {
@@ -6,16 +6,16 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
     constructor(
         private config: Config,
         private logger: Logger,
-        messageBus: IMessageBus,
+        private messageBus: IMessageBus,
     ) {
-        super(messageBus);
+        super();
     }
 
     get eventTypes(): string[] {
         return ['start-generation'];
     }
     
-    protected async processRequest(req: MessageEnvelope<Request<StartGenerationCommand>>): Promise<GenerationStats> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<StartGenerationCommand>>): Promise<GenerationStats> {
         const event = req.body.body;
         this.logger.info('Received event', event);
         // reset stats

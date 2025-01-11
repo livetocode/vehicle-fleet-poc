@@ -1,4 +1,4 @@
-import { GeneratePartitionCommand, GeneratePartitionStats, RequestHandler, MessageEnvelope, Request } from "core-lib";
+import { GeneratePartitionCommand, GeneratePartitionStats, RequestHandler, IncomingMessageEnvelope, Request } from "core-lib";
 import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
@@ -8,18 +8,18 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
     constructor(
         private config: Config,
         private logger: Logger,
-        messageBus: IMessageBus,
+        private messageBus: IMessageBus,
         private generatorIndex: number,
         private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
     ) {
-        super(messageBus);
+        super();
     }
 
     get eventTypes(): string[] {
         return ['generate-partition'];
     }
 
-    protected async processRequest(req: MessageEnvelope<Request<GeneratePartitionCommand>>): Promise<GeneratePartitionStats> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<GeneratePartitionCommand>>): Promise<GeneratePartitionStats> {
         const event = req.body.body;
         const vehicleCount = event.request.vehicleCount;
         const refreshIntervalInSecs = event.request.refreshIntervalInSecs;

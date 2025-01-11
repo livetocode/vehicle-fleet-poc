@@ -3,7 +3,7 @@ import { Stopwatch } from "../stopwatch.js";
 import { ActiveEventHandlers, EventHandler } from "./EventHandler.js";
 import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { Response, isRequest, isResponse } from "./Requests.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 
@@ -16,7 +16,7 @@ export class MessageDispatcher {
         private activeHandlers: ActiveEventHandlers,
     ) {}
     
-    async dispatch(msg: MessageEnvelope) {
+    async dispatch(msg: IncomingMessageEnvelope) {
         if (isResponse(msg)) {
             this.processResponse(msg);
             return;
@@ -43,7 +43,7 @@ export class MessageDispatcher {
         }
     }
 
-    async dispatchHandlers(msg: MessageEnvelope, handlers: EventHandler[]) {
+    async dispatchHandlers(msg: IncomingMessageEnvelope, handlers: EventHandler[]) {
         const executeHandler = async (handler: EventHandler) => {
             const watch = Stopwatch.startNew();
             const msgRequest = isRequest(msg) ? msg : undefined;
@@ -75,7 +75,7 @@ export class MessageDispatcher {
         }
     }
 
-    private processResponse(msg: MessageEnvelope<Response>) {
+    private processResponse(msg: IncomingMessageEnvelope<Response>) {
         this.responseMatchers.match(msg);
     }
 }

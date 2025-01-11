@@ -1,4 +1,4 @@
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { TypedMessage } from "./TypedMessage.js";
 
 export abstract class EventHandler<TEvent extends TypedMessage = TypedMessage> {
@@ -8,11 +8,11 @@ export abstract class EventHandler<TEvent extends TypedMessage = TypedMessage> {
 
     abstract get eventTypes(): string[];
     
-    abstract process(msg: MessageEnvelope<TEvent>): Promise<void>;
+    abstract process(msg: IncomingMessageEnvelope<TEvent>): Promise<void>;
 }
 
 export type EventHandlerContext = {
-    msg: MessageEnvelope;
+    msg: IncomingMessageEnvelope;
     handler: EventHandler;
 }
 

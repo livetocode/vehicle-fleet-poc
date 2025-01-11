@@ -1,4 +1,4 @@
-import { Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
+import { IncomingMessageEnvelope, Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
 import { JSONCodec, Msg, MsgHdrs, NatsConnection, connect } from "nats";
 import { gracefulTerminationService } from "./GracefulTerminationService.js";
 
@@ -83,7 +83,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         this.connection?.publish(msg.subject, this.codec.encode(msg.body));
     }
 
-    private createMessageEnvelope(subject: string, msg: Msg): MessageEnvelope {
+    private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
         const data: any = this.codec.decode(msg.data);
         const onReplyTo = this.onReplyTo;
         return {

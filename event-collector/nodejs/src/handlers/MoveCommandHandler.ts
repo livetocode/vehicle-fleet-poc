@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, EventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber, MessageEnvelope } from 'core-lib';
+import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, EventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber, IncomingMessageEnvelope } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
@@ -76,7 +76,7 @@ export class MoveCommandHandler extends EventHandler<MoveCommand | FlushCommand>
         await this.restore();
     }
 
-    async process(msg: MessageEnvelope<MoveCommand | FlushCommand>): Promise<void> {
+    async process(msg: IncomingMessageEnvelope<MoveCommand | FlushCommand>): Promise<void> {
         const event = msg.body;
         if (event.type === 'flush') {
             return this.processFlushCommand(event);

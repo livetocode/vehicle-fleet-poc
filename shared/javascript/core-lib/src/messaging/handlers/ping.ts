@@ -1,6 +1,6 @@
 import { Logger } from "../../logger.js";
 import { RequestHandler } from "../RequestHandler.js";
-import { MessageEnvelope } from "../MessageEnvelope.js";
+import { IncomingMessageEnvelope } from "../MessageEnvelopes.js";
 import { Request, RequestTimeoutError, Response, ResponseSuccess } from "../Requests.js";
 import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
@@ -21,15 +21,15 @@ function isPingResponse(resp: any) : resp is PingResponse {
 
 export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse> {
     
-    constructor(messageBus: IMessageBus, private logger: Logger, public identity: ServiceIdentity) {
-        super(messageBus);
+    constructor(private logger: Logger, public identity: ServiceIdentity) {
+        super();
     }
 
     get eventTypes(): string[] {
         return ['ping'];
     }
 
-    protected async processRequest(req: MessageEnvelope<Request<PingRequest>>): Promise<PingResponse> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<PingRequest>>): Promise<PingResponse> {
         this.logger.debug('Sending pong response...');
         return {
             type: 'pong',
@@ -42,7 +42,7 @@ export class PingService {
     private handler: PingRequestHandler;
 
     constructor(private messageBus: IMessageBus, private logger: Logger, identity: ServiceIdentity) {
-        this.handler = new PingRequestHandler(messageBus, logger, identity);
+        this.handler = new PingRequestHandler(logger, identity);
         this.messageBus.registerHandlers(this.handler);
         this.messageBus.subscribe('messaging.control.*');
 }

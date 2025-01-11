@@ -1,4 +1,4 @@
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { ResponseMatcher } from "./ResponseMatcher.js";
 import { Response } from "./Requests.js";
 
@@ -20,7 +20,7 @@ export class ResponseMatcherCollection {
         }
     }    
 
-    match(msg: MessageEnvelope<Response>) {
+    match(msg: IncomingMessageEnvelope<Response>) {
         for (const responseMatcher of this.responseMatchers) {
             if (responseMatcher.match(msg)) {
                 break;

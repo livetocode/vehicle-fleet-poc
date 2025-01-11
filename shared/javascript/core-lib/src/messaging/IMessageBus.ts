@@ -1,5 +1,5 @@
 import { EventHandler } from "./EventHandler.js";
-import { MessageEnvelope } from "./MessageEnvelope.js";
+import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope } from "./MessageEnvelopes.js";
 import { Request, Response, RequestOptions, RequestOptionsPair } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 
@@ -13,5 +13,5 @@ export type IMessageBus = {
     request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>>;
     requestMany(request: TypedMessage, options: RequestOptions): AsyncGenerator<MessageEnvelope<Response>>;
     requestBatch(requests: RequestOptionsPair[]): AsyncGenerator<MessageEnvelope<Response>>;
-    reply(request: Request, response: Response): void;
+    reply(request: IncomingMessageEnvelope<Request>, response: BaseMessageEnvelope<Response>): void;
 }

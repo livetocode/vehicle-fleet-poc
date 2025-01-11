@@ -1,8 +1,8 @@
-import { MessageEnvelope, ReplyMessageEnvelope } from "./MessageEnvelope";
+import { MessageEnvelope, IncomingMessageEnvelope, BaseMessageEnvelope } from "./MessageEnvelopes";
 
-export type ReceiveMessageCallback = (msg: MessageEnvelope) => Promise<void>;
+export type ReceiveMessageCallback = (msg: IncomingMessageEnvelope) => Promise<void>;
 
-export type ReplyToCallback = (request: MessageEnvelope, response: ReplyMessageEnvelope) => void;
+export type ReplyToCallback = (request: IncomingMessageEnvelope, response: BaseMessageEnvelope) => void;
 
 export type Subscription = {
     subject: string;

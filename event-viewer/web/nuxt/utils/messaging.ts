@@ -1,6 +1,6 @@
 import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection } from "nats.ws";
-import type {MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
-import { type MessageBusDriver, MessageBus, isRequest, isResponse, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
+import type {IncomingMessageEnvelope, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
+import { type MessageBusDriver, MessageBus, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
 import type { Logger, ServiceIdentity } from "core-lib";
 
 export class NatsMessageBus extends MessageBus {
@@ -88,7 +88,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         this.connection?.publish(msg.subject, this.codec.encode(msg.body));
     }
 
-    private createMessageEnvelope(subject: string, msg: Msg): MessageEnvelope {
+    private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
         const data: any = this.codec.decode(msg.data);
         const onReplyTo = this.onReplyTo;
         return {

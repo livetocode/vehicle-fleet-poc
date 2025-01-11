@@ -126,7 +126,7 @@ async function main() {
     );
     await moveCommandHandler.init();
 
-    const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, messageBus, repo);
+    const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
     messageBus.registerHandlers(moveCommandHandler, clearVehiclesDataHandler);
 

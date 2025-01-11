@@ -1,6 +1,6 @@
 import { EventHandler, EventHandlerContext } from "./EventHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
-import { MessageEnvelope, ReplyMessageEnvelope } from "./MessageEnvelope.js";
+import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
 import { randomUUID, sleep } from "../utils.js";
 import { PingResponse, PingService } from "./handlers/ping.js";
@@ -82,14 +82,11 @@ export class MessageBus implements IMessageBus {
         }
     }
 
-    publish(subject: string, message: any): void {
+    publish(subject: string, message: TypedMessage): void {
         const envelope: MessageEnvelope = {
             subject,
             body: message,
             headers: {},
-            reply(_resp) {
-                throw new Error('not implemented when publishing a message');
-            },
         }
         this.publishEnvelope(envelope);
     }
@@ -131,11 +128,14 @@ export class MessageBus implements IMessageBus {
         }
     }
 
-    reply(request: Request, response: Response): void {
-        if (response.requestId !== request.id) {
-            throw new Error(`Response mismatch error: expected response's requestId "${response.requestId}" to match request ID "${request.id}"`);
+    reply(request: IncomingMessageEnvelope<Request>, response: BaseMessageEnvelope<Response>): void {
+        if (response.body.requestId !== request.body.id) {
+            throw new Error(`Response mismatch error: expected response's requestId "${response.body.requestId}" to match request ID "${request.body.id}"`);
         }
-        this.publish(request.replyTo, response);
+        this.publishEnvelope({
+            ...response,
+            subject: request.body.replyTo,
+        });
     }
 
     cancel(request: CancelRequestById, options: Partial<RequestOptions>): Promise<MessageEnvelope<Response>> {
@@ -150,17 +150,17 @@ export class MessageBus implements IMessageBus {
         return this.pingService.ping();
     }
 
-    protected envelopeReply(request: MessageEnvelope, response: ReplyMessageEnvelope): void {
+    protected envelopeReply(request: IncomingMessageEnvelope, response: BaseMessageEnvelope): void {
         if (!isRequest(request)) {
             throw new Error('Cannot reply to message because it is not a request');
         }
         if (!isReplyResponse(response)) {
             throw new Error('Submitted message is not a response');
         }
-        this.reply(request.body, response.body);
+        this.reply(request, response);
     }
     
-    private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): MessageEnvelope<Request> {
+    private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): IncomingMessageEnvelope<Request> {
         if (opt.limit !== undefined) {
             if (opt.limit < 1) {
                 throw new Error(`limit should be greater than zero, but received: ${opt.limit}`);

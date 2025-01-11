@@ -1,4 +1,4 @@
-import { MessageEnvelope, MessageHeaders, ReplyMessageEnvelope } from "./MessageEnvelope.js";
+import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
 import { TypedMessage } from "./TypedMessage.js";
 
@@ -86,7 +86,7 @@ export class RequestCancelledError extends Error {
     }
 }
 
-export function isRequest(msg: MessageEnvelope): msg is MessageEnvelope<Request> { 
+export function isRequest(msg: IncomingMessageEnvelope): msg is IncomingMessageEnvelope<Request> { 
     if (msg.body.type === 'request') {
         const body = msg.body as any;
         return body.id &&
@@ -111,14 +111,14 @@ export function isResponse(msg: MessageEnvelope): msg is MessageEnvelope<Respons
     return false;
 }
 
-export function isReplyResponse(msg: ReplyMessageEnvelope): msg is ReplyMessageEnvelope<Response> { 
-    const body = msg.body;
-    if (body.type === 'response-success') {
+export function isReplyResponse(msg: BaseMessageEnvelope): msg is BaseMessageEnvelope<Response> { 
+    const body = msg.body as any;
+    if (msg.body.type === 'response-success') {
         return body.id &&
             body.requestId &&
             body.body;
     }
-    if (body.type === 'response-error') {
+    if (msg.body.type === 'response-error') {
         return body.id &&
             body.requestId &&
             body.code;        
@@ -126,7 +126,7 @@ export function isReplyResponse(msg: ReplyMessageEnvelope): msg is ReplyMessageE
     return false;
 }
 
-export function isCancelRequest(msg: MessageEnvelope): msg is MessageEnvelope<Request<CancelRequest>> { 
+export function isCancelRequest(msg: IncomingMessageEnvelope): msg is IncomingMessageEnvelope<Request<CancelRequest>> { 
     if (isRequest(msg)) {
         const body = msg.body.body as any;
         if (body.type === 'cancel-request-id') {

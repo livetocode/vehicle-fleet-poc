@@ -5,7 +5,7 @@ export * from './LambdaEventHandler.js';
 export * from './MessageBus.js';
 export * from './MessageBusDriver.js';
 export * from './MessageBusMetrics.js';
-export * from './MessageEnvelope.js';
+export * from './MessageEnvelopes.js';
 export * from './MessageDispatcher.js';
 export * from './NoopMessageBusMetrics.js';
 export * from './Requests.js';
