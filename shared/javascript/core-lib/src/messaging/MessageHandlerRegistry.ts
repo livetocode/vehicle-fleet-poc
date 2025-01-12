@@ -1,9 +1,9 @@
-import { EventHandler } from "./EventHandler";
+import { MessageHandler } from "./MessageHandler";
 
-export class EventHandlerRegistry {
-    private handlers = new Map<string, EventHandler[]>();
+export class MessageHandlerRegistry {
+    private handlers = new Map<string, MessageHandler[]>();
 
-    register(handler: EventHandler) {
+    register(handler: MessageHandler) {
         for (const eventType of handler.eventTypes) {
             let eventTypeHandlers = this.handlers.get(eventType);
             if (!eventTypeHandlers) {
@@ -14,7 +14,7 @@ export class EventHandlerRegistry {
         }
     }
 
-    unregister(handler: EventHandler): void {
+    unregister(handler: MessageHandler): void {
         for (const type of handler.eventTypes) {
             const handlers = this.handlers.get(type);
             if (handlers) {
@@ -26,7 +26,7 @@ export class EventHandlerRegistry {
         }
     }
 
-    find(eventType: string): EventHandler[] | undefined {
+    find(eventType: string): MessageHandler[] | undefined {
         return this.handlers.get(eventType);
     }
 

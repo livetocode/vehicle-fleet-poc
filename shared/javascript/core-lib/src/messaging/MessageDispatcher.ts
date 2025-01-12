@@ -1,7 +1,7 @@
 import { Logger } from "../logger.js";
 import { Stopwatch } from "../stopwatch.js";
-import { ActiveEventHandlers, EventHandler } from "./EventHandler.js";
-import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
+import { ActiveMessageHandlers, MessageHandler } from "./MessageHandler.js";
+import { MessageHandlerRegistry } from "./MessageHandlerRegistry.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { Response, isRequest, isResponse } from "./Requests.js";
@@ -11,9 +11,9 @@ export class MessageDispatcher {
     constructor (
         private logger: Logger,
         private metrics: MessageBusMetrics,
-        private handlers: EventHandlerRegistry,
+        private handlers: MessageHandlerRegistry,
         private responseMatchers: ResponseMatcherCollection,
-        private activeHandlers: ActiveEventHandlers,
+        private activeHandlers: ActiveMessageHandlers,
     ) {}
     
     async dispatch(msg: IncomingMessageEnvelope) {
@@ -43,8 +43,8 @@ export class MessageDispatcher {
         }
     }
 
-    async dispatchHandlers(msg: IncomingMessageEnvelope, handlers: EventHandler[]) {
-        const executeHandler = async (handler: EventHandler) => {
+    async dispatchHandlers(msg: IncomingMessageEnvelope, handlers: MessageHandler[]) {
+        const executeHandler = async (handler: MessageHandler) => {
             const watch = Stopwatch.startNew();
             const msgRequest = isRequest(msg) ? msg : undefined;
             const reqId = msgRequest?.body.id;

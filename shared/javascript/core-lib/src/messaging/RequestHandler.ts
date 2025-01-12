@@ -1,11 +1,11 @@
 import { randomUUID } from "../utils.js";
-import { EventHandler } from "./EventHandler.js";
+import { MessageHandler } from "./MessageHandler.js";
 import { IMessageBus } from "./IMessageBus.js";
 import { BaseMessageEnvelope, IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { Request, Response, RequestCancelledError } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 
-export abstract class RequestHandler<TRequestBody extends TypedMessage, TResponse> extends EventHandler<Request<TRequestBody>> {
+export abstract class RequestHandler<TRequestBody extends TypedMessage, TResponse> extends MessageHandler<Request<TRequestBody>> {
     
     async process(msg: IncomingMessageEnvelope<Request<TRequestBody>>): Promise<void> {
         const event = msg.body;

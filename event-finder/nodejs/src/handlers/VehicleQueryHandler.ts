@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, EventHandler, IMessageBus, IncomingMessageEnvelope } from 'core-lib';
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, MessageHandler, IMessageBus, IncomingMessageEnvelope } from 'core-lib';
 import path from 'path';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
@@ -76,7 +76,7 @@ export class VehicleQueryContext {
     }
 }
 
-export class VehicleQueryHandler extends EventHandler<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats> {
+export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats> {
     subQueryResults = new Map<string, Map<string, VehicleQueryPartitionResultStats | null>>();
 
     constructor(

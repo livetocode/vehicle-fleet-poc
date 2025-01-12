@@ -1,4 +1,4 @@
-import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -10,8 +10,8 @@ export class VehicleFinderViewModel {
     public periods: any;
     public vehicleTypes: string[];
 
-    private _queryResultHandler?: EventHandler;
-    private _queryResultStatsHandler?: EventHandler;
+    private _queryResultHandler?: MessageHandler;
+    private _queryResultStatsHandler?: MessageHandler;
     private _vehicleIds = new Set<number>();
     private _currentQuery?: VehicleQuery;
     private _lastQueryResultStats?: VehicleQueryResultStats;
@@ -25,11 +25,11 @@ export class VehicleFinderViewModel {
     }
 
     async init(): Promise<void> {
-        this._queryResultHandler = new LambdaEventHandler<VehicleQueryResult>(
+        this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(
             ['vehicle-query-result'], 
             async (ev: any) => { this.onProcessQueryResult(ev); },
         );
-        this._queryResultStatsHandler = new LambdaEventHandler<VehicleQueryResultStats>(
+        this._queryResultStatsHandler = new LambdaMessageHandler<VehicleQueryResultStats>(
             ['vehicle-query-result-stats'], 
             async (ev: any) => { this.onProcessQueryResultStats(ev); },
         );

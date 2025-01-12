@@ -111,6 +111,16 @@ export function isResponse(msg: MessageEnvelope): msg is MessageEnvelope<Respons
     return false;
 }
 
+export function isResponseSuccess(msg: MessageEnvelope): msg is MessageEnvelope<ResponseSuccess> { 
+    if (msg.body.type === 'response-success') {
+        const body = msg.body as any;
+        return body.id &&
+            body.requestId &&
+            body.body;
+    }
+    return false;
+}
+
 export function isReplyResponse(msg: BaseMessageEnvelope): msg is BaseMessageEnvelope<Response> { 
     const body = msg.body as any;
     if (msg.body.type === 'response-success') {

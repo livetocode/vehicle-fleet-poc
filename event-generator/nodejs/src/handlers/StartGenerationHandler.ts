@@ -1,4 +1,4 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError } from "core-lib";
 
 
 export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {

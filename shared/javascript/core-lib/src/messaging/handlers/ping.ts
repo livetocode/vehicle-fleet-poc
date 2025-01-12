@@ -1,7 +1,7 @@
 import { Logger } from "../../logger.js";
 import { RequestHandler } from "../RequestHandler.js";
 import { IncomingMessageEnvelope } from "../MessageEnvelopes.js";
-import { Request, RequestTimeoutError, Response, ResponseSuccess } from "../Requests.js";
+import { isResponseSuccess, Request, RequestTimeoutError } from "../Requests.js";
 import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
 
@@ -61,11 +61,14 @@ export class PingService {
                 limit: 1000,
             })) {
                 this.logger.debug('Received pong response', resp.body);
+                if (isResponseSuccess(resp)) {
+                    if (isPingResponse(resp.body.body)) {
+                        yield resp.body.body;
+                    }
+
+                }
                 if (resp.body.type === 'response-success') {
                     const respBody = resp.body.body;
-                    if (isPingResponse(respBody)) {
-                        yield respBody;
-                    }
                 }
             }
         } catch(err) {

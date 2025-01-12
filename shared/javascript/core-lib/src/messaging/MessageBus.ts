@@ -1,4 +1,4 @@
-import { EventHandler, EventHandlerContext } from "./EventHandler.js";
+import { MessageHandler, MessageHandlerContext } from "./MessageHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
@@ -7,7 +7,7 @@ import { PingResponse, PingService } from "./handlers/ping.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageBusDriver } from "./MessageBusDriver.js";
 import { TypedMessage } from "./TypedMessage.js";
-import { EventHandlerRegistry } from "./EventHandlerRegistry.js";
+import { MessageHandlerRegistry } from "./MessageHandlerRegistry.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
@@ -22,7 +22,7 @@ export class MessageBus implements IMessageBus {
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
     private cancelService: CancelRequestService;
-    private handlers = new EventHandlerRegistry();
+    private handlers = new MessageHandlerRegistry();
     protected messageDispatcher: MessageDispatcher;        
 
     constructor(
@@ -31,7 +31,7 @@ export class MessageBus implements IMessageBus {
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
     ) {
-        const activeEventHandlers = new Map<string, EventHandlerContext>();
+        const activeEventHandlers = new Map<string, MessageHandlerContext>();
         this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
         this.pingService = new PingService(this, logger, identity);
@@ -60,13 +60,13 @@ export class MessageBus implements IMessageBus {
         return this.driver.waitForClose();
     }
 
-    registerHandlers(...handlers: EventHandler[]): void {
+    registerHandlers(...handlers: MessageHandler[]): void {
         for (const handler of handlers) {
             this.handlers.register(handler);
         }
     }
 
-    unregisterHandler(handler: EventHandler): void {
+    unregisterHandler(handler: MessageHandler): void {
         this.handlers.unregister(handler);
     }
 

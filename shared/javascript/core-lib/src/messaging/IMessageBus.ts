@@ -1,12 +1,12 @@
-import { EventHandler } from "./EventHandler.js";
+import { MessageHandler } from "./MessageHandler.js";
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope } from "./MessageEnvelopes.js";
 import { Request, Response, RequestOptions, RequestOptionsPair } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 
 export type IMessageBus = {
     get privateInboxName(): string;
-    registerHandlers(...handlers: EventHandler[]): void;
-    unregisterHandler(handler: EventHandler): void;
+    registerHandlers(...handlers: MessageHandler[]): void;
+    unregisterHandler(handler: MessageHandler): void;
     subscribe(subject: string, consumerGroupName?: string): void;
     publish(subject: string, message: any): void;
     publishEnvelope(message: MessageEnvelope): void;

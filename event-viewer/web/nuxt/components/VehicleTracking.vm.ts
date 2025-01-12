@@ -1,4 +1,4 @@
-import { LambdaEventHandler, randomUUID, type EventHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -80,8 +80,8 @@ export class VehicleTrackingViewModel {
     private totalElapsedTimeInMS = 0;
     private totalRejectedMessagesInThePast = 0;
     private totalRejectedMessagesInTheFuture = 0;
-    private _statsHandler?: EventHandler;
-    private _resetStatsHandler?: EventHandler;
+    private _statsHandler?: MessageHandler;
+    private _resetStatsHandler?: MessageHandler;
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
@@ -99,11 +99,11 @@ export class VehicleTrackingViewModel {
     }
 
     async init(): Promise<void> {
-        this._statsHandler = new LambdaEventHandler<AggregatePeriodStats>(
+        this._statsHandler = new LambdaMessageHandler<AggregatePeriodStats>(
             ['aggregate-period-stats'], 
             async (ev: any) => { this.onProcessStats(ev); },
         );
-        this._resetStatsHandler = new LambdaEventHandler<ResetAggregatePeriodStats>(
+        this._resetStatsHandler = new LambdaMessageHandler<ResetAggregatePeriodStats>(
             ['reset-aggregate-period-stats'], 
             async (ev: any) => { this.onResetStats(ev); },
         );
@@ -154,6 +154,8 @@ export class VehicleTrackingViewModel {
                     throw err;
                 }
             }
+            this.logger.info('Pausing before start...');
+            await sleep(10000);
             const request: StartGenerationCommand = {
                 type: 'start-generation',
                 vehicleCount: data.vehicleCount,

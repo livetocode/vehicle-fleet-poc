@@ -1,8 +1,8 @@
-import { EventHandler } from "./EventHandler.js";
+import { MessageHandler } from "./MessageHandler.js";
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { TypedMessage } from "./TypedMessage.js";
 
-export class LambdaEventHandler<TEvent extends TypedMessage = TypedMessage> extends EventHandler<TEvent> {
+export class LambdaMessageHandler<TEvent extends TypedMessage = TypedMessage> extends MessageHandler<TEvent> {
     constructor(private _eventTypes: string[], private handler: (e: TEvent) => Promise<void>) {
         super();
     }

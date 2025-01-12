@@ -1,7 +1,7 @@
 import { Logger } from "../../logger.js";
 import { Stopwatch } from "../../stopwatch.js";
 import { sleep } from "../../utils.js";
-import { EventHandlerContext } from "../EventHandler.js";
+import { MessageHandlerContext } from "../MessageHandler.js";
 import { IMessageBus } from "../IMessageBus.js";
 import { IncomingMessageEnvelope, MessageEnvelope } from "../MessageEnvelopes.js";
 import { RequestHandler } from "../RequestHandler.js";
@@ -14,7 +14,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         private messageBus: IMessageBus,
         private logger: Logger,
         public identity: ServiceIdentity,
-        private activeHandlers: Map<string, EventHandlerContext>,
+        private activeHandlers: Map<string, MessageHandlerContext>,
     ) {
         super();
     }
@@ -135,7 +135,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
             }    
         } catch(err) {
             if (err instanceof RequestTimeoutError) {
-                this.logger.trace('Child request cancellation timed out');
+                this.logger.debug('Child request cancellation timed out');
             } else {
                 throw err;
             }
@@ -173,7 +173,7 @@ export class CancelRequestService {
         private messageBus: IMessageBus,
         logger: Logger,
         identity: ServiceIdentity,
-        activeHandlers: Map<string, EventHandlerContext>,
+        activeHandlers: Map<string, MessageHandlerContext>,
     ) {
         this.handler = new CancelRequestHandler(messageBus, logger, identity, activeHandlers);
         this.messageBus.registerHandlers(this.handler);

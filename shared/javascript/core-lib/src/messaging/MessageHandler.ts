@@ -1,7 +1,7 @@
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { TypedMessage } from "./TypedMessage.js";
 
-export abstract class EventHandler<TEvent extends TypedMessage = TypedMessage> {
+export abstract class MessageHandler<TEvent extends TypedMessage = TypedMessage> {
     get isNonBlocking() {
         return false;
     }
@@ -11,9 +11,9 @@ export abstract class EventHandler<TEvent extends TypedMessage = TypedMessage> {
     abstract process(msg: IncomingMessageEnvelope<TEvent>): Promise<void>;
 }
 
-export type EventHandlerContext = {
+export type MessageHandlerContext = {
     msg: IncomingMessageEnvelope;
-    handler: EventHandler;
+    handler: MessageHandler;
 }
 
-export type ActiveEventHandlers = Map<string, EventHandlerContext>;
+export type ActiveMessageHandlers = Map<string, MessageHandlerContext>;

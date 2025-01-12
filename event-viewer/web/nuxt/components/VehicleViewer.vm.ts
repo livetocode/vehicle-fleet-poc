@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { EventHandler, LambdaEventHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
+import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
 import Geohash from 'latlon-geohash';
 
 export interface AssetRef {
@@ -34,10 +34,10 @@ export class VehicleViewerViewModel {
     private _viewPort?: ViewPort;
     private _vehicles = new Map<string, Vehicle>();
     private _assets: AssetRef[] = [];
-    private _moveHandler?: EventHandler;
-    private _queryHandler?: EventHandler;
-    private _queryResultHandler?: EventHandler;
-    private _resetStatsHandler?: EventHandler;
+    private _moveHandler?: MessageHandler;
+    private _queryHandler?: MessageHandler;
+    private _queryResultHandler?: MessageHandler;
+    private _resetStatsHandler?: MessageHandler;
     private host: any;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger, private mode: string) {
@@ -84,12 +84,12 @@ export class VehicleViewerViewModel {
             this.animate(time);
         });
         if (this.mode === 'tracking') {
-            this._moveHandler = new LambdaEventHandler<MoveCommand>(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-            this._resetStatsHandler = new LambdaEventHandler<ResetAggregatePeriodStats>(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
+            this._moveHandler = new LambdaMessageHandler<MoveCommand>(['move'], async (ev: any) => { this.onProcessCommand(ev); });
+            this._resetStatsHandler = new LambdaMessageHandler<ResetAggregatePeriodStats>(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
             this._messageBus.registerHandlers(this._moveHandler, this._resetStatsHandler);
         } else if (this.mode === 'search') {
-            this._queryHandler = new LambdaEventHandler<VehicleQuery>(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
-            this._queryResultHandler = new LambdaEventHandler<VehicleQueryResult>(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
+            this._queryHandler = new LambdaMessageHandler<VehicleQuery>(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
+            this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
             this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
         }
         app.renderer.on('resize', () => {

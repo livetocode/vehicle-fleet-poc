@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, EventHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber, IncomingMessageEnvelope } from 'core-lib';
+import { AggregatePeriodStats, Config, DataPartitionStats, FlushCommand, MessageHandler, Logger, MessageBus, MoveCommand, Stopwatch, TimeRange, calcTimeWindow, computeHashNumber, IncomingMessageEnvelope } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
@@ -43,7 +43,7 @@ export interface PersistedMoveCommand {
     direction: string;
 }
 
-export class MoveCommandHandler extends EventHandler<MoveCommand | FlushCommand> {
+export class MoveCommandHandler extends MessageHandler<MoveCommand | FlushCommand> {
     private accumulator: MoveCommandAccumulator;
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
