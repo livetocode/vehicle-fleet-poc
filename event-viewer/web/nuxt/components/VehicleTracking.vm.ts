@@ -130,20 +130,23 @@ export class VehicleTrackingViewModel {
     }) {
         const execute = async () => {
             this.logger.info('Cancelling any active generation...');
+            let found = false;
             try {
                 for await (const resp of this._messageBus.cancelMany({ 
                     type: 'cancel-request-type',
                     requestType: 'start-generation',
                     serviceName: 'generator',
                     waitOnCompletion: true,
+                    cancelChildRequests: true,
                 } , { 
                     limit: this.config.generator.instances, 
-                    timeout: 5000,
+                    timeout: 10000,
                  } )) {
                     this.logger.debug('Received cancel request response', resp.body);
                     if (isCancelResponse(resp)) {
                         if (resp.body.body.found) {
                             this.logger.info('An active generation has been found and cancelled');
+                            found = true;
                         }
                     }
                 }    
@@ -154,8 +157,10 @@ export class VehicleTrackingViewModel {
                     throw err;
                 }
             }
-            this.logger.info('Pausing before start...');
-            await sleep(10000);
+            if (found) {
+                this.logger.info('Pausing before start...');
+                await sleep(2000);    
+            }
             const request: StartGenerationCommand = {
                 type: 'start-generation',
                 vehicleCount: data.vehicleCount,

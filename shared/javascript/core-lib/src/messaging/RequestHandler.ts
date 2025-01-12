@@ -1,6 +1,5 @@
 import { randomUUID } from "../utils.js";
 import { MessageHandler } from "./MessageHandler.js";
-import { IMessageBus } from "./IMessageBus.js";
 import { BaseMessageEnvelope, IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { Request, Response, RequestCancelledError } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
@@ -9,6 +8,9 @@ export abstract class RequestHandler<TRequestBody extends TypedMessage, TRespons
     
     async process(msg: IncomingMessageEnvelope<Request<TRequestBody>>): Promise<void> {
         const event = msg.body;
+        if (event.type !== 'request') {
+            throw new Error(`A RequestHandler expects to receive a request message but received "${event.type}"`);
+        }
         if (event.expiresAt) {
             const expiredAt = new Date(event.expiresAt);
             if (expiredAt < new Date()) {

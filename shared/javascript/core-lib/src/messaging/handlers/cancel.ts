@@ -29,8 +29,10 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
     }
 
     protected async processRequest(req: IncomingMessageEnvelope<Request<CancelRequest>>): Promise<CancelResponse> {
-        this.logger.debug('Cancel request received', req.body);
         const watch = Stopwatch.startNew();
+        this.logger.debug('Cancel request received', req.body);
+        const timeout = (req.body.timeout ?? 10000) - 1000;
+
         let found = false;
         let cancellationCount = 0;
         const body = req.body.body;
@@ -41,7 +43,9 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         // If we found some requests to cancel, then cancel the child requests first
         if (matchedRequests.size > 0) {
             found = true;
-            cancellationCount += await this.cancelChildRequests(req, matchedRequests, depth);
+            if (body.cancelChildRequests === true) {
+                cancellationCount += await this.cancelChildRequests(req, matchedRequests, depth, timeout);
+            }
             // Now that the children have been cancelled, cancel the requests
             for (const msg of matchedRequests.values()) {
                 msg.shouldCancel = true;
@@ -49,7 +53,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
             }
             // If we need to wait on completion, then wait until cancelled requests have disappeared from memory or if timeout expires
             if (req.body.body.waitOnCompletion) {
-                await this.waitOnCompletion(req, matchedRequests, watch);
+                await this.waitOnCompletion(req, matchedRequests, watch, timeout);
             }
         }
         // return the cancellation response to the caller
@@ -106,10 +110,14 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         req: IncomingMessageEnvelope<Request<CancelRequest>>,
         matchedRequests: Map<string, IncomingMessageEnvelope>,
         depth: number,
+        timeout: number,
     ): Promise<number> {
-        this.logger.debug('Found requests to cancel', [...matchedRequests.values()].map(x => x.body), req.body.id, req.body.parentId);            
+        this.logger.debug('Found requests to cancel for ', req.body.id, [...matchedRequests.values()].map(x => x.body), req.body.id, req.body.parentId);            
         let cancellationCount = 0;
-        const childTimeout = Math.max(100, (req.body.timeout ?? 5000) - 1000);
+        let childTimeout = timeout;
+        if (req.body.body.waitOnCompletion === true) {
+            childTimeout = Math.max(100, Math.round(timeout / 2));
+        }
         const batch: RequestOptionsPair[] = [...matchedRequests.keys()].map(x => [
             {
                 type: 'cancel-request-parentId',
@@ -135,7 +143,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
             }    
         } catch(err) {
             if (err instanceof RequestTimeoutError) {
-                this.logger.debug('Child request cancellation timed out');
+                this.logger.debug(`Child request cancellation timed out for requestId=${req.body.id}, parentId=${req.body.parentId}`);
             } else {
                 throw err;
             }
@@ -147,9 +155,9 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         req: IncomingMessageEnvelope<Request<CancelRequest>>,
         matchedRequests: Map<string, IncomingMessageEnvelope>,
         watch: Stopwatch,
+        timeout: number,
     ): Promise<void> {
         this.logger.trace(`Cancel request "${req.body.id}" needs to wait on completion... (parentId=${req.body.parentId})`);
-        const timeout = req.body.timeout ?? 10000;
         while (matchedRequests.size > 0 && timeout > 0 && watch.elapsedTimeInMS() < timeout) {
             await sleep(50);
             const completedTasks: string[] = [];

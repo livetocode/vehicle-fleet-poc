@@ -1,6 +1,6 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { MoveCommandHandler, PersistedMoveCommand } from "./handlers/MoveCommandHandler.js";
+import { MoveCommandHandler } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
@@ -14,6 +14,8 @@ import { GeohashDataPartitionStrategy } from './core/data/GeohashDataPartitionSt
 import { IdGroupDataPartitionStrategy } from './core/data/IdGroupDataPartitionStrategy.js';
 import { createDataFrameRepository, DataFrameFormat, DataFrameRepository, stringToFormat } from 'data-lib';
 import { ClearVehiclesDataHandler } from './handlers/ClearVehiclesDataHandler.js';
+import { MoveCommandAccumulator, PersistedMoveCommand } from './handlers/MoveCommandAccumulator.js';
+import { FlushDataHandler } from './handlers/FlushDataHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -115,20 +117,29 @@ async function main() {
 
     const messageBus = await createMessageBus(config.hub, identity, logger);
     
+    const accumulator = new MoveCommandAccumulator(
+        config,
+        logger,
+        messageBus,
+        eventStore,
+        aggregateStore,
+        collectorIndex,
+    );
+
     const moveCommandHandler = new MoveCommandHandler(
         config,
         logger,
-        messageBus, 
         eventStore, 
-        aggregateStore,
+        accumulator,
         dataPartitionStrategy,
         collectorIndex, 
     );
     await moveCommandHandler.init();
 
+    const flushDataHandler = new FlushDataHandler(logger, accumulator);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
-    messageBus.registerHandlers(moveCommandHandler, clearVehiclesDataHandler);
+    messageBus.registerHandlers(moveCommandHandler,flushDataHandler, clearVehiclesDataHandler);
 
     messageBus.subscribe(`requests.collector`, `requests-collector`);
     messageBus.subscribe(`commands.*.${collectorIndex}`);

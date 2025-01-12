@@ -49,14 +49,17 @@ export interface MoveCommand {
     timestamp: string;
 }
 
-export interface FlushCommand {
-    type: 'flush';
-    exitProcess: boolean;
+export interface FlushRequest {
+    type: 'flush-request';
+}
+
+export interface FlushResponse {
+    type: 'flush-response';
 }
 
 export type Command =
   | MoveCommand
-  | FlushCommand;
+  | FlushRequest;
 
 export type ProcessMemory = {
     rss: number;

@@ -16,12 +16,14 @@ export type CancelRequestById = {
     type: 'cancel-request-id';
     requestId: string;
     waitOnCompletion?: boolean;
+    cancelChildRequests?: boolean;
 };
 
 export type CancelRequestByParentId = {
     type: 'cancel-request-parentId';
     parentId: string;
     waitOnCompletion?: boolean;
+    cancelChildRequests?: boolean;
     depth: number;
 };
 
@@ -30,6 +32,7 @@ export type CancelRequestByType = {
     requestType: string;
     serviceName?: string;
     waitOnCompletion?: boolean;
+    cancelChildRequests?: boolean;
 };
 
 export type CancelRequest = CancelRequestById | CancelRequestByParentId | CancelRequestByType;

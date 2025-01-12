@@ -1,4 +1,4 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushCommand, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushRequest, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError, isResponseSuccess } from "core-lib";
 
 
 export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {
@@ -76,16 +76,35 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         }
         
         // flush collectors
-        const flushCmd: FlushCommand = {
-            type: 'flush',
-            exitProcess: false,
-        }
+        const flushReq: FlushRequest = { type: 'flush-request' };
+        const flushRequests: RequestOptionsPair<FlushRequest>[] = [];
         for (let i = 0; i < this.config.collector.instances; i++) {
-            this.logger.info(`Flushing collector #${i}`);
-            this.messageBus.publish(`commands.flush.${i}`, flushCmd);
+            flushRequests.push([
+                flushReq, 
+                {
+                    subject: `commands.flush.${i}`,
+                    limit: 1,
+                    timeout: 30000,
+                },
+            ]);
+        }
+        try {
+            this.logger.info(`Flushing ${flushRequests.length} collectors`);
+            for await (const resp of this.messageBus.requestBatch(flushRequests)) {
+                if (isResponseSuccess(resp)) {
+                    this.logger.debug('Received flush response', resp.body);
+                }
+            }    
+        } catch(err: any) {
+            if (err instanceof RequestTimeoutError) {
+                this.logger.debug('Flush requests timed out', err);
+            } else {
+                throw err;
+            }
         }
 
         watch.stop();
+        this.logger.info('Generation is complete.');
         // send response stats
         return {
             type: 'generation-stats',
