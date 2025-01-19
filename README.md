@@ -51,11 +51,11 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 |                         |                  |                            |                |                 | command is sent to force the collectors  |
 |                         |                  |                            |                |                 | to write the accumulated data.           |
 +-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| stats                   |                  | aggregate-period-stats     | collector      | viewer          | Every time a chunk of data is persisted  |
+| events                  |                  | aggregate-period-created   | collector      | viewer          | Every time a chunk of data is persisted  |
 |                         |                  |                            |                |                 | by the collector, some stats on the chunk|
 |                         |                  |                            |                |                 | will be sent to the viewer.              |
 +-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| stats                   |                  |reset-aggregate-period-stats| generator      | viewer          | Clear the map in the viewer when a new   |
+| events                  |                  | vehicle-generation-started | generator      | viewer          | Clear the map in the viewer when a new   |
 |                         |                  |                            |                |                 | generation begins.                       |
 +-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
 | query.vehicles          | vehicle-finder   | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
@@ -99,7 +99,7 @@ sequenceDiagram
         generator-agent ->> collector: topic:commands.move.*/type:move
         loop aggregate events
             collector ->> collector: bufferize, then flush
-            collector -->> viewer: topic:stats/type:aggregate-period-stats
+            collector -->> viewer: topic:events/type:aggregate-period-created
         end
         deactivate collector
     end
@@ -107,7 +107,7 @@ sequenceDiagram
     deactivate generator-agent
     note right of generator: force a flush at the end of the generation
     generator ->>+ collector: topic:commands.flush.*/type:flush
-    collector -->>- viewer: topic:stats/type:aggregate-period-stats
+    collector -->>- viewer: topic:events/type:aggregate-period-created
     generator ->>- viewer: topic:inbox.viewer.*/type:generation-stats
 ```
 

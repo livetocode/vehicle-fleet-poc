@@ -1,7 +1,7 @@
 import { Counter } from "messaging-lib";
 import { getProcessStats } from "../core/diagnostics/processStats.js";
 import { Accumulator, Splitter } from "data-lib";
-import { TimeRange, Config, Logger, MessageBus, calcTimeWindow, Stopwatch, DataPartitionStats, AggregatePeriodStats } from "core-lib";
+import { TimeRange, Config, Logger, MessageBus, calcTimeWindow, Stopwatch, DataPartitionStats, AggregatePeriodCreated } from "core-lib";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { StoredEvent, EventStore } from "../core/persistence/EventStore.js";
 
@@ -93,8 +93,8 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
         watch.stop();
         this.logger.debug(`Splitted partition into ${subPartitionCount} subpartitions`);
         const totalElapsedTimeInMS = this.firstEventReceivedAt ? new Date().getTime() - this.firstEventReceivedAt.getTime() : 0;
-        const statsEvent: AggregatePeriodStats = {
-            type: 'aggregate-period-stats',
+        const statsEvent: AggregatePeriodCreated = {
+            type: 'aggregate-period-created',
             collectorCount: this.config.collector.instances,
             collectorIndex: this.collectorIndex,
             fromTime: partitionKey.fromTime.toUTCString(),
@@ -110,7 +110,7 @@ export class MoveCommandAccumulator extends Accumulator<StoredEvent<PersistedMov
             totalRejectedMessagesInTheFuture: this.totalRejectedMessagesInTheFuture,
             totalRejectedMessagesInThePast: this.totalRejectedMessagesInThePast,
         }
-        this.messageBus.publish('stats', statsEvent);
+        this.messageBus.publish('events.vehicles.aggregate-period.created', statsEvent);
         await this.eventStore.delete(partitionKey, this.collectorIndex);
     }
 

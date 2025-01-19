@@ -2,7 +2,7 @@ import fs from 'fs';
 import YAML from 'yaml';
 import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
-import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
+import { VehicleQueryHandler, VehicleQueryPartitionHandler } from './handlers/VehicleQueryHandler.js';
 import { createDataFrameRepository } from 'data-lib';
 
 function loadConfig(filename: string): Config {
@@ -64,7 +64,13 @@ async function main() {
         messageBus,
         repo,
     );
-    messageBus.registerHandlers(vehicleQueryHandler);
+    const vehicleQueryPartitionHandler = new VehicleQueryPartitionHandler(
+        config,
+        logger,
+        messageBus,
+        repo,
+    );
+    messageBus.registerHandlers(vehicleQueryHandler, vehicleQueryPartitionHandler);
 
     if (config.finder.parallelSearch) {
         messageBus.subscribe(`query.vehicles.partitions`, 'vehicle-finder-partitions');

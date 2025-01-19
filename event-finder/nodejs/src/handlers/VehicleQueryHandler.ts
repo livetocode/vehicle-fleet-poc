@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, MessageHandler, IMessageBus, IncomingMessageEnvelope } from 'core-lib';
+import { Config, VehicleQuery, Stopwatch, Logger, VehicleQueryResult, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, VehicleQueryPartitionResultStats, sleep, asyncChunks, MessageHandler, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResultStats, VehicleQueryStartedEvent } from 'core-lib';
 import path from 'path';
 import { gpsCoordinatesToPolyon, polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
@@ -40,17 +40,17 @@ export class VehicleQueryContext {
     timeoutExpired = false;
     limitReached = false;    
 
-    constructor(public config: Config, public event: VehicleQuery) {
+    constructor(public config: Config, public event: Request<VehicleQuery>) {
         this.watch.start();
-        this.fromDate = new Date(event.fromDate);
-        this.toDate = new Date(event.toDate);
+        this.fromDate = new Date(event.body.fromDate);
+        this.toDate = new Date(event.body.toDate);
         if (this.fromDate.getTime() > this.toDate.getTime()) {
             throw new Error('fromDate must be less than toDate');
         }
-        this.polygon = gpsCoordinatesToPolyon(event.polygon);
+        this.polygon = gpsCoordinatesToPolyon(event.body.polygon);
         this.timeout = event.timeout ?? this.config.finder.defaultTimeoutInMS;
-        this.parallelize = event.parallelize ?? this.config.finder.parallelSearch;
-        this.useChunking = event.useChunking ?? this.config.finder.useChunking;
+        this.parallelize = event.body.parallelize ?? this.config.finder.parallelSearch;
+        this.useChunking = event.body.useChunking ?? this.config.finder.useChunking;
     }
 
     hasTimedOut(): boolean {
@@ -62,8 +62,8 @@ export class VehicleQueryContext {
     }
 
     checkIfLimitWasReached() {
-        if (!this.limitReached && this.event.limit) {
-            this.limitReached = this.selectedRecordCount >= this.event.limit;
+        if (!this.limitReached && this.event.body.limit) {
+            this.limitReached = this.selectedRecordCount >= this.event.body.limit;
         }
         return this.limitReached;
     }
@@ -74,10 +74,21 @@ export class VehicleQueryContext {
         }
         return this.timeoutExpired;
     }
+
+    processSubQueryResponse(resp: VehicleQueryPartitionResultStats) {
+        this.selectedRecordCount += resp.stats.selectedRecordCount;
+        this.processedBytes += resp.stats.processedBytes;
+        this.processedFilesCount += resp.stats.processedFilesCount;
+        this.processedRecordCount += resp.stats.processedRecordCount;
+        for (const vehicleId of resp.distinctVehicleIds) {
+            this.distinctVehicles.add(vehicleId);
+        }
+        this.checkIfLimitWasReached();
+        this.checkTimeout();
+    }
 }
 
-export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats> {
-    subQueryResults = new Map<string, Map<string, VehicleQueryPartitionResultStats | null>>();
+export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQueryResultStats> {
 
     constructor(
         private config: Config,
@@ -91,213 +102,123 @@ export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQu
     get eventTypes(): string[] {
         return [
             'vehicle-query',
-            'vehicle-query-partition',
-            'vehicle-query-partition-result-stats',
         ]; 
     }
 
-    async process(msg: IncomingMessageEnvelope<VehicleQuery | VehicleQueryPartition | VehicleQueryPartitionResultStats>): Promise<void> {
-        const event = msg.body;
-        if (event.type === 'vehicle-query') {
-            return this.processQuery(event);
-        }
-        if (event.type === 'vehicle-query-partition') {
-            return this.processQueryPartition(event);
-        }
-        if (event.type === 'vehicle-query-partition-result-stats') {
-            return this.processQueryPartitionResultStats(event);
-        }
-        throw new Error(`Unexpected event type ${(event as any).type}`);
-    }
-
-    private async processQuery(event: VehicleQuery): Promise<void> {
-            this.logger.debug('Received query', event);
-        if (event.ttl && event.ttl < new Date().toISOString()) {
-            this.logger.warn('Ignoring request because its TTL has been exceeded');
-            return;
-        }
-        try {
-            const ctx = new VehicleQueryContext(this.config, event);
-            const geohashes = this.createGeohashes(ctx.polygon);
-            if (ctx.parallelize && ctx.useChunking) {
-                for await  (const filenames of asyncChunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
-                    for (const filename of filenames) {
-                        await this.processFile(ctx, filename);
-                        if (ctx.shouldAbort()) {
-                            break;
+    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQuery>>): Promise<VehicleQueryResultStats> {
+        const event = req.body.body;
+        this.logger.debug('Received query', event);
+        const startingEvent: VehicleQueryStartedEvent = {
+            type: 'vehicle-query-started',
+            query: req.body,
+        };
+        // Send it to our inbox to let the viewer display the polygon shape and clear the data
+        this.messageBus.publish(req.body.replyTo, startingEvent);
+        const ctx = new VehicleQueryContext(this.config, req.body);
+        const geohashes = this.createGeohashes(ctx.polygon);
+        if (ctx.useChunking) {
+            for await  (const filenames of asyncChunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
+                const subRequests: RequestOptionsPair<VehicleQueryPartition>[] = []; 
+                for (const filename of filenames) {
+                    const subRequest = this.createProcessFileRequest(ctx, filename);
+                    if (subRequest) {
+                        subRequests.push(subRequest);
+                    }
+                }
+                try {
+                    for await (const resp of this.messageBus.requestBatch(subRequests)) {
+                        this.logger.debug('Received sub-request response', resp.body);
+                        if (isResponseSuccess(resp)) {
+                            if (isVehicleQueryPartitionResultStats(resp.body.body)) {
+                                ctx.processSubQueryResponse(resp.body.body);
+                            }
                         }
-                    }
-                    await this.waitForSubQueries(ctx);
-                    if (ctx.shouldAbort()) {
-                        break;
-                    }
-                }    
-            } else if (ctx.parallelize && !ctx.useChunking) {
-                for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
-                    await this.processFile(ctx, filename);
-                    if (ctx.shouldAbort()) {
-                        break;
+                    }    
+                } catch(err: any) {
+                    if (err instanceof RequestTimeoutError) {
+                        this.logger.debug('Some sub-requests timed out', err);
+                    } else {
+                        throw err;
                     }
                 }
-                await this.waitForSubQueries(ctx);    
-            } else { // serialize
-                for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
-                    await this.processFile(ctx, filename);
-                    if (ctx.shouldAbort()) {
-                        break;
+                if (ctx.shouldAbort()) {
+                    break;
+                }
+            }    
+        } else {
+            const subRequests: RequestOptionsPair<VehicleQueryPartition>[] = []; 
+            for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
+                const subRequest = this.createProcessFileRequest(ctx, filename);
+                if (subRequest) {
+                    subRequests.push(subRequest);
+                }
+                try {
+                    for await (const resp of this.messageBus.requestBatch(subRequests)) {
+                        this.logger.debug('Received sub-request response', resp.body);
+                        if (isResponseSuccess(resp)) {
+                            if (isVehicleQueryPartitionResultStats(resp.body.body)) {
+                                ctx.processSubQueryResponse(resp.body.body);
+                            }
+                        }
+                    }    
+                } catch(err: any) {
+                    if (err instanceof RequestTimeoutError) {
+                        this.logger.debug('Some sub-requests timed out', err);
+                    } else {
+                        throw err;
                     }
+                }
+                if (ctx.shouldAbort()) {
+                    break;
                 }
             }
+        } 
 
-            ctx.watch.stop();
-            const stats: VehicleQueryResultStats = {
-                type: 'vehicle-query-result-stats',
-                queryId: event.id,
-                elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
-                processedFilesCount: ctx.processedFilesCount,
-                processedBytes: ctx.processedBytes,
-                processedRecordCount: ctx.processedRecordCount,
-                selectedRecordCount: ctx.selectedRecordCount,
-                distinctVehicleCount: ctx.distinctVehicles.size,
-                timeoutExpired: ctx.timeoutExpired,
-                limitReached: ctx.limitReached,
-            };
-            this.logger.debug('Stats', stats);
-            this.messageBus.publish(event.replyTo, stats);
-        } finally {
-            this.subQueryResults.delete(event.id);
-        }
-    }
-
-    private async processQueryPartition(event: VehicleQueryPartition): Promise<void> {
-        this.logger.debug('Received query partition', event);
-        const ctx = new VehicleQueryContext(this.config, event.query);
-        await this.executeProcessFile(ctx, event.filename, event.filesize);
         ctx.watch.stop();
-        const stats: VehicleQueryPartitionResultStats = {
-            type: 'vehicle-query-partition-result-stats',
-            partitionQueryId: event.partitionQueryId,
-            distinctVehicleIds: [...ctx.distinctVehicles],
-            stats: {
-                type: 'vehicle-query-result-stats',
-                queryId: event.query.id,
-                elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
-                processedFilesCount: ctx.processedFilesCount,
-                processedBytes: ctx.processedBytes,
-                processedRecordCount: ctx.processedRecordCount,
-                selectedRecordCount: ctx.selectedRecordCount,
-                distinctVehicleCount: ctx.distinctVehicles.size,
-                timeoutExpired: ctx.timeoutExpired,
-                limitReached: ctx.limitReached,
-            }
+        const stats: VehicleQueryResultStats = {
+            type: 'vehicle-query-result-stats',
+            elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
+            processedFilesCount: ctx.processedFilesCount,
+            processedBytes: ctx.processedBytes,
+            processedRecordCount: ctx.processedRecordCount,
+            selectedRecordCount: ctx.selectedRecordCount,
+            distinctVehicleCount: ctx.distinctVehicles.size,
+            timeoutExpired: ctx.timeoutExpired,
+            limitReached: ctx.limitReached,
         };
         this.logger.debug('Stats', stats);
-        this.messageBus.publish(event.replyTo, stats);
-    }
-
-    private async processQueryPartitionResultStats(event: VehicleQueryPartitionResultStats): Promise<void> {
-        const subQueries = this.subQueryResults.get(event.stats.queryId);
-        if (subQueries && subQueries.get(event.partitionQueryId) === null) {
-            subQueries.set(event.partitionQueryId, event);
-        }
-    }
-
-    private async waitForSubQueries(ctx: VehicleQueryContext) {
-        if (ctx.shouldAbort()) {
-            return;
-        }
-        if (ctx.parallelize && this.subQueryResults.get(ctx.event.id)) {
-            // wait for subquery results to come back
-            let isDone = false;
-            while (!isDone) {
-                await sleep(5);
-                const status = this.calcSubQueryStatus(ctx);
-                isDone = status.isDone;
-                if (ctx.shouldAbort()) {
-                    isDone = true;
-                }
-            }
-        }
+        return stats;
     }
     
-    private processFile(ctx: VehicleQueryContext, item: DataFrameDescriptor) {
-        ctx.processedFilesCount += 1;
-        if (ctx.parallelize) {
-            return this.requestProcessFile(ctx, item);
-        } else {
-            return this.executeProcessFile(ctx, item.name, item.size);
-        }
-    }
-    
-    private async requestProcessFile(ctx: VehicleQueryContext, item: DataFrameDescriptor) {
+    private createProcessFileRequest(ctx: VehicleQueryContext, item: DataFrameDescriptor): RequestOptionsPair<VehicleQueryPartition> | undefined {
         ctx.checkIfLimitWasReached();
         ctx.checkTimeout();
         if (ctx.shouldAbort()) {
-            return;
+            return undefined;
         }
+        ctx.processedFilesCount += 1;
         const subQuery: VehicleQueryPartition = {
             type: 'vehicle-query-partition',
             query: {
                 ...ctx.event,
+                body: {
+                    ...ctx.event.body,
+                    limit: ctx.event.body.limit ? ctx.event.body.limit - ctx.selectedRecordCount : undefined,
+                },
                 timeout: Math.max(500, ctx.timeout - ctx.watch.elapsedTimeInMS()),
-                limit: ctx.event.limit ? ctx.event.limit - ctx.selectedRecordCount : undefined,
             },
-            partitionQueryId: crypto.randomUUID(), 
             filename: item.name,
             filesize: item.size,
-            replyTo: this.messageBus.privateInboxName,
 
         };
-        let subQueries = this.subQueryResults.get(subQuery.query.id);
-        if (!subQueries) {
-            subQueries = new Map<string, VehicleQueryPartitionResultStats>();
-            this.subQueryResults.set(subQuery.query.id, subQueries);
-        }
-        subQueries.set(subQuery.partitionQueryId, null);
-        this.messageBus.publish('query.vehicles.partitions', subQuery);
-    }
-
-    private async executeProcessFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
-        for await (const res of this.searchFile(ctx, filename, filesize)) {
-            this.messageBus.publish(ctx.event.replyTo, res);
-            ctx.selectedRecordCount += 1;
-            ctx.distinctVehicles.add(res.vehicleId);
-            if (ctx.checkIfLimitWasReached()) {
-                break;
+        return [
+            subQuery,
+            {
+                subject: 'query.vehicles.partitions',
+                parentId: ctx.event.id,
+                timeout: ctx.timeout,
             }
-        }
-        ctx.checkTimeout();
-    }
-
-    private calcSubQueryStatus(ctx: VehicleQueryContext) {
-        let isDone = false;
-        const subQueries = this.subQueryResults.get(ctx.event.id);
-        if (subQueries) {
-            const processedSubQueries: string[] = [];
-            for (const [k, v] of subQueries) {
-                if (v !== null) {
-                    processedSubQueries.push(k);
-                    ctx.selectedRecordCount += v.stats.selectedRecordCount;
-                    ctx.processedBytes += v.stats.processedBytes;
-                    ctx.processedFilesCount += v.stats.processedFilesCount;
-                    ctx.processedRecordCount += v.stats.processedRecordCount;
-                    for (const vehicleId of v.distinctVehicleIds) {
-                        ctx.distinctVehicles.add(vehicleId);
-                    }
-                }
-            }
-            for (const k of processedSubQueries) {
-                subQueries.delete(k);
-            }
-            if (subQueries.size === 0) {
-                isDone = true;
-            }
-        }
-        ctx.checkIfLimitWasReached();
-        if (!isDone) {
-            ctx.checkTimeout();
-        }
-        return { isDone };
+        ];
     }
 
     private createGeohashes(polygon: Feature<Polygon>) {
@@ -332,6 +253,74 @@ export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQu
         }
     }
 
+
+}
+
+export function findCommonAncestorDirectory(d1: Date, d2: Date) {
+    const dp1 = dateToUtcParts(d1);
+    const dp2 = dateToUtcParts(d2);
+    const result: string[] = [];
+    for (let i = 0; i < dp1.length; i++) {
+        if (dp1[i] === dp2[i]) {
+            result.push(dp1[i]);
+        } else {
+            break;
+        }
+    }
+    return result;
+}
+
+export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPartition, VehicleQueryPartitionResultStats> {
+    constructor(
+        private config: Config,
+        private logger: Logger,
+        private messageBus: IMessageBus,
+        private repo: DataFrameRepository,
+    ) {
+        super();
+    }
+
+    get eventTypes(): string[] {
+        return ['vehicle-query-partition'];
+    }
+
+    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQueryPartition>>): Promise<VehicleQueryPartitionResultStats> {
+        const event = req.body.body;
+        this.logger.debug('Received query partition', event);
+        const ctx = new VehicleQueryContext(this.config, event.query);
+        await this.executeProcessFile(ctx, event.filename, event.filesize);
+        ctx.watch.stop();
+        const stats: VehicleQueryPartitionResultStats = {
+            type: 'vehicle-query-partition-result-stats',
+            distinctVehicleIds: [...ctx.distinctVehicles],
+            stats: {
+                type: 'vehicle-query-result-stats',
+                elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
+                processedFilesCount: ctx.processedFilesCount,
+                processedBytes: ctx.processedBytes,
+                processedRecordCount: ctx.processedRecordCount,
+                selectedRecordCount: ctx.selectedRecordCount,
+                distinctVehicleCount: ctx.distinctVehicles.size,
+                timeoutExpired: ctx.timeoutExpired,
+                limitReached: ctx.limitReached,
+            }
+        };
+        this.logger.debug('Stats', stats);
+        return stats;
+    }
+
+    private async executeProcessFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
+        for await (const res of this.searchFile(ctx, filename, filesize)) {
+            this.messageBus.publish(ctx.event.replyTo, res);
+            ctx.selectedRecordCount += 1;
+            ctx.distinctVehicles.add(res.vehicleId);
+            if (ctx.checkIfLimitWasReached()) {
+                break;
+            }
+        }
+        ctx.checkTimeout();
+    }
+
     private async *searchFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
         this.logger.debug('search file ', filename);
         const df = await this.repo.read(filename);
@@ -363,7 +352,7 @@ export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQu
             if (timestamp >= ctx.fromDate && timestamp <= ctx.toDate) {
                 const pos = turf.point([gps_lon, gps_lat]);
                 const isInsidePolygon = turf.booleanContains(ctx.polygon, pos);
-                const isValidVehicle = ctx.event.vehicleTypes.length === 0 || ctx.event.vehicleTypes.includes(vehicleType);
+                const isValidVehicle = ctx.event.body.vehicleTypes.length === 0 || ctx.event.body.vehicleTypes.includes(vehicleType);
                 if (isInsidePolygon && isValidVehicle) {
                     vehicles_search_selected_events_total_counter.inc();
                     const ev: VehicleQueryResult = {
@@ -385,19 +374,5 @@ export class VehicleQueryHandler extends MessageHandler<VehicleQuery | VehicleQu
                 }
             }
         }
-    }
-}
-
-export function findCommonAncestorDirectory(d1: Date, d2: Date) {
-    const dp1 = dateToUtcParts(d1);
-    const dp2 = dateToUtcParts(d2);
-    const result: string[] = [];
-    for (let i = 0; i < dp1.length; i++) {
-        if (dp1[i] === dp2[i]) {
-            result.push(dp1[i]);
-        } else {
-            break;
-        }
-    }
-    return result;
+    }    
 }

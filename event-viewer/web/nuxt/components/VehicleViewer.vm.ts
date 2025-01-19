@@ -1,5 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type Config, type Logger, type MoveCommand, type ResetAggregatePeriodStats, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
+import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, VehicleQueryStartedEvent,
+    type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
+import type { Request } from 'core-lib';
 import Geohash from 'latlon-geohash';
 
 export interface AssetRef {
@@ -38,6 +40,7 @@ export class VehicleViewerViewModel {
     private _queryHandler?: MessageHandler;
     private _queryResultHandler?: MessageHandler;
     private _resetStatsHandler?: MessageHandler;
+    private _query?: Request<VehicleQuery>;
     private host: any;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger, private mode: string) {
@@ -85,10 +88,10 @@ export class VehicleViewerViewModel {
         });
         if (this.mode === 'tracking') {
             this._moveHandler = new LambdaMessageHandler<MoveCommand>(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-            this._resetStatsHandler = new LambdaMessageHandler<ResetAggregatePeriodStats>(['reset-aggregate-period-stats'], async (ev: any) => { this.onResetStats(ev); });
+            this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(['vehicle-generation-started'], async (ev: any) => { this.onVehicleGenerationStarted(ev); });
             this._messageBus.registerHandlers(this._moveHandler, this._resetStatsHandler);
         } else if (this.mode === 'search') {
-            this._queryHandler = new LambdaMessageHandler<VehicleQuery>(['vehicle-query'], async (ev: any) => { this.onProcessQuery(ev); });
+            this._queryHandler = new LambdaMessageHandler<VehicleQueryStartedEvent>(['vehicle-query-started'], async (ev: any) => { this.onVehicleQueryStarted(ev); });
             this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
             this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
         }
@@ -126,16 +129,17 @@ export class VehicleViewerViewModel {
         this.onMoveVehicle(cmd);
     }
     
-    private onResetStats(ev: ResetAggregatePeriodStats) {
+    private onVehicleGenerationStarted(ev: VehicleGenerationStarted) {
         this.reset(true);
     }
 
-    private onProcessQuery(res: VehicleQuery) {
-        this.logger.debug('Received query', res);
+    private onVehicleQueryStarted(ev: VehicleQueryStartedEvent) {
+        this.logger.debug('Received query', ev.query);
         this.reset(true);
+        this._query = ev.query;
         const viewport = this._viewPort;
         if (viewport) {
-            const points = res.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
+            const points = ev.query.body.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
             const shape = new Graphics().poly(points).stroke({ color: 0xff0000 })
             this._zoneContainer?.addChild(shape);
         }
@@ -143,6 +147,9 @@ export class VehicleViewerViewModel {
 
     private onProcessQueryResult(res: VehicleQueryResult) {
         if (!this._app) {
+            return;
+        }
+        if (res.queryId !== this._query?.id) {
             return;
         }
         const cmd: MoveCommand = {

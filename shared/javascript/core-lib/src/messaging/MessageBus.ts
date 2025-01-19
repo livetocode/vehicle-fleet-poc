@@ -1,6 +1,6 @@
 import { MessageHandler, MessageHandlerContext } from "./MessageHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
-import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope } from "./MessageEnvelopes.js";
+import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
 import { randomUUID, sleep } from "../utils.js";
 import { PingResponse, PingService } from "./handlers/ping.js";
@@ -82,11 +82,11 @@ export class MessageBus implements IMessageBus {
         }
     }
 
-    publish(subject: string, message: TypedMessage): void {
+    publish(subject: string, message: TypedMessage, headers?: MessageHeaders): void {
         const envelope: MessageEnvelope = {
             subject,
             body: message,
-            headers: {},
+            headers: headers ?? {},
         }
         this.publishEnvelope(envelope);
     }
@@ -94,6 +94,19 @@ export class MessageBus implements IMessageBus {
     publishEnvelope(message: MessageEnvelope): void {
         this.driver.publish(message);
         this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
+    }
+
+    publishLocal(message: TypedMessage, headers?: MessageHeaders): Promise<void> {
+        const self = this;
+        const envelope: IncomingMessageEnvelope = {
+            subject: '@local',
+            body: message,
+            headers: headers ?? {},
+            reply(replyMsg) {
+                self.publishLocal(replyMsg.body, replyMsg.headers).catch(err => self.logger.error(err));
+            }
+        }
+        return this.messageDispatcher.dispatch(envelope);
     }
 
     async request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>> {

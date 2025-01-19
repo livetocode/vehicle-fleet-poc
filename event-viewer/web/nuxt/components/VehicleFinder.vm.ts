@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config, RequestTimeoutError, isResponseSuccess } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -11,7 +11,6 @@ export class VehicleFinderViewModel {
     public vehicleTypes: string[];
 
     private _queryResultHandler?: MessageHandler;
-    private _queryResultStatsHandler?: MessageHandler;
     private _vehicleIds = new Set<number>();
     private _currentQuery?: VehicleQuery;
     private _lastQueryResultStats?: VehicleQueryResultStats;
@@ -29,21 +28,13 @@ export class VehicleFinderViewModel {
             ['vehicle-query-result'], 
             async (ev: any) => { this.onProcessQueryResult(ev); },
         );
-        this._queryResultStatsHandler = new LambdaMessageHandler<VehicleQueryResultStats>(
-            ['vehicle-query-result-stats'], 
-            async (ev: any) => { this.onProcessQueryResultStats(ev); },
-        );
-        this._messageBus.registerHandlers(this._queryResultHandler, this._queryResultStatsHandler);
+        this._messageBus.registerHandlers(this._queryResultHandler);
     }
 
     async dispose(): Promise<void> {
         if (this._queryResultHandler) {
             this._messageBus?.unregisterHandler(this._queryResultHandler);
             this._queryResultHandler = undefined;
-        }
-        if (this._queryResultStatsHandler) {
-            this._messageBus?.unregisterHandler(this._queryResultStatsHandler);
-            this._queryResultStatsHandler = undefined;
         }
     }
 
@@ -125,18 +116,15 @@ export class VehicleFinderViewModel {
         }
         this.query({
             type: 'vehicle-query',
-            replyTo: this._messageBus.privateInboxName,
             id: randomUUID(),
             fromDate: period.from,
             toDate: period.to,
             polygon,            
             vehicleTypes: data.vehicleTypes,
             limit: data.limit ?? 1000000,
-            timeout: (data.timeout ?? 30) * 1000,
-            ttl: new Date(Date.now() + 5 * 1000).toISOString(), // Message will expire in 5 seconds
             parallelize: data.parallelize,
             useChunking: data.useChunking,
-        });
+        }, (data.timeout ?? 30) * 1000).catch(console.error);
     }
 
     private reset() {
@@ -203,23 +191,40 @@ export class VehicleFinderViewModel {
         return result;
     }
 
-    private query(q: VehicleQuery) {
+    private async query(q: VehicleQuery, timeout: number) {
         this.reset();
         this._currentQuery = q;
         this._lastUpdateTimestamp = new Date();
-        this._messageBus.publish('query.vehicles', q);
-        this._messageBus.publish(this._messageBus.privateInboxName, q); // Send it to our inbox to let the viewer display the polygon shape and clear the data
+        try {
+            const resp = await this._messageBus.request(q, {
+                subject: 'query.vehicles',
+                id: q.id,
+                timeout,            
+            });
+            if (isResponseSuccess(resp)) {
+                this.logger.debug('Received query response', resp.body);
+                if (resp.body.body.type === 'vehicle-query-result-stats') {
+                    this.onProcessQueryResultStats(resp.body.body as any);
+                }
+            }
+    
+        } catch (err: any) {
+            if (err instanceof RequestTimeoutError) {
+                this.logger.warn('Request timed out', err);
+            } else {
+                throw err;
+            }
+        }
     }
 
     private onProcessQueryResult(ev: VehicleQueryResult): void {
-        // this.logger.debug(ev);
         if (!ev.vehicleId) {
             return;
         }
         if (this._currentQuery && this._currentQuery.id !== ev.queryId) {
             return;
         }
-
+        this.logger.trace('Processing query response', ev);
         const id = parseInt(ev.vehicleId);
         if (!this._vehicleIds.has(id)) {
             this._vehicleIds.add(id);
@@ -236,9 +241,7 @@ export class VehicleFinderViewModel {
     }
     
     private onProcessQueryResultStats(ev: VehicleQueryResultStats): void {
-        if (this._currentQuery?.id !== ev.queryId) {
-            return;
-        }
+        this.logger.debug('Received query result stats', ev);
         this._lastQueryResultStats = ev;
         this.statValues.value = this.createStats();
     }

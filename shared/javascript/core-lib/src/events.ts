@@ -1,13 +1,6 @@
-import { GpsCoordinates, IRect, Point } from "./geometry.js";
-
-export interface MyRequest {
-    id: string;
-    replyTo: string;
-}
-
-export interface MyResponse {
-    requestId: string;
-}
+import { GpsCoordinates } from "./geometry.js";
+import { TypedMessage } from "./messaging/TypedMessage.js";
+import { Request } from "./messaging/Requests.js";
 
 export interface StartGenerationCommand {
     type: 'start-generation';
@@ -82,8 +75,8 @@ export interface DataPartitionStats {
     elapsedTimeInMS: number;
 }  
 
-export interface AggregatePeriodStats {
-    type: 'aggregate-period-stats',
+export interface AggregatePeriodCreated {
+    type: 'aggregate-period-created';
     collectorCount: number;
     collectorIndex: number;
     fromTime: string;
@@ -100,12 +93,22 @@ export interface AggregatePeriodStats {
     totalRejectedMessagesInTheFuture: number;
 }
 
-export interface ResetAggregatePeriodStats {
-    type: 'reset-aggregate-period-stats',
+export interface VehicleGenerationStarted {
+    type: 'vehicle-generation-started';
+    timestamp: string;
 }
 
-export interface VehicleQuery extends MyRequest {
+export interface VehicleGenerationStopped {
+    type: 'vehicle-generation-stopped';
+    success: boolean;
+    timestamp: string;
+    elapsedTimeInMS: number;
+}
+
+
+export interface VehicleQuery {
     type: 'vehicle-query';
+    id: string;
     fromDate: string;
     toDate: string;
     polygon: GpsCoordinates[];
@@ -115,6 +118,11 @@ export interface VehicleQuery extends MyRequest {
     ttl?: string;
     parallelize?: boolean;
     useChunking?: boolean;
+}
+
+export type VehicleQueryStartedEvent = {
+    type: 'vehicle-query-started';
+    query: Request<VehicleQuery>;
 }
 
 export interface VehicleQueryResult {
@@ -131,7 +139,6 @@ export interface VehicleQueryResult {
 
 export interface VehicleQueryResultStats {
     type: 'vehicle-query-result-stats';
-    queryId: string;
     processedFilesCount: number;
     processedBytes: number;
     processedRecordCount: number;
@@ -144,16 +151,13 @@ export interface VehicleQueryResultStats {
 
 export interface VehicleQueryPartition {
     type: 'vehicle-query-partition';
-    partitionQueryId: string;
-    replyTo: string;
-    query: VehicleQuery;
+    query: Request<VehicleQuery>;
     filename: string;
     filesize: number;
 }
 
 export interface VehicleQueryPartitionResultStats {
     type: 'vehicle-query-partition-result-stats';
-    partitionQueryId: string;
     stats: VehicleQueryResultStats;
     distinctVehicleIds: string[];
 }
@@ -165,4 +169,8 @@ export interface ClearVehiclesData {
 export interface ClearVehiclesDataResult {
     type: 'clear-vehicles-data-result';
     success: boolean;
+}
+
+export function isVehicleQueryPartitionResultStats(msg: TypedMessage): msg is VehicleQueryPartitionResultStats {
+    return msg.type === 'vehicle-query-partition-result-stats';
 }

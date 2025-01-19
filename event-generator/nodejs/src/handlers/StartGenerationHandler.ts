@@ -1,4 +1,4 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushRequest, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, ResetAggregatePeriodStats, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError, isResponseSuccess } from "core-lib";
+import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushRequest, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped } from "core-lib";
 
 
 export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {
@@ -18,8 +18,12 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
     protected async processRequest(req: IncomingMessageEnvelope<Request<StartGenerationCommand>>): Promise<GenerationStats> {
         const event = req.body.body;
         this.logger.info('Received event', event);
-        // reset stats
-        this.messageBus.publish(`stats`, { type: 'reset-aggregate-period-stats' } as ResetAggregatePeriodStats);
+        // on start
+        const startEvent: VehicleGenerationStarted = {
+            type: 'vehicle-generation-started',
+            timestamp: new Date().toISOString(),
+        }
+        this.messageBus.publish(`events.vehicles.generation.started`, startEvent);
 
         // delete existing events
         const clearRequest: ClearVehiclesData = {
@@ -32,7 +36,7 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         });
         if (clearResponse.body.type === 'response-success') {
             if (clearResponse.body.body.type === 'clear-vehicles-data-result') {
-                const clearResponseBody: ClearVehiclesDataResult = clearResponse.body.body;
+                const clearResponseBody: ClearVehiclesDataResult = clearResponse.body.body as any;
                 if (!clearResponseBody.success) {
                     throw new Error('Collector could not clear the data!');
                 }
@@ -105,6 +109,16 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
 
         watch.stop();
         this.logger.info('Generation is complete.');
+
+        // on stop
+        const stopEvent: VehicleGenerationStopped = {
+            type: 'vehicle-generation-stopped',
+            success: true,
+            timestamp: new Date().toISOString(),
+            elapsedTimeInMS: watch.elapsedTimeInMS(),
+        }
+        this.messageBus.publish(`events.vehicles.generation.stopped`, stopEvent);
+
         // send response stats
         return {
             type: 'generation-stats',

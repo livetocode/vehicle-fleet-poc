@@ -43,7 +43,7 @@ export class MessageDispatcher {
         }
     }
 
-    async dispatchHandlers(msg: IncomingMessageEnvelope, handlers: MessageHandler[]) {
+    dispatchHandlers(msg: IncomingMessageEnvelope, handlers: MessageHandler[]) {
         const executeHandler = async (handler: MessageHandler) => {
             const watch = Stopwatch.startNew();
             const msgRequest = isRequest(msg) ? msg : undefined;
@@ -69,9 +69,9 @@ export class MessageDispatcher {
             this.metrics.processMessage(subject, bodyType ?? 'unknown', status, watch.elapsedTimeInMS());
         }
         if (handlers.length === 1) {
-            await executeHandler(handlers[0]);
+            return executeHandler(handlers[0]);
         } else {
-            await Promise.all(handlers.map(executeHandler));
+            return Promise.all(handlers.map(executeHandler));
         }
     }
 

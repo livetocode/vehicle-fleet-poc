@@ -45,7 +45,7 @@ export type CancelResponse = {
 }
 
 // TODO: add elapsedTime to responses
-export type ResponseSuccess<TBody = any> = {
+export type ResponseSuccess<TBody = TypedMessage> = {
     id: string;
     requestId: string;
     type: 'response-success';

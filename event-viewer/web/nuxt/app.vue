@@ -23,7 +23,7 @@
 onMounted(() => {
   logger.debug('App is mounting...');
   messageBus.subscribe('commands.move.*');
-  messageBus.subscribe('stats');
+  messageBus.subscribe('events.vehicles.*.*');
   messageBus.start(connectionString).catch(console.error);
   logger.debug('App is mounted');
 });

@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodStats, type Config, type Logger, type ResetAggregatePeriodStats, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -72,7 +72,7 @@ export class VehicleTrackingViewModel {
         refreshIntervalInSecs: number;
         realtime: boolean;
     };
-    private events = ref<AggregatePeriodStats[]>([]);
+    private events = ref<AggregatePeriodCreated[]>([]);
     private totalEventCount = 0;
     private totalTimePartitionCount = 0;
     private totalDataPartitionCount = 0;
@@ -99,13 +99,13 @@ export class VehicleTrackingViewModel {
     }
 
     async init(): Promise<void> {
-        this._statsHandler = new LambdaMessageHandler<AggregatePeriodStats>(
-            ['aggregate-period-stats'], 
-            async (ev: any) => { this.onProcessStats(ev); },
+        this._statsHandler = new LambdaMessageHandler<AggregatePeriodCreated>(
+            ['aggregate-period-created'], 
+            async (ev: any) => { this.onAggregatePeriodCreated(ev); },
         );
-        this._resetStatsHandler = new LambdaMessageHandler<ResetAggregatePeriodStats>(
-            ['reset-aggregate-period-stats'], 
-            async (ev: any) => { this.onResetStats(ev); },
+        this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
+            ['vehicle-generation-started'], 
+            async (ev: any) => { this.onVehicleGenerationStarted(ev); },
         );
         this._messageBus.registerHandlers(this._statsHandler, this._resetStatsHandler);
     }
@@ -185,7 +185,7 @@ export class VehicleTrackingViewModel {
         execute().catch(console.error);
     }
 
-    formatStats(ev: AggregatePeriodStats) {
+    formatStats(ev: AggregatePeriodCreated) {
         const eventCountAsStr = formatCounts(ev.eventCount, 1);
         const totalBytes = ev.partitions.map(x => x.size).reduce((a, b) => a + b, 0);
         const totalBytesAsStr = formatBytes(totalBytes, 1);
@@ -243,7 +243,7 @@ export class VehicleTrackingViewModel {
         ];
     }
     
-    private onResetStats(ev: ResetAggregatePeriodStats): void {
+    private onVehicleGenerationStarted(ev: VehicleGenerationStarted): void {
         this.logger.debug(ev);
         this._nextEventStatsId = 1;
         this.totalEventCount = 0;
@@ -260,7 +260,7 @@ export class VehicleTrackingViewModel {
         this.statValues.value = this.createStats();
     }
 
-    private onProcessStats(ev: AggregatePeriodStats): void {
+    private onAggregatePeriodCreated(ev: AggregatePeriodCreated): void {
         this.logger.debug(ev);
         this._timePartitions.add(ev.partitionKey);
         const evWithId = {
