@@ -2,8 +2,9 @@ import fs from 'fs';
 import YAML from 'yaml';
 import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
-import { VehicleQueryHandler, VehicleQueryPartitionHandler } from './handlers/VehicleQueryHandler.js';
+import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 import { createDataFrameRepository } from 'data-lib';
+import { VehicleQueryPartitionHandler } from './handlers/VehicleQueryPartitionHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
