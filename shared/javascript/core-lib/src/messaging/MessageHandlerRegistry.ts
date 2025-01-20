@@ -4,7 +4,7 @@ export class MessageHandlerRegistry {
     private handlers = new Map<string, MessageHandler[]>();
 
     register(handler: MessageHandler) {
-        for (const eventType of handler.eventTypes) {
+        for (const eventType of handler.messageTypes) {
             let eventTypeHandlers = this.handlers.get(eventType);
             if (!eventTypeHandlers) {
                 eventTypeHandlers = [];
@@ -15,7 +15,7 @@ export class MessageHandlerRegistry {
     }
 
     unregister(handler: MessageHandler): void {
-        for (const type of handler.eventTypes) {
+        for (const type of handler.messageTypes) {
             const handlers = this.handlers.get(type);
             if (handlers) {
                 const idx = handlers?.indexOf(handler);

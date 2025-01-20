@@ -19,7 +19,7 @@ export class MoveCommandHandler extends MessageHandler<MoveCommand> {
         this.geohashPartitioner = new GeohashDataPartitionStrategy(config.collector.geohashLength);
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['move']; 
     }
 

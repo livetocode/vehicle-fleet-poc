@@ -25,7 +25,7 @@ export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['ping'];
     }
 

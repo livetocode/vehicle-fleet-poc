@@ -11,7 +11,7 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['start-generation'];
     }
     

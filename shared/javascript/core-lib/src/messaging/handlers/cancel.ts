@@ -24,7 +24,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         return true;
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['cancel-request-id', 'cancel-request-parentId', 'cancel-request-type'];
     }
 

@@ -99,7 +99,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQue
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return [
             'vehicle-query',
         ]; 
@@ -280,7 +280,7 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['vehicle-query-partition'];
     }
 

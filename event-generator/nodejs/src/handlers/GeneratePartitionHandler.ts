@@ -15,7 +15,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['generate-partition'];
     }
 

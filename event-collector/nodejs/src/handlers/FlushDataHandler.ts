@@ -9,7 +9,7 @@ export class FlushDataHandler extends RequestHandler<FlushRequest, FlushResponse
     ) {
         super();
     }
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['flush-request'];
     }
 

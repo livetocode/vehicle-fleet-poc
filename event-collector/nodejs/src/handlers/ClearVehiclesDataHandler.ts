@@ -10,7 +10,7 @@ export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesData, 
         super();
     }
 
-    get eventTypes(): string[] {
+    get messageTypes(): string[] {
         return ['clear-vehicles-data'];
     }
 

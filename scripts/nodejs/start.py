@@ -6,7 +6,7 @@ import requests
 import subprocess
 from collections import deque
 
-next_http_port = 7800;
+next_http_port = 7700;
 
 def read_config():
     with open('config.yaml', 'r') as file:
@@ -33,7 +33,9 @@ def delete_folder(folder: str):
 
 def kill_processes(processes):
     for process in processes:
-        process.kill()
+        if process.poll() is None:
+            print(f"killing process {process.pid}")
+            process.kill()
 
 def wait_for_processes_to_complete(processes):
     while processes:
@@ -42,6 +44,8 @@ def wait_for_processes_to_complete(processes):
             time.sleep(0.1)
 
 def wait_for_instances_to_be_ready(instances):
+    pids = [process.pid for process, _ in instances]
+    print(f"Waiting for pids: {pids}")
     time.sleep(1)
     current_instances = deque(instances)
     while current_instances:
