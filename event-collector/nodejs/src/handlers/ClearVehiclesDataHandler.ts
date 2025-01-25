@@ -1,7 +1,7 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, RequestHandler, Logger, IncomingMessageEnvelope, Request } from "core-lib";
+import { ClearVehiclesDataRequest, ClearVehiclesDataResponse, RequestHandler, Logger, IncomingMessageEnvelope, Request } from "core-lib";
 import { DataFrameRepository } from "data-lib";
 
-export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesData, ClearVehiclesDataResult> {
+export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesDataRequest, ClearVehiclesDataResponse> {
 
     constructor(
         private logger: Logger,
@@ -11,21 +11,21 @@ export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesData, 
     }
 
     get messageTypes(): string[] {
-        return ['clear-vehicles-data'];
+        return ['clear-vehicles-data-request'];
     }
 
-    protected async processRequest(req: IncomingMessageEnvelope<Request<ClearVehiclesData>>): Promise<ClearVehiclesDataResult> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<ClearVehiclesDataRequest>>): Promise<ClearVehiclesDataResponse> {
         this.logger.info("Clearing");
         try {
             await this.repo.clear();
             return {
-                type: 'clear-vehicles-data-result',
+                type: 'clear-vehicles-data-response',
                 success: true,
             };
         } catch(err: any) {
             this.logger.error(err);
             return {
-                type: 'clear-vehicles-data-result',
+                type: 'clear-vehicles-data-response',
                 success: false,
             };
         }

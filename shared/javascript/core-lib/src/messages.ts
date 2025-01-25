@@ -2,8 +2,8 @@ import { GpsCoordinates } from "./geometry.js";
 import { TypedMessage } from "./messaging/TypedMessage.js";
 import { Request } from "./messaging/Requests.js";
 
-export interface StartGenerationCommand {
-    type: 'start-generation';
+export interface GenerateRequest {
+    type: 'generate-request';
     vehicleCount: number;
     vehicleTypes: string[];
     maxNumberOfEvents: number;
@@ -13,23 +13,24 @@ export interface StartGenerationCommand {
     startDate?: string;
 }
 
-export interface GeneratePartitionCommand {
-    type: 'generate-partition';
-    startDate: string;
-    maxNumberOfEvents: number;
-    request: StartGenerationCommand;
+export interface GenerateResponse {
+    type: 'generate-response';
+    elapsedTimeInMS: number;
 }
 
-export interface GeneratePartitionStats {
-    type: 'generate-partition-stats';
+export interface GeneratePartitionRequest {
+    type: 'generate-partition-request';
+    startDate: string;
+    maxNumberOfEvents: number;
+    request: GenerateRequest;
+}
+
+export interface GeneratePartitionResponse {
+    type: 'generate-partition-response';
     generatedEventCount: number;
     elapsedTimeInMS: number;
 }
 
-export interface GenerationStats {
-    type: 'generation-stats';
-    elapsedTimeInMS: number;
-}
 
 export interface MoveCommand {
     type: 'move';
@@ -49,10 +50,6 @@ export interface FlushRequest {
 export interface FlushResponse {
     type: 'flush-response';
 }
-
-export type Command =
-  | MoveCommand
-  | FlushRequest;
 
 export type ProcessMemory = {
     rss: number;
@@ -106,8 +103,8 @@ export interface VehicleGenerationStopped {
 }
 
 
-export interface VehicleQuery {
-    type: 'vehicle-query';
+export interface VehicleQueryRequest {
+    type: 'vehicle-query-request';
     id: string;
     fromDate: string;
     toDate: string;
@@ -120,9 +117,27 @@ export interface VehicleQuery {
     useChunking?: boolean;
 }
 
+export interface VehicleQueryResponse {
+    type: 'vehicle-query-response';
+    processedFilesCount: number;
+    processedBytes: number;
+    processedRecordCount: number;
+    selectedRecordCount: number;
+    distinctVehicleCount: number;
+    elapsedTimeInMS: number;
+    timeoutExpired: boolean;
+    limitReached: boolean;
+}
+
 export type VehicleQueryStartedEvent = {
     type: 'vehicle-query-started';
-    query: Request<VehicleQuery>;
+    query: Request<VehicleQueryRequest>;
+}
+
+export type VehicleQueryStoppedEvent = {
+    type: 'vehicle-query-stopped';
+    query: Request<VehicleQueryRequest>;
+    response: VehicleQueryResponse;
 }
 
 export interface VehicleQueryResult {
@@ -137,40 +152,40 @@ export interface VehicleQueryResult {
     geoHash: string;
 }
 
-export interface VehicleQueryResultStats {
-    type: 'vehicle-query-result-stats';
-    processedFilesCount: number;
-    processedBytes: number;
-    processedRecordCount: number;
-    selectedRecordCount: number;
-    distinctVehicleCount: number;
-    elapsedTimeInMS: number;
-    timeoutExpired: boolean;
-    limitReached: boolean;
-}
-
-export interface VehicleQueryPartition {
-    type: 'vehicle-query-partition';
-    query: Request<VehicleQuery>;
+export interface VehicleQueryPartitionRequest {
+    type: 'vehicle-query-partition-request';
+    query: Request<VehicleQueryRequest>;
     filename: string;
     filesize: number;
 }
 
-export interface VehicleQueryPartitionResultStats {
-    type: 'vehicle-query-partition-result-stats';
-    stats: VehicleQueryResultStats;
+export interface VehicleQueryPartitionResponse {
+    type: 'vehicle-query-partition-response';
+    partialResponse: VehicleQueryResponse;
     distinctVehicleIds: string[];
 }
 
-export interface ClearVehiclesData {
-    type: 'clear-vehicles-data';
+export interface ClearVehiclesDataRequest {
+    type: 'clear-vehicles-data-request';
 }
 
-export interface ClearVehiclesDataResult {
-    type: 'clear-vehicles-data-result';
+export interface ClearVehiclesDataResponse {
+    type: 'clear-vehicles-data-response';
     success: boolean;
 }
 
-export function isVehicleQueryPartitionResultStats(msg: TypedMessage): msg is VehicleQueryPartitionResultStats {
-    return msg.type === 'vehicle-query-partition-result-stats';
+export function isVehicleQueryPartitionResponse(msg: TypedMessage): msg is VehicleQueryPartitionResponse {
+    return msg.type === 'vehicle-query-partition-response';
+}
+
+export function isGenerateResponse(msg: TypedMessage): msg is GenerateResponse {
+    return msg.type === 'generate-response';
+}
+
+export function isVehicleQueryResponse(msg: TypedMessage): msg is VehicleQueryResponse {
+    return msg.type === 'vehicle-query-response';
+}
+
+export function isClearVehiclesDataResponse(msg: TypedMessage): msg is ClearVehiclesDataResponse {
+    return msg.type === 'clear-vehicles-data-response';
 }

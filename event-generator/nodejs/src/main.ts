@@ -5,7 +5,7 @@ import YAML from 'yaml';
 import { IdDataPartitionStrategy } from "./data/IdDataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "./data/GeohashDataPartitionStrategy.js";
 import { IdGroupDataPartitionStrategy } from "./data/IdGroupDataPartitionStrategy.js";
-import { StartGenerationHandler } from "./handlers/StartGenerationHandler.js";
+import { GenerateHandler } from "./handlers/GenerateHandler.js";
 import { GeneratePartitionHandler } from './handlers/GeneratePartitionHandler.js';
 
 function loadConfig(filename: string): Config {
@@ -80,7 +80,7 @@ async function main() {
     const messageBus = await createMessageBus(config.hub, identity, logger);
 
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
-    const startGenerationHandler = new StartGenerationHandler(
+    const startGenerationHandler = new GenerateHandler(
         config,
         logger,
         messageBus,

@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, Logger, VehicleQueryResult, VehicleQueryPartition, VehicleQueryPartitionResultStats, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request } from 'core-lib';
+import { Config, Logger, VehicleQueryResult, VehicleQueryPartitionRequest, VehicleQueryPartitionResponse, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request } from 'core-lib';
 import * as turf from '@turf/turf';
 import { DataFrameRepository } from "data-lib";
 import { VehicleQueryContext } from "./VehicleQueryContext.js";
@@ -23,7 +23,7 @@ const vehicles_search_processed_bytes_total_counter = new Counter({
     labelNames: [],
 });
 
-export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPartition, VehicleQueryPartitionResultStats> {
+export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPartitionRequest, VehicleQueryPartitionResponse> {
     constructor(
         private config: Config,
         private logger: Logger,
@@ -34,20 +34,24 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
     }
 
     get messageTypes(): string[] {
-        return ['vehicle-query-partition'];
+        return ['vehicle-query-partition-request'];
     }
 
-    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQueryPartition>>): Promise<VehicleQueryPartitionResultStats> {
+    async execute(req: IncomingMessageEnvelope<Request<VehicleQueryPartitionRequest>>): Promise<VehicleQueryPartitionResponse> {
+        return this.processRequest(req);
+    }
+
+    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQueryPartitionRequest>>): Promise<VehicleQueryPartitionResponse> {
         const event = req.body.body;
         this.logger.debug('Received query partition', event);
         const ctx = new VehicleQueryContext(this.config, event.query);
         await this.executeProcessFile(ctx, event.filename, event.filesize);
         ctx.watch.stop();
-        const stats: VehicleQueryPartitionResultStats = {
-            type: 'vehicle-query-partition-result-stats',
+        const stats: VehicleQueryPartitionResponse = {
+            type: 'vehicle-query-partition-response',
             distinctVehicleIds: [...ctx.distinctVehicles],
-            stats: {
-                type: 'vehicle-query-result-stats',
+            partialResponse: {
+                type: 'vehicle-query-response',
                 elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
                 processedFilesCount: ctx.processedFilesCount,
                 processedBytes: ctx.processedBytes,

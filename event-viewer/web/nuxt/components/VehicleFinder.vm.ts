@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQuery, type VehicleQueryResultStats, addOffsetToCoordinates, KM, type Config, RequestTimeoutError, isResponseSuccess } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQueryRequest, type VehicleQueryResponse, addOffsetToCoordinates, KM, type Config, RequestTimeoutError, isResponseSuccess, isVehicleQueryResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -12,8 +12,8 @@ export class VehicleFinderViewModel {
 
     private _queryResultHandler?: MessageHandler;
     private _vehicleIds = new Set<number>();
-    private _currentQuery?: VehicleQuery;
-    private _lastQueryResultStats?: VehicleQueryResultStats;
+    private _currentQuery?: VehicleQueryRequest;
+    private _lastQueryResultStats?: VehicleQueryResponse;
     private _lastUpdateTimestamp?: Date;
     
     constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {
@@ -115,7 +115,7 @@ export class VehicleFinderViewModel {
             return;
         }
         this.query({
-            type: 'vehicle-query',
+            type: 'vehicle-query-request',
             id: randomUUID(),
             fromDate: period.from,
             toDate: period.to,
@@ -191,7 +191,7 @@ export class VehicleFinderViewModel {
         return result;
     }
 
-    private async query(q: VehicleQuery, timeout: number) {
+    private async query(q: VehicleQueryRequest, timeout: number) {
         this.reset();
         this._currentQuery = q;
         this._lastUpdateTimestamp = new Date();
@@ -203,8 +203,11 @@ export class VehicleFinderViewModel {
             });
             if (isResponseSuccess(resp)) {
                 this.logger.debug('Received query response', resp.body);
-                if (resp.body.body.type === 'vehicle-query-result-stats') {
-                    this.onProcessQueryResultStats(resp.body.body as any);
+                const body = resp.body.body;
+                if (isVehicleQueryResponse(body)) {
+                    this.logger.debug('Received query result stats', body);
+                    this._lastQueryResultStats = body;
+                    this.statValues.value = this.createStats();            
                 }
             }
     
@@ -240,9 +243,4 @@ export class VehicleFinderViewModel {
         }
     }
     
-    private onProcessQueryResultStats(ev: VehicleQueryResultStats): void {
-        this.logger.debug('Received query result stats', ev);
-        this._lastQueryResultStats = ev;
-        this.statValues.value = this.createStats();
-    }
 }

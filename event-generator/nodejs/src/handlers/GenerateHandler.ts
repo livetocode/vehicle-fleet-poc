@@ -1,7 +1,7 @@
-import { ClearVehiclesData, ClearVehiclesDataResult, Config, FlushRequest, GeneratePartitionCommand, GenerationStats, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, StartGenerationCommand, Stopwatch, RequestCancelledError, isResponse, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped } from "core-lib";
+import { ClearVehiclesDataRequest, ClearVehiclesDataResponse, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse } from "core-lib";
 
 
-export class StartGenerationHandler extends RequestHandler<StartGenerationCommand, GenerationStats> {
+export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateResponse> {
 
     constructor(
         private config: Config,
@@ -12,10 +12,10 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
     }
 
     get messageTypes(): string[] {
-        return ['start-generation'];
+        return ['generate-request'];
     }
     
-    protected async processRequest(req: IncomingMessageEnvelope<Request<StartGenerationCommand>>): Promise<GenerationStats> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<GenerateRequest>>): Promise<GenerateResponse> {
         const event = req.body.body;
         this.logger.info('Received event', event);
         // on start
@@ -26,8 +26,8 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         this.messageBus.publish(`events.vehicles.generation.started`, startEvent);
 
         // delete existing events
-        const clearRequest: ClearVehiclesData = {
-            type: 'clear-vehicles-data', 
+        const clearRequest: ClearVehiclesDataRequest = {
+            type: 'clear-vehicles-data-request', 
         };
         const clearResponse = await this.messageBus.request(clearRequest, { 
             subject: `requests.collector`,
@@ -35,15 +35,15 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
             limit: 1,
         });
         if (clearResponse.body.type === 'response-success') {
-            if (clearResponse.body.body.type === 'clear-vehicles-data-result') {
-                const clearResponseBody: ClearVehiclesDataResult = clearResponse.body.body as any;
-                if (!clearResponseBody.success) {
+            const body = clearResponse.body.body;
+            if (isClearVehiclesDataResponse(body)) {
+                if (!body.success) {
                     throw new Error('Collector could not clear the data!');
                 }
-            } else {
-                throw new Error(`Unexpected response type ${clearResponse.body.body.type}`);
-            }
 
+            } else {
+                throw new Error(`Unexpected response type ${body.type}`);
+            }
         } else {
             throw new Error('Collector could not clear the data!');
         }
@@ -55,14 +55,14 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
         // create partition requests
         const startDate = getStartDate(event, this.config.generator.startDate);
 
-        const partitionRequests: RequestOptionsPair<GeneratePartitionCommand>[] = [];
+        const partitionRequests: RequestOptionsPair<GeneratePartitionRequest>[] = [];
         for (let i = 0; i < this.config.generator.instances; i++) {
             let maxNumberOfEvents = Math.trunc(event.maxNumberOfEvents / this.config.generator.instances);
             if (i === 0) {
                 maxNumberOfEvents += event.maxNumberOfEvents % this.config.generator.instances;
             }
             partitionRequests.push([{
-                type: 'generate-partition',
+                type: 'generate-partition-request',
                 maxNumberOfEvents,
                 startDate,
                 request: event,
@@ -121,13 +121,13 @@ export class StartGenerationHandler extends RequestHandler<StartGenerationComman
 
         // send response stats
         return {
-            type: 'generation-stats',
+            type: 'generate-response',
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         };
     }
 }
 
-function getStartDate(event: StartGenerationCommand, defaultStartDate?: string): string {
+function getStartDate(event: GenerateRequest, defaultStartDate?: string): string {
     if (event.realtime) {
         return new Date().toISOString();
     }

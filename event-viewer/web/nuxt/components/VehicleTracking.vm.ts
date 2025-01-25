@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type StartGenerationCommand, type StopGenerationCommand, type CancelRequestByType, RequestTimeoutError, isCancelResponse } from "core-lib";
+import { LambdaMessageHandler, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type GenerateRequest, RequestTimeoutError, isCancelResponse, isGenerateResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -134,7 +134,7 @@ export class VehicleTrackingViewModel {
             try {
                 for await (const resp of this._messageBus.cancelMany({ 
                     type: 'cancel-request-type',
-                    requestType: 'start-generation',
+                    requestType: 'generate-request',
                     serviceName: 'generator',
                     waitOnCompletion: true,
                     cancelChildRequests: true,
@@ -161,8 +161,8 @@ export class VehicleTrackingViewModel {
                 this.logger.info('Pausing before start...');
                 await sleep(2000);    
             }
-            const request: StartGenerationCommand = {
-                type: 'start-generation',
+            const request: GenerateRequest = {
+                type: 'generate-request',
                 vehicleCount: data.vehicleCount,
                 vehicleTypes: data.vehicleTypes,
                 maxNumberOfEvents: data.maxNumberOfEvents,
@@ -175,7 +175,7 @@ export class VehicleTrackingViewModel {
             const result = await this._messageBus.request(request, { subject: 'generation' });
             if (result.body.type === 'response-success') {
                 const resp = result.body.body;
-                if (resp.type === 'generation-stats') {
+                if (isGenerateResponse(resp)) {
                     this.logger.info('Generation completed in ', resp.elapsedTimeInMS, ' ms');
                 }
             } else {

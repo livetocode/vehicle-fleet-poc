@@ -1,5 +1,5 @@
 import { Feature, GeoJsonProperties, Polygon } from "geojson";
-import { Config, VehicleQuery, Stopwatch, VehicleQueryPartitionResultStats, Request } from 'core-lib';
+import { Config, VehicleQueryRequest, Stopwatch, VehicleQueryPartitionResponse, Request } from 'core-lib';
 import { gpsCoordinatesToPolyon } from "../core/geospatial.js";
 
 export class VehicleQueryContext {
@@ -18,7 +18,7 @@ export class VehicleQueryContext {
     timeoutExpired = false;
     limitReached = false;    
 
-    constructor(public config: Config, public event: Request<VehicleQuery>) {
+    constructor(public config: Config, public event: Request<VehicleQueryRequest>) {
         this.watch.start();
         this.fromDate = new Date(event.body.fromDate);
         this.toDate = new Date(event.body.toDate);
@@ -53,11 +53,11 @@ export class VehicleQueryContext {
         return this.timeoutExpired;
     }
 
-    processSubQueryResponse(resp: VehicleQueryPartitionResultStats) {
-        this.selectedRecordCount += resp.stats.selectedRecordCount;
-        this.processedBytes += resp.stats.processedBytes;
-        this.processedFilesCount += resp.stats.processedFilesCount;
-        this.processedRecordCount += resp.stats.processedRecordCount;
+    processSubQueryResponse(resp: VehicleQueryPartitionResponse) {
+        this.selectedRecordCount += resp.partialResponse.selectedRecordCount;
+        this.processedBytes += resp.partialResponse.processedBytes;
+        this.processedFilesCount += resp.partialResponse.processedFilesCount;
+        this.processedRecordCount += resp.partialResponse.processedRecordCount;
         for (const vehicleId of resp.distinctVehicleIds) {
             this.distinctVehicles.add(vehicleId);
         }

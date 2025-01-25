@@ -1,9 +1,9 @@
-import { GeneratePartitionCommand, GeneratePartitionStats, RequestHandler, IncomingMessageEnvelope, Request } from "core-lib";
+import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest } from "core-lib";
 import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
-export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCommand, GeneratePartitionStats> {
+export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRequest, GeneratePartitionResponse> {
 
     constructor(
         private config: Config,
@@ -16,10 +16,10 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
     }
 
     get messageTypes(): string[] {
-        return ['generate-partition'];
+        return ['generate-partition-request'];
     }
 
-    protected async processRequest(req: IncomingMessageEnvelope<Request<GeneratePartitionCommand>>): Promise<GeneratePartitionStats> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<GeneratePartitionRequest>>): Promise<GeneratePartitionResponse> {
         const event = req.body.body;
         const vehicleCount = event.request.vehicleCount;
         const refreshIntervalInSecs = event.request.refreshIntervalInSecs;
@@ -128,7 +128,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionCo
         watch.stop();
         this.logger.info(`Done generating ${eventCount} out of ${event.request.maxNumberOfEvents} events in ${watch.elapsedTimeAsString()}`);
         return {
-            type: 'generate-partition-stats',
+            type: 'generate-partition-response',
             generatedEventCount: eventCount,
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         };

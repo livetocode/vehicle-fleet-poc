@@ -56,11 +56,10 @@ generator:
     - truck
 
 collector:
-  verbose: false
   logging:
     enabled: true
     level: debug
-  instances: 4
+  instances: 3
   httpPort: 7720
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
@@ -75,6 +74,10 @@ collector:
     storage:
       # type: noop
       # type: s3
+
+      # type: azure-blob
+      # containerName: events
+
       type: file
       folder: ../../output/data
 
@@ -82,7 +85,7 @@ finder:
   logging:
     enabled: true
     level: info
-  instances: 4
+  instances: 5
   httpPort: 7730
   defaultTimeoutInMS: 30000
   dataFormat: parquet

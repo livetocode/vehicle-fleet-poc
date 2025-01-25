@@ -10,7 +10,7 @@ export type IMessageBus = {
     subscribe(subject: string, consumerGroupName?: string): void;
     publish(subject: string, message: any, headers?: MessageHeaders): void;
     publishEnvelope(message: MessageEnvelope): void;
-    publishLocal(message: any, headers?: MessageHeaders): void;
+    publishLocal(message: any, headers?: MessageHeaders): Promise<void> ;
     request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>>;
     requestMany(request: TypedMessage, options: RequestOptions): AsyncGenerator<MessageEnvelope<Response>>;
     requestBatch(requests: RequestOptionsPair[]): AsyncGenerator<MessageEnvelope<Response>>;

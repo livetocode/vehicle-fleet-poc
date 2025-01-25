@@ -1,6 +1,6 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, VehicleQueryStartedEvent,
-    type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQuery, type VehicleQueryResult, type MessageBus } from 'core-lib';
+    type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQueryRequest, type VehicleQueryResult, type MessageBus } from 'core-lib';
 import type { Request } from 'core-lib';
 import Geohash from 'latlon-geohash';
 
@@ -40,7 +40,7 @@ export class VehicleViewerViewModel {
     private _queryHandler?: MessageHandler;
     private _queryResultHandler?: MessageHandler;
     private _resetStatsHandler?: MessageHandler;
-    private _query?: Request<VehicleQuery>;
+    private _query?: Request<VehicleQueryRequest>;
     private host: any;
     
     constructor (private config: Config, private _messageBus: MessageBus, private logger: Logger, private mode: string) {

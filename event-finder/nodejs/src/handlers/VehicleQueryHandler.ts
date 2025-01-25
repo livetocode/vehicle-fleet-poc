@@ -1,11 +1,12 @@
-import { Config, VehicleQuery, Logger, dateToUtcParts, calcTimeWindow, VehicleQueryResultStats, VehicleQueryPartition, asyncChunks, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResultStats, VehicleQueryStartedEvent } from 'core-lib';
+import { Config, VehicleQueryRequest, Logger, dateToUtcParts, calcTimeWindow, VehicleQueryResponse, VehicleQueryPartitionRequest, asyncChunks, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, VehicleQueryStartedEvent, VehicleQueryStoppedEvent } from 'core-lib';
 import path from 'path';
 import { polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, Polygon } from "geojson";
 import { DataFrameRepository, ListOptions, DataFrameDescriptor, stringToFormat } from "data-lib";
 import { VehicleQueryContext } from './VehicleQueryContext.js';
+import { VehicleQueryPartitionHandler } from './VehicleQueryPartitionHandler.js';
 
-export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQueryResultStats> {
+export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, VehicleQueryResponse> {
 
     constructor(
         private config: Config,
@@ -18,11 +19,11 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQue
 
     get messageTypes(): string[] {
         return [
-            'vehicle-query',
+            'vehicle-query-request',
         ]; 
     }
 
-    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQuery>>): Promise<VehicleQueryResultStats> {
+    protected async processRequest(req: IncomingMessageEnvelope<Request<VehicleQueryRequest>>): Promise<VehicleQueryResponse> {
         const event = req.body.body;
         this.logger.debug('Received query', event);
         const startingEvent: VehicleQueryStartedEvent = {
@@ -30,73 +31,25 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQue
             query: req.body,
         };
         // Send it to our inbox to let the viewer display the polygon shape and clear the data
-        // TODO: keep this optimization or send to subject 'events.vehicles.query.started'
+        // TODO: keep this optimization or send to subject 'events.vehicles.query.started'?
+        // Warning: the viewer assumes it is the only one to receive this start event.
         this.messageBus.publish(req.body.replyTo, startingEvent);
         const ctx = new VehicleQueryContext(this.config, req.body);
         const geohashes = this.createGeohashes(ctx.polygon);
-        if (ctx.useChunking) {
-            for await  (const filenames of asyncChunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
-                const subRequests: RequestOptionsPair<VehicleQueryPartition>[] = []; 
-                for (const filename of filenames) {
-                    const subRequest = this.createProcessFileRequest(ctx, filename);
-                    if (subRequest) {
-                        subRequests.push(subRequest);
-                    }
-                }
-                try {
-                    for await (const resp of this.messageBus.requestBatch(subRequests)) {
-                        this.logger.debug('Received sub-request response', resp.body);
-                        if (isResponseSuccess(resp)) {
-                            if (isVehicleQueryPartitionResultStats(resp.body.body)) {
-                                ctx.processSubQueryResponse(resp.body.body);
-                            }
-                        }
-                    }    
-                } catch(err: any) {
-                    if (err instanceof RequestTimeoutError) {
-                        this.logger.debug('Some sub-requests timed out', err);
-                    } else {
-                        throw err;
-                    }
-                }
-                if (ctx.shouldAbort()) {
-                    break;
-                }
-            }    
+        if (ctx.parallelize) {
+            if (ctx.useChunking) {
+                await this.parallelSearchWithChunking(ctx, geohashes);
+            } else {
+                await this.parallelSearchWithoutChunking(ctx, geohashes);
+            }     
         } else {
-            const subRequests: RequestOptionsPair<VehicleQueryPartition>[] = []; 
-            for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
-                const subRequest = this.createProcessFileRequest(ctx, filename);
-                if (subRequest) {
-                    subRequests.push(subRequest);
-                }
-                try {
-                    for await (const resp of this.messageBus.requestBatch(subRequests)) {
-                        this.logger.debug('Received sub-request response', resp.body);
-                        if (isResponseSuccess(resp)) {
-                            if (isVehicleQueryPartitionResultStats(resp.body.body)) {
-                                ctx.processSubQueryResponse(resp.body.body);
-                            }
-                        }
-                    }    
-                } catch(err: any) {
-                    if (err instanceof RequestTimeoutError) {
-                        this.logger.debug('Some sub-requests timed out', err);
-                    } else {
-                        throw err;
-                    }
-                }
-                if (ctx.shouldAbort()) {
-                    break;
-                }
-            }
-        } 
+            await this.linearSearch(ctx, geohashes);
+        }
 
         ctx.watch.stop();
-        // TODO: should we also publish a stop event such as 'events.vehicles.query.stopped'?
 
-        const stats: VehicleQueryResultStats = {
-            type: 'vehicle-query-result-stats',
+        const response: VehicleQueryResponse = {
+            type: 'vehicle-query-response',
             elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
             processedFilesCount: ctx.processedFilesCount,
             processedBytes: ctx.processedBytes,
@@ -106,19 +59,117 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQue
             timeoutExpired: ctx.timeoutExpired,
             limitReached: ctx.limitReached,
         };
-        this.logger.debug('Stats', stats);
-        return stats;
+        this.logger.debug('Stats', response);
+        const stoppedEvent: VehicleQueryStoppedEvent = {
+            type: 'vehicle-query-stopped',
+            query: req.body,
+            response: response,            
+        }
+        this.messageBus.publish('events.vehicles.query.stopped', stoppedEvent);
+        return response;
+    }
+
+    private async parallelSearchWithChunking(ctx: VehicleQueryContext, geohashes: Set<string>) {
+        for await  (const filenames of asyncChunks(this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes), ctx.config.finder.instances)) {
+            const subRequests: RequestOptionsPair<VehicleQueryPartitionRequest>[] = []; 
+            for (const filename of filenames) {
+                const subRequest = this.createProcessFileRequest(ctx, filename);
+                if (subRequest) {
+                    subRequests.push(subRequest);
+                }
+            }
+            try {
+                for await (const resp of this.messageBus.requestBatch(subRequests)) {
+                    this.logger.debug('Received sub-request response', resp.body);
+                    if (isResponseSuccess(resp)) {
+                        if (isVehicleQueryPartitionResponse(resp.body.body)) {
+                            ctx.processSubQueryResponse(resp.body.body);
+                        }
+                    }
+                }    
+            } catch(err: any) {
+                if (err instanceof RequestTimeoutError) {
+                    this.logger.debug('Some sub-requests timed out', err);
+                } else {
+                    throw err;
+                }
+            }
+            if (ctx.shouldAbort()) {
+                break;
+            }
+        }    
+    }
+
+    private async parallelSearchWithoutChunking(ctx: VehicleQueryContext, geohashes: Set<string>) {
+        const subRequests: RequestOptionsPair<VehicleQueryPartitionRequest>[] = []; 
+        for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
+            const subRequest = this.createProcessFileRequest(ctx, filename);
+            if (subRequest) {
+                subRequests.push(subRequest);
+            }
+            if (ctx.shouldAbort()) {
+                break;
+            }
+        }
+        try {
+            for await (const resp of this.messageBus.requestBatch(subRequests)) {
+                this.logger.debug('Received sub-request response', resp.body);
+                if (isResponseSuccess(resp)) {
+                    if (isVehicleQueryPartitionResponse(resp.body.body)) {
+                        ctx.processSubQueryResponse(resp.body.body);
+                    }
+                }
+                if (ctx.shouldAbort()) {
+                    break;
+                }
+            }    
+        } catch(err: any) {
+            if (err instanceof RequestTimeoutError) {
+                this.logger.debug('Some sub-requests timed out', err);
+            } else {
+                throw err;
+            }
+        }
+
     }
     
-    private createProcessFileRequest(ctx: VehicleQueryContext, item: DataFrameDescriptor): RequestOptionsPair<VehicleQueryPartition> | undefined {
+    private async linearSearch(ctx: VehicleQueryContext, geohashes: Set<string>) {
+        const partitionHandler = new VehicleQueryPartitionHandler(this.config, this.logger, this.messageBus, this.repo);
+        for await (const filename of this.enumerateFiles(ctx.fromDate, ctx.toDate, geohashes)) {
+            const subRequest = this.createProcessFileRequest(ctx, filename);
+            if (subRequest) {
+                const req: IncomingMessageEnvelope<Request<VehicleQueryPartitionRequest>> = {
+                    subject: '@local',
+                    headers: {},
+                    body: {
+                        id: '@1',
+                        type: 'request',
+                        replyTo: '@local',
+                        body: subRequest[0],
+                    },
+                    reply() {
+                        throw new Error('Not implemented');
+                    },
+                }
+                const resp = await partitionHandler.execute(req);
+                this.logger.debug('Received sub-request response', resp);
+                ctx.processSubQueryResponse(resp);
+            }
+            if (ctx.shouldAbort()) {
+                break;
+            }
+        }        
+    }
+
+    private createProcessFileRequest(ctx: VehicleQueryContext, item: DataFrameDescriptor): RequestOptionsPair<VehicleQueryPartitionRequest> | undefined {
         ctx.checkIfLimitWasReached();
         ctx.checkTimeout();
         if (ctx.shouldAbort()) {
             return undefined;
         }
         ctx.processedFilesCount += 1;
-        const subQuery: VehicleQueryPartition = {
-            type: 'vehicle-query-partition',
+        const subQuery: VehicleQueryPartitionRequest = {
+            type: 'vehicle-query-partition-request',
             query: {
                 ...ctx.event,
                 body: {
@@ -141,7 +192,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQuery, VehicleQue
         ];
     }
 
-    private createGeohashes(polygon: Feature<Polygon>) {
+    private createGeohashes(polygon: Feature<Polygon>): Set<string> {
         if (this.config.partitioning.dataPartition.type === 'geohash') {
             return polygonToGeohashes(polygon, this.config.partitioning.dataPartition.hashLength, false);
         }
