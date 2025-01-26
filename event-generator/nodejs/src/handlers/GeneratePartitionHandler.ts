@@ -1,6 +1,5 @@
 import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest } from "core-lib";
 import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
-import { DataPartitionStrategy } from "../data/DataPartitionStrategy.js";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
 export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRequest, GeneratePartitionResponse> {
@@ -10,7 +9,6 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         private logger: Logger,
         private messageBus: IMessageBus,
         private generatorIndex: number,
-        private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
     ) {
         super();
     }
@@ -93,9 +91,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                     gps: gpsPos,
                     timestamp: cmd.timestamp.toISOString(),
                 }
-                const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(msg);
-                const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.instances;
-                this.messageBus.publish(`commands.move.${collectorIndex}`, msg);
+                this.messageBus.publish(`commands.move`, msg);
                 eventCount++;
                 idx++;
                 if (eventCount >= event.maxNumberOfEvents) {

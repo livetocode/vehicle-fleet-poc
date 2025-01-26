@@ -30,7 +30,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             type: 'clear-vehicles-data-request', 
         };
         const clearResponse = await this.messageBus.request(clearRequest, { 
-            subject: `requests.collector`,
+            subject: `requests.vehicles.clear`,
             parentId: req.body.id,
             limit: 1,
         });
@@ -67,7 +67,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
                 startDate,
                 request: event,
             }, {
-                subject: `generation.agent.${i}`,
+                subject: `services.generators.assigned.${i}.partitions`,
                 parentId: req.body.id,
                 limit: 1,
             }]);
@@ -86,7 +86,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             flushRequests.push([
                 flushReq, 
                 {
-                    subject: `commands.flush.${i}`,
+                    subject: `services.collectors.assigned.${i}.requests.flush`,
                     limit: 1,
                     timeout: 30000,
                 },

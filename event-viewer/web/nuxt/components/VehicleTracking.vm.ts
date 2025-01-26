@@ -172,7 +172,7 @@ export class VehicleTrackingViewModel {
                 startDate: this.config.generator.startDate,        
             }
             this.logger.info('Starting generation', request);
-            const result = await this._messageBus.request(request, { subject: 'generation' });
+            const result = await this._messageBus.request(request, { subject: 'requests.vehicles.generate' });
             if (result.body.type === 'response-success') {
                 const resp = result.body.body;
                 if (isGenerateResponse(resp)) {

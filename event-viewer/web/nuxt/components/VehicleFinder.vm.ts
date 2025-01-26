@@ -197,7 +197,7 @@ export class VehicleFinderViewModel {
         this._lastUpdateTimestamp = new Date();
         try {
             const resp = await this._messageBus.request(q, {
-                subject: 'query.vehicles',
+                subject: 'requests.vehicles.query',
                 id: q.id,
                 timeout,            
             });

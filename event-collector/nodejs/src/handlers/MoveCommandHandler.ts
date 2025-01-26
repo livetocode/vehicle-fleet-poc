@@ -1,19 +1,14 @@
-import { Config, FlushRequest, MessageHandler, Logger, MoveCommand, computeHashNumber, IncomingMessageEnvelope } from 'core-lib';
-import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
+import { Config, MessageHandler, MoveCommand, computeHashNumber, IncomingMessageEnvelope, EnrichedMoveCommand, IMessageBus } from 'core-lib';
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
-import { MoveCommandAccumulator, PersistedMoveCommand } from "./MoveCommandAccumulator.js";
 
 export class MoveCommandHandler extends MessageHandler<MoveCommand> {
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
     constructor(
         private config: Config,
-        private logger: Logger,
-        private eventStore: EventStore<PersistedMoveCommand>,
-        private accumulator: MoveCommandAccumulator,
+        private messageBus: IMessageBus,
         private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
-        private collectorIndex: number,
     ) {
         super();
         this.geohashPartitioner = new GeohashDataPartitionStrategy(config.collector.geohashLength);
@@ -23,49 +18,20 @@ export class MoveCommandHandler extends MessageHandler<MoveCommand> {
         return ['move']; 
     }
 
-    async init(): Promise<void> {
-        await this.restore();
-    }
-
     async process(msg: IncomingMessageEnvelope<MoveCommand>): Promise<void> {
+        // Enrich the move command by computing a Geohash and a partition key,
+        // in order to dispatch the event to a dedicated collector and avoir sharing partitions between collectors
         const event = msg.body;
         const dataPartitionKey = this.dataPartitionStrategy.getPartitionKey(event);
         const collectorIndex = computeHashNumber(dataPartitionKey) % this.config.collector.instances;
-        if (this.collectorIndex !== collectorIndex) {
-            this.logger.warn(`Received event for wrong collector index #${collectorIndex}`);
-            return;
-        }
-        this.logger.trace(event);
         const geoHash = this.geohashPartitioner.getPartitionKey(event);
-        const storedEvent: StoredEvent<PersistedMoveCommand> = { 
-            timestamp: new Date(event.timestamp), 
+        const vehicleMovedEvent: EnrichedMoveCommand = { 
+            type: 'enriched-move',
             partitionKey: dataPartitionKey, 
             collectorIndex,
-            event: {
-                timestamp: new Date(event.timestamp),
-                vehicleId: event.vehicleId,
-                vehicleType: event.vehicleType,
-                gps_lat: event.gps.lat,
-                gps_lon: event.gps.lon,
-                gps_alt: event.gps.alt,
-                geoHash,
-                speed: event.speed,
-                direction: event.direction,
-            },
+            geoHash,
+            command: event,
         };
-        await this.eventStore.write(storedEvent);
-        await this.accumulator.write(storedEvent);
-    }
-
-    private async restore(): Promise<void> {
-        this.logger.info('Restoring move command accumulator from storage...');
-        let count = 0;
-        for await (const batch of this.eventStore.fetch(this.collectorIndex)) {
-            for (const ev of batch) {
-                this.accumulator.write(ev);
-                count += 1;
-            }
-        }
-        this.logger.info(`Restored ${count} move command accumulator from storage.`);
+        this.messageBus.publish(`services.collectors.assigned.${collectorIndex}.commands.move`, vehicleMovedEvent);
     }
 }

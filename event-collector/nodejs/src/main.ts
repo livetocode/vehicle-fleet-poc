@@ -16,6 +16,7 @@ import { createDataFrameRepository, DataFrameFormat, DataFrameRepository, string
 import { ClearVehiclesDataHandler } from './handlers/ClearVehiclesDataHandler.js';
 import { MoveCommandAccumulator, PersistedMoveCommand } from './handlers/MoveCommandAccumulator.js';
 import { FlushDataHandler } from './handlers/FlushDataHandler.js';
+import { AssignedMoveCommandHandler } from './handlers/AssignedMoveCommandHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -128,21 +129,26 @@ async function main() {
 
     const moveCommandHandler = new MoveCommandHandler(
         config,
+        messageBus,
+        dataPartitionStrategy,
+    );
+
+    const assignedMoveCommandHandler = new AssignedMoveCommandHandler(
         logger,
         eventStore, 
         accumulator,
-        dataPartitionStrategy,
         collectorIndex, 
     );
-    await moveCommandHandler.init();
+    await assignedMoveCommandHandler.init();
 
     const flushDataHandler = new FlushDataHandler(logger, accumulator);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
-    messageBus.registerHandlers(moveCommandHandler,flushDataHandler, clearVehiclesDataHandler);
+    messageBus.registerHandlers(moveCommandHandler, assignedMoveCommandHandler, flushDataHandler, clearVehiclesDataHandler);
 
-    messageBus.subscribe(`requests.collector`, `requests-collector`);
-    messageBus.subscribe(`commands.*.${collectorIndex}`);
+    messageBus.subscribe(`commands.move`, 'collectors');
+    messageBus.subscribe(`requests.vehicles.clear`, 'collectors');
+    messageBus.subscribe(`services.collectors.assigned.${collectorIndex}.>`, 'collectors');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, identity);

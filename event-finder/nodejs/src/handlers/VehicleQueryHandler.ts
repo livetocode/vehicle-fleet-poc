@@ -185,7 +185,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         return [
             subQuery,
             {
-                subject: 'query.vehicles.partitions',
+                subject: 'services.finder.any.partitions',
                 parentId: ctx.event.id,
                 timeout: ctx.timeout,
             }

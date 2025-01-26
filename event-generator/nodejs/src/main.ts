@@ -1,10 +1,7 @@
-import { Config, ConsoleLogger, DataPartitionStrategyConfig, LoggingConfig, Logger, NoopLogger, ServiceIdentity } from 'core-lib';
+import { Config, ConsoleLogger, LoggingConfig, Logger, NoopLogger, ServiceIdentity } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
-import { IdDataPartitionStrategy } from "./data/IdDataPartitionStrategy.js";
-import { GeohashDataPartitionStrategy } from "./data/GeohashDataPartitionStrategy.js";
-import { IdGroupDataPartitionStrategy } from "./data/IdGroupDataPartitionStrategy.js";
 import { GenerateHandler } from "./handlers/GenerateHandler.js";
 import { GeneratePartitionHandler } from './handlers/GeneratePartitionHandler.js';
 
@@ -20,19 +17,6 @@ function loadConfig(filename: string): Config {
         result.collector.instances = parseInt(collectorInstances);
     }
     return result;
-}
-
-function createDataPartitionStrategy(config: DataPartitionStrategyConfig) {
-    if (config.type === 'id') {
-        return new IdDataPartitionStrategy();
-    }
-    if (config.type === 'idGroup') {
-        return new IdGroupDataPartitionStrategy(config.groupSize);
-    }
-    if (config.type === 'geohash') {
-        return new GeohashDataPartitionStrategy(config.hashLength);
-    }
-    throw new Error('Unknown data partition strategy');
 }
 
 function createLogger(logging: LoggingConfig, name: string): Logger {
@@ -79,7 +63,6 @@ async function main() {
     const logger =  createLogger(config.generator.logging, `${identity.name} #${generatorIndex}`);
     const messageBus = await createMessageBus(config.hub, identity, logger);
 
-    const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition);
     const startGenerationHandler = new GenerateHandler(
         config,
         logger,
@@ -90,13 +73,12 @@ async function main() {
         logger,
         messageBus,
         generatorIndex,
-        dataPartitionStrategy,
     );
 
     messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler);
 
-    messageBus.subscribe(`generation.agent.${generatorIndex}`, 'generation-agents');
-    messageBus.subscribe(`generation`, 'generators');
+    messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generation-agents');
+    messageBus.subscribe(`requests.vehicles.generate`, 'generators');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, identity);

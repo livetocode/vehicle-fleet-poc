@@ -43,6 +43,15 @@ export interface MoveCommand {
     timestamp: string;
 }
 
+export interface EnrichedMoveCommand {
+    type: 'enriched-move';
+    command: MoveCommand;
+    collectorIndex: number;
+    geoHash: string;
+    partitionKey: string;
+}
+
+
 export interface FlushRequest {
     type: 'flush-request';
 }
