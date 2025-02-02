@@ -5,6 +5,11 @@ import { isResponseSuccess, Request, RequestTimeoutError } from "../Requests.js"
 import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
 
+export type PingOptions = {
+    serviceName?: string;
+    timeout?: number;
+}
+
 export type PingRequest = {
     type: 'ping';
     serviceName?: string;
@@ -47,17 +52,18 @@ export class PingService {
         this.messageBus.subscribe('messaging.control.*');
 }
 
-    async *ping(serviceName?: string): AsyncGenerator<PingResponse> {
+    async *ping(options?: PingOptions): AsyncGenerator<PingResponse> {
+        const serviceName = options?.serviceName;
         const req: PingRequest = {
             type: 'ping',
-            serviceName,
+            serviceName: serviceName,
         };
         try {
             this.logger.debug('Sending ping request...');
 
             for await (const resp of this.messageBus.requestMany(req, {
                 subject: serviceName ? `messaging.control.ping.${serviceName}` : 'messaging.control.ping',
-                timeout: 5*1000,
+                timeout: options?.timeout ?? 3*1000,
                 limit: 1000,
             })) {
                 this.logger.debug('Received pong response', resp.body);
@@ -65,10 +71,6 @@ export class PingService {
                     if (isPingResponse(resp.body.body)) {
                         yield resp.body.body;
                     }
-
-                }
-                if (resp.body.type === 'response-success') {
-                    const respBody = resp.body.body;
                 }
             }
         } catch(err) {

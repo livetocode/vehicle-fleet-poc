@@ -3,7 +3,7 @@ import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, Cance
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
 import { randomUUID, sleep } from "../utils.js";
-import { PingResponse, PingService } from "./handlers/ping.js";
+import { PingOptions, PingResponse, PingService } from "./handlers/ping.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageBusDriver } from "./MessageBusDriver.js";
 import { TypedMessage } from "./TypedMessage.js";
@@ -13,16 +13,19 @@ import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
 import { IMessageBus } from "./IMessageBus.js";
+import { MessageSubscription, MessageSubscriptions } from "./MessageSubscriptions.js";
+import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
 
 export class MessageBus implements IMessageBus {
     private started = false;
     private uid = randomUUID();
-    private subjects = new Set<string>();
-    private pendingSubscriptions: { subject: string;  consumerGroupName?: string }[] = [];
+    private pendingSubscriptions: MessageSubscription[] = [];
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
+    private infoService: InfoService;
     private cancelService: CancelRequestService;
     private handlers = new MessageHandlerRegistry();
+    private subscriptions = new MessageSubscriptions();
     protected messageDispatcher: MessageDispatcher;        
 
     constructor(
@@ -35,6 +38,7 @@ export class MessageBus implements IMessageBus {
         this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
         this.pingService = new PingService(this, logger, identity);
+        this.infoService = new InfoService(this, logger, identity, this.subscriptions, this.handlers);
         this.cancelService = new CancelRequestService(this, logger, identity, activeEventHandlers);
     }
 
@@ -71,14 +75,12 @@ export class MessageBus implements IMessageBus {
     }
 
     subscribe(subject: string, consumerGroupName?: string): void {
-        if (this.subjects.has(subject)) {
-            return;
-        }
-        this.subjects.add(subject);
-        if (this.started) {
-            this.driver.subscribe({ subject, consumerGroupName });
-        } else {
-            this.pendingSubscriptions.push({ subject, consumerGroupName });
+        if (this.subscriptions.add({ subject, consumerGroupName })) {
+            if (this.started) {
+                this.driver.subscribe({ subject, consumerGroupName });
+            } else {
+                this.pendingSubscriptions.push({ subject, consumerGroupName });
+            }    
         }
     }
 
@@ -159,8 +161,12 @@ export class MessageBus implements IMessageBus {
         yield* this.cancelService.cancelMany(request, options);
     }
 
-    ping(): AsyncGenerator<PingResponse> {
-        return this.pingService.ping();
+    ping(options?: PingOptions): AsyncGenerator<PingResponse> {
+        return this.pingService.ping(options);
+    }
+
+    info(options?: InfoOptions): AsyncGenerator<InfoResponse> {
+        return this.infoService.info(options);
     }
 
     protected envelopeReply(request: IncomingMessageEnvelope, response: BaseMessageEnvelope): void {
