@@ -23,6 +23,7 @@ useHead({
             <v-spacer />
             <v-btn text nuxt to="/tracking">Tracking</v-btn>
             <v-btn text nuxt to="/search">Search</v-btn>
+            <v-btn text nuxt to="/settings">Settings</v-btn>
         </v-app-bar> 
         <v-main>
             <slot />
