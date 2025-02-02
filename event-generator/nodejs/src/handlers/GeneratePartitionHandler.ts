@@ -117,7 +117,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                         await sleep(delta);
                     }
                 } else {
-                    await sleep(1);
+                    await sleep(event.request.pauseDelayInMSecs ?? 1);
                 }    
             }
         }

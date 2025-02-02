@@ -126,7 +126,8 @@ export class VehicleTrackingViewModel {
         vehicleTypes: string[];
         maxNumberOfEvents: number;
         refreshIntervalInSecs: number;
-        realtime: boolean;    
+        realtime: boolean;
+        pauseDelayInMSecs: number;
     }) {
         const execute = async () => {
             this.logger.info('Cancelling any active generation...');
@@ -168,6 +169,7 @@ export class VehicleTrackingViewModel {
                 maxNumberOfEvents: data.maxNumberOfEvents,
                 refreshIntervalInSecs: data.refreshIntervalInSecs,
                 realtime: data.realtime,
+                pauseDelayInMSecs: data.pauseDelayInMSecs,
                 sendFlush: this.config.generator.sendFlush,
                 startDate: this.config.generator.startDate,        
             }

@@ -21,6 +21,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    pauseDelayInMSecs: {
+        type: Number,
+        default: 1,
+    },
 
 });
 const emit = defineEmits<{
@@ -31,6 +35,7 @@ const emit = defineEmits<{
       maxNumberOfEvents: number;
       refreshIntervalInSecs: number;
       realtime: boolean;
+      pauseDelayInMSecs: number;
     }): void,
 }>();
 
@@ -39,6 +44,7 @@ let fldVehicleTypes = ref<string[]>(props.vehicleTypes);
 let fldMaxNumberOfEvents = ref(props.maxNumberOfEvents);
 let fldRefreshIntervalInSecs = ref(props.refreshIntervalInSecs);
 let fldRealtime = ref(props.realtime);
+let fldPauseDelayInMSecs = ref(props.pauseDelayInMSecs);
 
 function onCancelDialog(isActive: Ref<boolean>) {
     isActive.value = false;
@@ -53,6 +59,7 @@ function onAcceptDialog(isActive: Ref<boolean>) {
       maxNumberOfEvents: fldMaxNumberOfEvents.value * 1,
       refreshIntervalInSecs: fldRefreshIntervalInSecs.value * 1,
       realtime: fldRealtime.value,
+      pauseDelayInMSecs: fldPauseDelayInMSecs.value,
     };
     emit('onAccept', data);
 };
@@ -96,13 +103,13 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                   cols="12"
                   sm="6"
                 >
-                <v-text-field type="number" label="Refresh interval (secs)" v-model="fldRefreshIntervalInSecs"></v-text-field>
+                  <v-text-field type="number" label="Refresh interval (secs)" v-model="fldRefreshIntervalInSecs"></v-text-field>
               </v-col>
                 <v-col
                   cols="12"
                   sm="6"
                 >
-                    <v-checkbox label="Realtime" v-model="fldRealtime"></v-checkbox>
+                  <v-text-field type="number" label="Pause delay (ms)" v-model="fldPauseDelayInMSecs"></v-text-field>
                 </v-col>
               </v-row>
 
@@ -123,7 +130,8 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                   cols="12"
                   sm="6"
                 >
-                </v-col>
+                <v-checkbox label="Realtime" v-model="fldRealtime"></v-checkbox>
+              </v-col>
               </v-row>
 
               <small class="text-caption text-medium-emphasis">*indicates required field</small>

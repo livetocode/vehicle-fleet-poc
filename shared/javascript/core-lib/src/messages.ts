@@ -11,6 +11,7 @@ export interface GenerateRequest {
     realtime: boolean;
     sendFlush: boolean;
     startDate?: string;
+    pauseDelayInMSecs?: number;
 }
 
 export interface GenerateResponse {
