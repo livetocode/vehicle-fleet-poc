@@ -25,7 +25,8 @@ export class VehicleFinderViewModel {
 
     async init(): Promise<void> {
         this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(
-            ['vehicle-query-result'], 
+            ['vehicle-query-result'],
+            'Receives a vehicle position matching the search criteria',
             async (ev: any) => { this.onProcessQueryResult(ev); },
         );
         this._messageBus.registerHandlers(this._queryResultHandler);

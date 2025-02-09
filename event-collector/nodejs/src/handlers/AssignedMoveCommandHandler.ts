@@ -15,6 +15,10 @@ export class AssignedMoveCommandHandler extends MessageHandler<EnrichedMoveComma
         super();
     }
 
+    get description(): string {
+        return `Dedicated collector that will accumulate events for its assigned partition key.`;
+    }
+
     get messageTypes(): string[] {
         return ['enriched-move']; 
     }

@@ -73,13 +73,13 @@ onUnmounted(() => {
                       :headers="subscriptionsHeaders"
                       :items="_subscriptions"
                       :loading="isFetching"
+                      item-value="id"
                       density="compact"
                       fixed-header
                   >
               <template v-slot:item.services="{ value }">
                 {{ value.join(', ') }}
               </template>              
-
             </v-data-table-virtual>              
           </v-row>            
         </v-container>
@@ -89,19 +89,28 @@ onUnmounted(() => {
         <v-container>
           <v-row>
             <v-data-table-virtual
-                      class="mt-3"
-                      :headers="handlersHeaders"
-                      :items="_handlers"
-                      :loading="isFetching"
-                      density="compact"
-                      fixed-header
-                  >
+              class="mt-3"
+              :headers="handlersHeaders"
+              :items="_handlers"
+              :loading="isFetching"
+              item-value="id"
+              density="compact"
+              show-expand
+              fixed-header
+            >
               <template v-slot:item.services="{ value }">
                 {{ value.join(', ') }}
               </template>              
               <template v-slot:item.messageTypes="{ value }">
                 {{ value.join(', ') }}
               </template>              
+              <template v-slot:expanded-row="{ columns, item }">
+                <tr>
+                  <td :colspan="columns.length" class="pl-10 pr-10 pt-3 pb-3">
+                    {{ item.description }}
+                  </td>
+                </tr>
+              </template>
             </v-data-table-virtual>
           </v-row>
         </v-container>

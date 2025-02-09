@@ -13,6 +13,10 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         super();
     }
 
+    get description(): string {
+        return `Generates the vehicle positions for a subset of the vehicles based on the configured partition key.`;
+    }
+
     get messageTypes(): string[] {
         return ['generate-partition-request'];
     }

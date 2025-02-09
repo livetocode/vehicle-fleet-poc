@@ -11,6 +11,10 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
         super();
     }
 
+    get description(): string {
+        return `Coordinates the generation of the vehicles' positions by partitioning the work into sub-generators`;
+    }
+
     get messageTypes(): string[] {
         return ['generate-request'];
     }

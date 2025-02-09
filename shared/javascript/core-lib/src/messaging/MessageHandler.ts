@@ -6,6 +6,12 @@ export abstract class MessageHandler<TEvent extends TypedMessage = TypedMessage>
         return false;
     }
 
+    get name(): string {
+        return this.constructor.name;
+    }
+
+    abstract get description(): string;
+    
     abstract get messageTypes(): string[];
     
     abstract process(msg: IncomingMessageEnvelope<TEvent>): Promise<void>;

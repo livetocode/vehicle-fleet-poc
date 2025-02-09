@@ -2,10 +2,12 @@ import type { Logger, MessageBus, MessageSubscription, MessageHandlerInfo } from
 
 
 export type Subscription = MessageSubscription & {
+    id: number;
     services: string[];
 }
 
 export type Handler = MessageHandlerInfo & {
+    id: number;
     services: string[];    
 }
 
@@ -32,6 +34,8 @@ export class MessagesViewModel {
         try {
             const subscriptions: Subscription[] = [];
             const handlers: Handler[] = [];
+            let nextSubscriptionId = 0;
+            let nextHandlerId = 0;
             for await (const resp of this._messageBus.info({ timeout: 1000 })) {
                 for (const sub of resp.subscriptions) {
                     if (!sub.subject.startsWith('inbox.')) {
@@ -41,7 +45,9 @@ export class MessagesViewModel {
                                 item.services.push(resp.identity.name)
                             }
                         } else {
+                            nextSubscriptionId += 1
                             subscriptions.push({
+                                id: nextSubscriptionId,
                                 ...sub,
                                 services: [resp.identity.name],
                             });    
@@ -55,7 +61,9 @@ export class MessagesViewModel {
                             item.services.push(resp.identity.name)
                         }
                     } else {
+                        nextHandlerId += 1
                         handlers.push({
+                            id: nextHandlerId,
                             ...h,
                             services: [resp.identity.name],
                         });

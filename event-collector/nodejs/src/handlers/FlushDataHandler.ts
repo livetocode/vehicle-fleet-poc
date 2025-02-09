@@ -9,6 +9,11 @@ export class FlushDataHandler extends RequestHandler<FlushRequest, FlushResponse
     ) {
         super();
     }
+
+    get description(): string {
+        return `Forces the collector to flush its cached data.`;
+    }
+
     get messageTypes(): string[] {
         return ['flush-request'];
     }

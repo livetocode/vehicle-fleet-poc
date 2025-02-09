@@ -87,12 +87,28 @@ export class VehicleViewerViewModel {
             this.animate(time);
         });
         if (this.mode === 'tracking') {
-            this._moveHandler = new LambdaMessageHandler<MoveCommand>(['move'], async (ev: any) => { this.onProcessCommand(ev); });
-            this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(['vehicle-generation-started'], async (ev: any) => { this.onVehicleGenerationStarted(ev); });
+            this._moveHandler = new LambdaMessageHandler<MoveCommand>(
+                ['move'],
+                'Receives the vehicle positions',
+                async (ev: any) => { this.onProcessCommand(ev); },
+            );
+            this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
+                ['vehicle-generation-started'],
+                'Receives a notification when a new generation starts',
+                async (ev: any) => { this.onVehicleGenerationStarted(ev); },
+            );
             this._messageBus.registerHandlers(this._moveHandler, this._resetStatsHandler);
         } else if (this.mode === 'search') {
-            this._queryHandler = new LambdaMessageHandler<VehicleQueryStartedEvent>(['vehicle-query-started'], async (ev: any) => { this.onVehicleQueryStarted(ev); });
-            this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(['vehicle-query-result'], async (ev: any) => { this.onProcessQueryResult(ev); });
+            this._queryHandler = new LambdaMessageHandler<VehicleQueryStartedEvent>(
+                ['vehicle-query-started'],
+                'Receives a notification when a new search starts',
+                async (ev: any) => { this.onVehicleQueryStarted(ev); },
+            );
+            this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(
+                ['vehicle-query-result'],
+                'Receives a vehicle position matching the search criteria',
+                async (ev: any) => { this.onProcessQueryResult(ev); },
+            );
             this._messageBus.registerHandlers(this._queryHandler, this._queryResultHandler);    
         }
         app.renderer.on('resize', () => {

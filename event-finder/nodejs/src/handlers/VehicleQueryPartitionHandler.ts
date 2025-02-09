@@ -33,6 +33,10 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
         super();
     }
 
+    get description(): string {
+        return `This is a search agent that will search vehicle positions for its assigned partitions`;
+    }
+
     get messageTypes(): string[] {
         return ['vehicle-query-partition-request'];
     }

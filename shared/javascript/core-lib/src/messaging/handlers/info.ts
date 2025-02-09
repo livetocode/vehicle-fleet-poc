@@ -6,6 +6,7 @@ import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
 import { MessageSubscription, MessageSubscriptions } from "../MessageSubscriptions.js";
 import { MessageHandlerRegistry } from "../MessageHandlerRegistry.js";
+import { LambdaMessageHandler } from "../LambdaMessageHandler.js";
 
 export type InfoOptions = {
     serviceName?: string;
@@ -13,25 +14,25 @@ export type InfoOptions = {
 }
 
 export type InfoRequest = {
-    type: 'info-req';
+    type: 'info-request';
     serviceName?: string;
 };
 
 export type MessageHandlerInfo = {
     name: string;
     messageTypes: string[];
-    description?: string;
+    description: string;
 }
 
 export type InfoResponse = {
-    type: 'info-resp';
+    type: 'info-response';
     identity: ServiceIdentity;
     subscriptions: MessageSubscription[],
     handlers: MessageHandlerInfo[],
 };
 
 function isInfoResponse(resp: any) : resp is InfoResponse {
-    return resp.type === 'info-resp';
+    return resp.type === 'info-response';
 }
 
 export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse> {
@@ -45,19 +46,24 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
         super();
     }
 
+    get description(): string {
+        return `Returns information about the message types and the subscriptions`;
+    }
+
     get messageTypes(): string[] {
-        return ['info-req'];
+        return ['info-request'];
     }
 
     protected async processRequest(req: IncomingMessageEnvelope<Request<InfoRequest>>): Promise<InfoResponse> {
         this.logger.debug('Sending info response...');
         return {
-            type: 'info-resp',
+            type: 'info-response',
             identity: this.identity,
             subscriptions: this.subscriptions.entries(),
             handlers: this.registry.handlers().map(x => ({
-                name: x.constructor.name,
+                name: x.name,
                 messageTypes: x.messageTypes,
+                description: x.description,
             })),
         }
     }
@@ -81,7 +87,7 @@ export class InfoService {
     async *info(options?: InfoOptions): AsyncGenerator<InfoResponse> {
         const serviceName = options?.serviceName;
         const req: InfoRequest = {
-            type: 'info-req',
+            type: 'info-request',
             serviceName: serviceName,
         };
         try {

@@ -100,11 +100,13 @@ export class VehicleTrackingViewModel {
 
     async init(): Promise<void> {
         this._statsHandler = new LambdaMessageHandler<AggregatePeriodCreated>(
-            ['aggregate-period-created'], 
+            ['aggregate-period-created'],
+            'Receives a notification for each aggregate period created',
             async (ev: any) => { this.onAggregatePeriodCreated(ev); },
         );
         this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
-            ['vehicle-generation-started'], 
+            ['vehicle-generation-started'],
+            'Receives a notification when a new generation starts',
             async (ev: any) => { this.onVehicleGenerationStarted(ev); },
         );
         this._messageBus.registerHandlers(this._statsHandler, this._resetStatsHandler);

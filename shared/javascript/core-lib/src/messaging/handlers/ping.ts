@@ -30,6 +30,10 @@ export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse
         super();
     }
 
+    get description(): string {
+        return `Returns information about the service that participates to the system`;
+    }
+
     get messageTypes(): string[] {
         return ['ping'];
     }

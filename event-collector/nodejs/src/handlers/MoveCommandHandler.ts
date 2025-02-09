@@ -14,6 +14,10 @@ export class MoveCommandHandler extends MessageHandler<MoveCommand> {
         this.geohashPartitioner = new GeohashDataPartitionStrategy(config.collector.geohashLength);
     }
 
+    get description(): string {
+        return `Receives vehicle positions and dispatch them to dedicated collectors based on the configured partition key.`;
+    }
+
     get messageTypes(): string[] {
         return ['move']; 
     }

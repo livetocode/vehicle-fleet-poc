@@ -10,6 +10,10 @@ export class ClearVehiclesDataHandler extends RequestHandler<ClearVehiclesDataRe
         super();
     }
 
+    get description(): string {
+        return `Deletes all vehicle positions before running a new simulation.`;
+    }
+
     get messageTypes(): string[] {
         return ['clear-vehicles-data-request'];
     }

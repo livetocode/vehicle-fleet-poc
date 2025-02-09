@@ -17,6 +17,10 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         super();
     }
 
+    get description(): string {
+        return `Coordinates the search of vehicle positions by partitioning the work across multiple search agents, using the configured partition key.`;
+    }
+
     get messageTypes(): string[] {
         return [
             'vehicle-query-request',

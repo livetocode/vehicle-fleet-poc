@@ -24,6 +24,10 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         return true;
     }
 
+    get description(): string {
+        return `Finds and cancels active message handlers.`;
+    }
+
     get messageTypes(): string[] {
         return ['cancel-request-id', 'cancel-request-parentId', 'cancel-request-type'];
     }
