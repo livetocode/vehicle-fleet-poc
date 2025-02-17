@@ -1,4 +1,5 @@
-import type { Logger, MessageBus, MessageSubscription, MessageHandlerInfo } from "core-lib";
+import { type Logger, type MessageBus, type MessageSubscription, type MessageHandlerInfo, type MessageRoute, normalizeSubject } from "core-lib";
+import { makeRouteId } from "core-lib/dist/messaging/MessageRoutes";
 
 
 export type Subscription = MessageSubscription & {
@@ -14,6 +15,7 @@ export type Handler = MessageHandlerInfo & {
 export class MessagesViewModel {
     subscriptions = ref<Subscription[]>([]);
     handlers = ref<Handler[]>([]);
+    routes = ref<MessageRoute[]>([]);
     isFetching = ref(false);
     
     constructor(private _messageBus: MessageBus, private logger: Logger) {}
@@ -34,6 +36,7 @@ export class MessagesViewModel {
         try {
             const subscriptions: Subscription[] = [];
             const handlers: Handler[] = [];
+            const routes = new Map<string, MessageRoute>();
             let nextSubscriptionId = 0;
             let nextHandlerId = 0;
             for await (const resp of this._messageBus.info({ timeout: 1000 })) {
@@ -69,6 +72,12 @@ export class MessagesViewModel {
                         });
                     }
                 }
+                for (const route of resp.routes) {
+                    const routeId = makeRouteId(route);
+                    route.subject = normalizeSubject(route.subject);
+                    route.subscription = normalizeSubject(route.subscription);
+                    routes.set(routeId, route);
+                }
             }
             subscriptions.sort((a, b) => {
                 const delta = a.subject.localeCompare(b.subject);
@@ -95,8 +104,26 @@ export class MessagesViewModel {
             }
             this.subscriptions.value = subscriptions;    
             this.handlers.value = handlers;    
+            this.routes.value = [...routes.values()].sort(compareMessageRoute);
         } finally {
             this.isFetching.value = false;
         }
     }
+}
+
+function compareMessageRoute(a: MessageRoute, b: MessageRoute): number {
+    let delta = a.sender.localeCompare(b.sender);
+    if (delta === 0) {
+        delta = a.subject.localeCompare(b.subject);
+    }
+    if (delta === 0) {
+        delta = a.subscription.localeCompare(b.subscription);
+    }
+    if (delta === 0) {
+        delta = a.messageType.localeCompare(b.messageType);
+    }
+    if (delta === 0) {
+        delta = a.receiver.localeCompare(b.receiver);
+    }
+    return delta;
 }

@@ -6,11 +6,15 @@ import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { Response, isRequest, isResponse } from "./Requests.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
+import { MessageRoutes } from "./MessageRoutes.js";
+import { ServiceIdentity } from "./ServiceIdentity.js";
 
 export class MessageDispatcher {
     constructor (
         private logger: Logger,
+        protected identity: ServiceIdentity,
         private metrics: MessageBusMetrics,
+        private messageRoutes: MessageRoutes,
         private handlers: MessageHandlerRegistry,
         private responseMatchers: ResponseMatcherCollection,
         private activeHandlers: ActiveMessageHandlers,
@@ -25,6 +29,13 @@ export class MessageDispatcher {
         const bodyType = msgRequest ? msgRequest.body.body.type : msg.body.type;
         const handlers = this.handlers.find(bodyType);
         if (handlers) {
+            this.messageRoutes.add({
+                messageType: bodyType,
+                receiver: this.identity.name,
+                sender: msg.headers['serviceName'] ?? 'unknown',
+                subject: msg.subject,
+                subscription: msg.subscribedSubject,
+            });
             const blockingHandlers = handlers.filter(x => !x.isNonBlocking);
             const nonBlockingHandlers = handlers.filter(x => x.isNonBlocking);
             if (nonBlockingHandlers.length > 0) {

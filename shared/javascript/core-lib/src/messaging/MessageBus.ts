@@ -15,6 +15,7 @@ import { ServiceIdentity } from "./ServiceIdentity.js";
 import { IMessageBus } from "./IMessageBus.js";
 import { MessageSubscription, MessageSubscriptions } from "./MessageSubscriptions.js";
 import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
+import { MessageRoutes } from "./MessageRoutes.js";
 
 export class MessageBus implements IMessageBus {
     private started = false;
@@ -35,10 +36,11 @@ export class MessageBus implements IMessageBus {
         protected driver: MessageBusDriver,
     ) {
         const activeEventHandlers = new Map<string, MessageHandlerContext>();
-        this.messageDispatcher = new MessageDispatcher(logger, metrics, this.handlers, this.responseMatchers, activeEventHandlers);
+        const messageRoutes = new MessageRoutes();
+        this.messageDispatcher = new MessageDispatcher(logger, identity, metrics, messageRoutes, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
         this.pingService = new PingService(this, logger, identity);
-        this.infoService = new InfoService(this, logger, identity, this.subscriptions, this.handlers);
+        this.infoService = new InfoService(this, logger, identity, this.subscriptions, this.handlers, messageRoutes);
         this.cancelService = new CancelRequestService(this, logger, identity, activeEventHandlers);
     }
 
@@ -94,6 +96,7 @@ export class MessageBus implements IMessageBus {
     }
     
     publishEnvelope(message: MessageEnvelope): void {
+        message.headers.serviceName = this.identity.name;
         this.driver.publish(message);
         this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
     }
@@ -102,8 +105,12 @@ export class MessageBus implements IMessageBus {
         const self = this;
         const envelope: IncomingMessageEnvelope = {
             subject: '@local',
+            subscribedSubject: '@local',
             body: message,
-            headers: headers ?? {},
+            headers: {
+                ...headers,
+                senderName: this.identity.name,
+            },
             reply(replyMsg) {
                 self.publishLocal(replyMsg.body, replyMsg.headers).catch(err => self.logger.error(err));
             }
@@ -179,7 +186,7 @@ export class MessageBus implements IMessageBus {
         this.reply(request, response);
     }
     
-    private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): IncomingMessageEnvelope<Request> {
+    private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): MessageEnvelope<Request> {
         if (opt.limit !== undefined) {
             if (opt.limit < 1) {
                 throw new Error(`limit should be greater than zero, but received: ${opt.limit}`);
@@ -190,7 +197,6 @@ export class MessageBus implements IMessageBus {
                 throw new Error(`timeout should be greater than zero, but received: ${opt.timeout}`);
             }
         }
-        const onReplyTo = this.driver.onReplyTo;
         return {
             headers: opt.headers ?? {},
             subject: opt.subject,
@@ -202,9 +208,6 @@ export class MessageBus implements IMessageBus {
                 timeout: opt.timeout,
                 expiresAt: computeExpiresAt(opt.timeout),
                 body: req,    
-            },
-            reply(replyMsg) {
-                onReplyTo(this, replyMsg);
             },
         }
     }

@@ -3,12 +3,12 @@ import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
 import { TypedMessage } from "./TypedMessage.js";
 
 export class LambdaMessageHandler<TEvent extends TypedMessage = TypedMessage> extends MessageHandler<TEvent> {
-    constructor(private _messageTypes: string[], private _description: string, private handler: (e: TEvent) => Promise<void>) {
+    constructor(private _messageTypes: string[], private _name: string, private _description: string, private handler: (e: TEvent) => Promise<void>) {
         super();
     }
 
     get name(): string {
-        return  `Lambda<${this.messageTypes.join(', ')}>`;
+        return  this._name;
     }
 
     get description(): string {

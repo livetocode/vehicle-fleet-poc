@@ -144,6 +144,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
             if (subRequest) {
                 const req: IncomingMessageEnvelope<Request<VehicleQueryPartitionRequest>> = {
                     subject: '@local',
+                    subscribedSubject: '@local',
                     headers: {},
                     body: {
                         id: '@1',

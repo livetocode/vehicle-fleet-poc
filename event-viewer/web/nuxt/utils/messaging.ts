@@ -1,4 +1,4 @@
-import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection } from "nats.ws";
+import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection, headers } from "nats.ws";
 import type {IncomingMessageEnvelope, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
 import { type MessageBusDriver, MessageBus, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
 import type { Logger, ServiceIdentity } from "core-lib";
@@ -85,14 +85,15 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     }
     
     publish(msg: MessageEnvelope): void {
-        this.connection?.publish(msg.subject, this.codec.encode(msg.body));
+        this.connection?.publish(msg.subject, this.codec.encode(msg.body), { headers: convertToMsgHdrs(msg.headers)});
     }
 
     private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
         const data: any = this.codec.decode(msg.data);
         const onReplyTo = this.onReplyTo;
         return {
-            subject,
+            subject: msg.subject,
+            subscribedSubject: subject,
             headers: convertFromMsgHdrs(msg.headers),
             body: data,
             reply(replyMsg) {
@@ -108,6 +109,14 @@ function convertFromMsgHdrs(source?: MsgHdrs): MessageHeaders {
         for (const [k, v] of source) {
             result[k] = v;
         }
+    }
+    return result;
+}
+
+function convertToMsgHdrs(source: MessageHeaders): MsgHdrs {
+    const result = headers();
+    for (const [k, v] of Object.entries(source)) {
+        result.set(k, v);
     }
     return result;
 }

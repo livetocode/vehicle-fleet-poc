@@ -1,6 +1,6 @@
 import { TypedMessage } from "./TypedMessage";
 
-export type MessageHeaders = Record<string, string | string[]>;
+export type MessageHeaders = Record<string, string>;
 
 export type ReplyMessageCallback = (msg: BaseMessageEnvelope) => void;
 
@@ -14,6 +14,7 @@ export type MessageEnvelope<T extends TypedMessage = TypedMessage> = BaseMessage
 }
 
 export type IncomingMessageEnvelope<T extends TypedMessage = TypedMessage> = MessageEnvelope<T> & {
+    subscribedSubject: string;
     reply: ReplyMessageCallback;
     shouldCancel?: boolean;
 }

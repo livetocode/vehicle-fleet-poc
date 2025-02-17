@@ -15,6 +15,7 @@ const messageBus = inject<MessageBus>('messageBus');
 const _vm = new MessagesViewModel(messageBus, logger);
 const _subscriptions = _vm.subscriptions;
 const _handlers = _vm.handlers;
+const _routes = _vm.routes;
 const isFetching = _vm.isFetching;
 const tab = ref(0);
 
@@ -28,6 +29,13 @@ const handlersHeaders = [
   { title: 'Handler Name', align: 'start', key: 'name' },
   { title: 'Message Types', align: 'start', key: 'messageTypes' },
   { title: 'Services', align: 'start', key: 'services' },
+];
+
+const routesHeaders = [
+  { title: 'Sender', align: 'start', key: 'sender' },
+  { title: 'Subject / subscription', align: 'start', key: 'subject' },
+  { title: 'Message Type', align: 'start', key: 'messageType' },
+  { title: 'Receiver', align: 'start', key: 'receiver' },
 ];
 
 const breadcrumbs = [
@@ -111,6 +119,27 @@ onUnmounted(() => {
                   </td>
                 </tr>
               </template>
+            </v-data-table-virtual>
+          </v-row>
+        </v-container>
+
+      </v-tabs-window-item>
+
+      <v-tabs-window-item :value="3">
+        <v-container>
+          <v-row>
+            <v-data-table-virtual
+              class="mt-3"
+              :headers="routesHeaders"
+              :items="_routes"
+              :loading="isFetching"
+              item-value="id"
+              density="compact"
+              fixed-header
+            >
+              <template v-slot:item.subject="{ value, item }">
+                {{ value }} <br/> {{ item.subscription }}
+              </template>              
             </v-data-table-virtual>
           </v-row>
         </v-container>

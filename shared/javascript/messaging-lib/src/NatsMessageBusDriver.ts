@@ -1,5 +1,5 @@
 import { IncomingMessageEnvelope, Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
-import { JSONCodec, Msg, MsgHdrs, NatsConnection, connect } from "nats";
+import { JSONCodec, Msg, MsgHdrs, NatsConnection, connect, headers } from "nats";
 import { gracefulTerminationService } from "./GracefulTerminationService.js";
 
 export class NatsMessageBusDriver implements MessageBusDriver {
@@ -80,14 +80,15 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     }
     
     publish(msg: MessageEnvelope): void {
-        this.connection?.publish(msg.subject, this.codec.encode(msg.body));
+        this.connection?.publish(msg.subject, this.codec.encode(msg.body), { headers: convertToMsgHdrs(msg.headers)});
     }
 
     private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
         const data: any = this.codec.decode(msg.data);
         const onReplyTo = this.onReplyTo;
         return {
-            subject,
+            subject: msg.subject,
+            subscribedSubject: subject,
             headers: convertFromMsgHdrs(msg.headers),
             body: data,
             reply(replyMsg) {
@@ -102,9 +103,20 @@ function convertFromMsgHdrs(source?: MsgHdrs): MessageHeaders {
     const result: MessageHeaders = {};
     if (source) {
         for (const [k, v] of source) {
-            result[k] = v;
+            if (Array.isArray(v)) {
+                result[k] = v.join(',');
+            } else {
+                result[k] = v;
+            }
         }
     }
     return result;
 }
 
+function convertToMsgHdrs(source: MessageHeaders): MsgHdrs {
+    const result = headers();
+    for (const [k, v] of Object.entries(source)) {
+        result.set(k, v);
+    }
+    return result;
+}

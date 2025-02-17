@@ -6,7 +6,7 @@ import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
 import { MessageSubscription, MessageSubscriptions } from "../MessageSubscriptions.js";
 import { MessageHandlerRegistry } from "../MessageHandlerRegistry.js";
-import { LambdaMessageHandler } from "../LambdaMessageHandler.js";
+import { MessageRoute, MessageRoutes } from "../MessageRoutes.js";
 
 export type InfoOptions = {
     serviceName?: string;
@@ -29,6 +29,7 @@ export type InfoResponse = {
     identity: ServiceIdentity;
     subscriptions: MessageSubscription[],
     handlers: MessageHandlerInfo[],
+    routes: MessageRoute[],
 };
 
 function isInfoResponse(resp: any) : resp is InfoResponse {
@@ -42,6 +43,7 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
         private identity: ServiceIdentity,
         private subscriptions: MessageSubscriptions,
         private registry: MessageHandlerRegistry,
+        private messageRoutes: MessageRoutes,
     ) {
         super();
     }
@@ -65,6 +67,7 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
                 messageTypes: x.messageTypes,
                 description: x.description,
             })),
+            routes: this.messageRoutes.routes
         }
     }
 }
@@ -78,8 +81,9 @@ export class InfoService {
         identity: ServiceIdentity,
         subscriptions: MessageSubscriptions,
         registry: MessageHandlerRegistry,
+        routes: MessageRoutes,
     ) {
-        this.handler = new InfoRequestHandler(logger, identity, subscriptions, registry);
+        this.handler = new InfoRequestHandler(logger, identity, subscriptions, registry, routes);
         this.messageBus.registerHandlers(this.handler);
         this.messageBus.subscribe('messaging.control.*');
 }

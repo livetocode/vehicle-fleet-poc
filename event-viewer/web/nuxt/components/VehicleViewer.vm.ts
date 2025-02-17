@@ -89,11 +89,13 @@ export class VehicleViewerViewModel {
         if (this.mode === 'tracking') {
             this._moveHandler = new LambdaMessageHandler<MoveCommand>(
                 ['move'],
+                'VehicleViewerViewModel',
                 'Receives the vehicle positions',
                 async (ev: any) => { this.onProcessCommand(ev); },
             );
             this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
                 ['vehicle-generation-started'],
+                'VehicleViewerViewModel',
                 'Receives a notification when a new generation starts',
                 async (ev: any) => { this.onVehicleGenerationStarted(ev); },
             );
@@ -101,11 +103,13 @@ export class VehicleViewerViewModel {
         } else if (this.mode === 'search') {
             this._queryHandler = new LambdaMessageHandler<VehicleQueryStartedEvent>(
                 ['vehicle-query-started'],
+                'VehicleViewerViewModel',
                 'Receives a notification when a new search starts',
                 async (ev: any) => { this.onVehicleQueryStarted(ev); },
             );
             this._queryResultHandler = new LambdaMessageHandler<VehicleQueryResult>(
                 ['vehicle-query-result'],
+                'VehicleViewerViewModel',
                 'Receives a vehicle position matching the search criteria',
                 async (ev: any) => { this.onProcessQueryResult(ev); },
             );
