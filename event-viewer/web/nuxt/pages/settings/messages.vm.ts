@@ -73,9 +73,9 @@ export class MessagesViewModel {
                     }
                 }
                 for (const route of resp.routes) {
-                    const routeId = makeRouteId(route);
                     route.subject = normalizeSubject(route.subject);
                     route.subscription = normalizeSubject(route.subscription);
+                    const routeId = makeRouteId(route);
                     routes.set(routeId, route);
                 }
             }

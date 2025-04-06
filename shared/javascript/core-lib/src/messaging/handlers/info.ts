@@ -48,6 +48,10 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
         super();
     }
 
+    get name(): string {
+        return 'InfoRequestHandler';
+    }
+
     get description(): string {
         return `Returns information about the message types and the subscriptions`;
     }

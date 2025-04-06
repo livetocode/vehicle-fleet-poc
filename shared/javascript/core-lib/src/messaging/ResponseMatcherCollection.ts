@@ -20,12 +20,12 @@ export class ResponseMatcherCollection {
         }
     }    
 
-    match(msg: IncomingMessageEnvelope<Response>) {
+    match(msg: IncomingMessageEnvelope<Response>): boolean {
         for (const responseMatcher of this.responseMatchers) {
             if (responseMatcher.match(msg)) {
-                break;
+                return true;
             }    
         }
-
+        return false;
     }
 }

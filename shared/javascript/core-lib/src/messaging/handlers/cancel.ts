@@ -24,6 +24,10 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         return true;
     }
 
+    get name(): string {
+        return 'CancelRequestHandler';
+    }
+
     get description(): string {
         return `Finds and cancels active message handlers.`;
     }

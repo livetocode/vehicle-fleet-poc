@@ -107,7 +107,11 @@ function convertFromMsgHdrs(source?: MsgHdrs): MessageHeaders {
     const result: MessageHeaders = {};
     if (source) {
         for (const [k, v] of source) {
-            result[k] = v;
+            if (Array.isArray(v)) {
+                result[k] = v.join(',');
+            } else {
+                result[k] = v;
+            }
         }
     }
     return result;
