@@ -1,6 +1,7 @@
 import { GpsCoordinates } from "./geometry.js";
 import { TypedMessage } from "./messaging/TypedMessage.js";
 import { Request } from "./messaging/Requests.js";
+import { ServiceIdentity } from "./messaging/ServiceIdentity.js";
 
 export interface GenerateRequest {
     type: 'generate-request';
@@ -12,6 +13,7 @@ export interface GenerateRequest {
     sendFlush: boolean;
     startDate?: string;
     pauseDelayInMSecs?: number;
+    useBackpressure?: boolean;
 }
 
 export interface GenerateResponse {
@@ -32,6 +34,10 @@ export interface GeneratePartitionResponse {
     elapsedTimeInMS: number;
 }
 
+export interface MessageTracking {
+    sequence: number;
+    emitter: ServiceIdentity;
+}
 
 export interface MoveCommand {
     type: 'move';
@@ -42,6 +48,7 @@ export interface MoveCommand {
     speed: number;
     gps: GpsCoordinates;
     timestamp: string;
+    tracking?: MessageTracking;
 }
 
 export interface EnrichedMoveCommand {
@@ -52,6 +59,11 @@ export interface EnrichedMoveCommand {
     partitionKey: string;
 }
 
+export interface MessageTrackingAck {
+    type: 'message-tracking-ack';
+    messageType: string;
+    tracking: MessageTracking;
+}
 
 export interface FlushRequest {
     type: 'flush-request';

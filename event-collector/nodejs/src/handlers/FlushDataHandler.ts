@@ -1,4 +1,4 @@
-import { FlushRequest, FlushResponse, IncomingMessageEnvelope, Logger, Request, RequestHandler } from "core-lib";
+import { FlushRequest, FlushResponse, IncomingMessageEnvelope, Logger, MessageTrackingCollection, Request, RequestHandler } from "core-lib";
 import { MoveCommandAccumulator } from "./MoveCommandAccumulator.js";
 
 export class FlushDataHandler extends RequestHandler<FlushRequest, FlushResponse> {
@@ -6,6 +6,7 @@ export class FlushDataHandler extends RequestHandler<FlushRequest, FlushResponse
     constructor(
         private logger: Logger,
         private accumulator: MoveCommandAccumulator,
+        private trackingCollection: MessageTrackingCollection,
     ) {
         super();
     }
@@ -21,6 +22,7 @@ export class FlushDataHandler extends RequestHandler<FlushRequest, FlushResponse
     protected async processRequest(req: IncomingMessageEnvelope<Request<FlushRequest>>): Promise<FlushResponse> {
         this.logger.warn('Trigger flush');
         await this.accumulator.flush();
+        this.trackingCollection.clear();
         return { type: 'flush-response' };
     }
 }

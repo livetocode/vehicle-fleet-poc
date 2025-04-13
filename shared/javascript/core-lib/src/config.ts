@@ -79,6 +79,14 @@ export type PartitioningConfig = {
     dataPartition: DataPartitionStrategyConfig;
 }
 
+export type BackpressureConfig = {
+    enabled: boolean;
+    notificationThreshold: number;
+    notificationPeriodInMS: number;
+    waitTimeoutInMS: number;
+    waitThreshold: number;
+}
+
 export type MapConfig = {
     topLeftOrigin: GpsCoordinates;
     widthInKm: number;
@@ -164,6 +172,7 @@ export type ViewerConfig = {
 export type Config = {
     hub: HubConfig;
     partitioning: PartitioningConfig;
+    backpressure: BackpressureConfig;
     generator: GeneratorConfig;
     collector: CollectorConfig;  
     finder: FinderConfig;

@@ -30,18 +30,22 @@ export class MessageBus implements IMessageBus {
     protected messageDispatcher: MessageDispatcher;        
 
     constructor(
-        protected identity: ServiceIdentity,
+        private _identity: ServiceIdentity,
         protected logger: Logger,
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
     ) {
         const activeEventHandlers = new Map<string, MessageHandlerContext>();
         const messageRoutes = new MessageRoutes();
-        this.messageDispatcher = new MessageDispatcher(logger, identity, metrics, messageRoutes, this.handlers, this.responseMatchers, activeEventHandlers);
+        this.messageDispatcher = new MessageDispatcher(logger, _identity, metrics, messageRoutes, this.handlers, this.responseMatchers, activeEventHandlers);
         this.subscribe(this.privateInboxName);
-        this.pingService = new PingService(this, logger, identity);
-        this.infoService = new InfoService(this, logger, identity, this.subscriptions, this.handlers, messageRoutes);
-        this.cancelService = new CancelRequestService(this, logger, identity, activeEventHandlers);
+        this.pingService = new PingService(this, logger, _identity);
+        this.infoService = new InfoService(this, logger, _identity, this.subscriptions, this.handlers, messageRoutes);
+        this.cancelService = new CancelRequestService(this, logger, _identity, activeEventHandlers);
+    }
+
+    get identity(): ServiceIdentity {
+        return this._identity;
     }
 
     get privateInboxName(): string {

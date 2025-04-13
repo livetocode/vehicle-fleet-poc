@@ -2,8 +2,10 @@ import { MessageHandler } from "./MessageHandler.js";
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { Request, Response, RequestOptions, RequestOptionsPair } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
+import { ServiceIdentity } from "./ServiceIdentity.js";
 
 export type IMessageBus = {
+    get identity(): ServiceIdentity;
     get privateInboxName(): string;
     registerHandlers(...handlers: MessageHandler[]): void;
     unregisterHandler(handler: MessageHandler): void;

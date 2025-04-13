@@ -71,6 +71,7 @@ export class VehicleTrackingViewModel {
         maxNumberOfEvents: number;
         refreshIntervalInSecs: number;
         realtime: boolean;
+        useBackpressure: boolean;
     };
     private events = ref<AggregatePeriodCreated[]>([]);
     private totalEventCount = 0;
@@ -95,6 +96,7 @@ export class VehicleTrackingViewModel {
             maxNumberOfEvents: this.config.generator.maxNumberOfEvents,
             refreshIntervalInSecs: this.config.generator.refreshIntervalInSecs,
             realtime: this.config.generator.realtime,
+            useBackpressure: this.config.backpressure.enabled,
         };
     }
 
@@ -132,6 +134,7 @@ export class VehicleTrackingViewModel {
         refreshIntervalInSecs: number;
         realtime: boolean;
         pauseDelayInMSecs: number;
+        useBackpressure: boolean;
     }) {
         const execute = async () => {
             this.logger.info('Cancelling any active generation...');
@@ -174,6 +177,7 @@ export class VehicleTrackingViewModel {
                 refreshIntervalInSecs: data.refreshIntervalInSecs,
                 realtime: data.realtime,
                 pauseDelayInMSecs: data.pauseDelayInMSecs,
+                useBackpressure: data.useBackpressure,
                 sendFlush: this.config.generator.sendFlush,
                 startDate: this.config.generator.startDate,        
             }

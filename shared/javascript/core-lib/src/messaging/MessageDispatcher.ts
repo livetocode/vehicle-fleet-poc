@@ -87,13 +87,9 @@ export class MessageDispatcher {
     }
 
     private processResponse(msg: IncomingMessageEnvelope<Response>) {
-        debugger
         if (this.responseMatchers.match(msg)) {
             const msgResp = isResponse(msg) ? msg : undefined;
             const bodyType = msgResp ? msgResp.body.body.type : msg.body.type;
-            if (bodyType.includes('pong')) {
-                console.log(this.identity, 'received pong from', msg.headers['serviceName']);
-            }
             this.messageRoutes.add({
                 messageType: bodyType,
                 receiver: this.identity.name,

@@ -12,13 +12,20 @@ partitioning:
   timePartition:
     aggregationPeriodInMin: 10
     maxCapacity: 100000
-    maxActivePartitions: 4
+    maxActivePartitions: 2
   dataPartition:
     # type: id
     # type: idGroup
     # groupSize: 10
     type: geohash
     hashLength: 5 # 4.9km x 4.9km
+
+backpressure:
+  enabled: true
+  notificationThreshold: 1000
+  notificationPeriodInMS: 100
+  waitTimeoutInMS: 10000
+  waitThreshold: 1000
 
 generator:
   logging:

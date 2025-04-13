@@ -4,7 +4,7 @@ import { MoveCommandHandler } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
-import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity } from 'core-lib';
+import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity, MessageTrackingCollection } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
@@ -127,6 +127,8 @@ async function main() {
         collectorIndex,
     );
 
+    const trackingCollection = new MessageTrackingCollection();
+
     const moveCommandHandler = new MoveCommandHandler(
         config,
         messageBus,
@@ -135,13 +137,16 @@ async function main() {
 
     const assignedMoveCommandHandler = new AssignedMoveCommandHandler(
         logger,
+        config.backpressure,
+        messageBus,
         eventStore, 
         accumulator,
-        collectorIndex, 
+        collectorIndex,
+        trackingCollection,
     );
     await assignedMoveCommandHandler.init();
-
-    const flushDataHandler = new FlushDataHandler(logger, accumulator);
+    
+    const flushDataHandler = new FlushDataHandler(logger, accumulator, trackingCollection);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
     messageBus.registerHandlers(moveCommandHandler, assignedMoveCommandHandler, flushDataHandler, clearVehiclesDataHandler);

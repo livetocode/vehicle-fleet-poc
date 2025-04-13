@@ -11,6 +11,7 @@ export * from './MessageHandler.js';
 export * from './MessageHandlerRegistry.js';
 export * from './MessageRoutes.js';
 export * from './MessageSubscriptions.js';
+export * from './MessageTrackingCollection.js';
 export * from './NoopMessageBusMetrics.js';
 export * from './Requests.js';
 export * from './RequestHandler.js';

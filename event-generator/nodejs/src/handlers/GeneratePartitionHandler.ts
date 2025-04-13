@@ -1,4 +1,4 @@
-import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest } from "core-lib";
+import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection } from "core-lib";
 import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
@@ -9,6 +9,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         private logger: Logger,
         private messageBus: IMessageBus,
         private generatorIndex: number,
+        private messageTrackingCollection: MessageTrackingCollection,
     ) {
         super();
     }
@@ -22,6 +23,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
     }
 
     protected async processRequest(req: IncomingMessageEnvelope<Request<GeneratePartitionRequest>>): Promise<GeneratePartitionResponse> {
+        this.messageTrackingCollection.clear();
         const event = req.body.body;
         const vehicleCount = event.request.vehicleCount;
         const refreshIntervalInSecs = event.request.refreshIntervalInSecs;
@@ -75,6 +77,8 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         }
         const watch = new Stopwatch();
         watch.start();
+        const useBackpressure = this.config.backpressure.enabled && 
+                                req.body.body.request.useBackpressure === true;
         let eventCount = 0;
         let done = false;
         while (!done) {
@@ -94,6 +98,12 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                     speed: cmd.newState.speed,
                     gps: gpsPos,
                     timestamp: cmd.timestamp.toISOString(),
+                }
+                if (useBackpressure) {
+                    msg.tracking = {
+                        sequence: eventCount,
+                        emitter: this.messageBus.identity,
+                    }
                 }
                 this.messageBus.publish(`commands.move`, msg);
                 eventCount++;
@@ -120,6 +130,8 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                     if (delta > 0) {
                         await sleep(delta);
                     }
+                } else if (useBackpressure) {
+                    await this.applyBackpressure(event, eventCount);
                 } else {
                     await sleep(event.request.pauseDelayInMSecs ?? 1);
                 }    
@@ -132,5 +144,36 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
             generatedEventCount: eventCount,
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         };
+    }
+
+    private async applyBackpressure(event: GeneratePartitionRequest, eventCount: number) {
+        const threshold = this.config.collector.instances > 1 ? 
+                            this.config.backpressure.waitThreshold * this.config.collector.instances * 0.6 :
+                            this.config.backpressure.waitThreshold;
+        const waitWatch = Stopwatch.startNew();
+        let iterations = 0;
+        while (true) {
+            const state = this.messageTrackingCollection.find(this.messageBus.identity);
+            if (waitWatch.elapsedTimeInMS() >= this.config.backpressure.waitTimeoutInMS) {
+                this.logger.debug(`back pressure timed out after ${waitWatch.elapsedTimeAsString()}`, 'seq=', state?.tracking.sequence, 'counter=', state?.counter);
+                break;
+            }
+            if (state) {
+                const delta = eventCount - state.tracking.sequence;
+                if (delta > threshold) {
+                    // this.logger.debug(`${iterations}: delta = ${eventCount} - ${state.tracking.sequence} = ${delta}`);
+                    await sleep(5);
+                } else {
+                    break;
+                }    
+            } else {
+                await sleep(event.request.pauseDelayInMSecs ?? 100);
+                break;
+            }
+            iterations += 1;
+        }    
+        if (iterations > 0) {
+            this.logger.debug(`back pressure for ${iterations} iterations, during ${waitWatch.elapsedTimeAsString()}`);
+        }
     }
 }

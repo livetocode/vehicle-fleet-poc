@@ -25,6 +25,10 @@ const props = defineProps({
         type: Number,
         default: 1,
     },
+    useBackpressure: {
+        type: Boolean,
+        default: true,
+    },
 
 });
 const emit = defineEmits<{
@@ -45,6 +49,7 @@ let fldMaxNumberOfEvents = ref(props.maxNumberOfEvents);
 let fldRefreshIntervalInSecs = ref(props.refreshIntervalInSecs);
 let fldRealtime = ref(props.realtime);
 let fldPauseDelayInMSecs = ref(props.pauseDelayInMSecs);
+let fldUseBackpressure = ref(props.useBackpressure);
 
 function onCancelDialog(isActive: Ref<boolean>) {
     isActive.value = false;
@@ -60,6 +65,7 @@ function onAcceptDialog(isActive: Ref<boolean>) {
       refreshIntervalInSecs: fldRefreshIntervalInSecs.value * 1,
       realtime: fldRealtime.value,
       pauseDelayInMSecs: fldPauseDelayInMSecs.value,
+      useBackpressure: fldUseBackpressure.value,
     };
     emit('onAccept', data);
 };
@@ -128,9 +134,15 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                 </v-col>
                 <v-col
                   cols="12"
-                  sm="6"
+                  sm="3"
                 >
                 <v-checkbox label="Realtime" v-model="fldRealtime"></v-checkbox>
+              </v-col>
+              <v-col
+                  cols="12"
+                  sm="3"
+                >
+                <v-checkbox label="Back pressure" v-model="fldUseBackpressure"></v-checkbox>
               </v-col>
               </v-row>
 

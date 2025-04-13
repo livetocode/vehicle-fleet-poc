@@ -1,9 +1,10 @@
-import { Config, ConsoleLogger, LoggingConfig, Logger, NoopLogger, ServiceIdentity } from 'core-lib';
+import { Config, ConsoleLogger, LoggingConfig, Logger, NoopLogger, ServiceIdentity, MessageTrackingCollection } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
 import { GenerateHandler } from "./handlers/GenerateHandler.js";
 import { GeneratePartitionHandler } from './handlers/GeneratePartitionHandler.js';
+import { MessageTrackingHandler } from './handlers/MessageTrackingHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -63,6 +64,8 @@ async function main() {
     const logger =  createLogger(config.generator.logging, `${identity.name} #${generatorIndex}`);
     const messageBus = await createMessageBus(config.hub, identity, logger);
 
+    const messageTrackingCollection = new MessageTrackingCollection();
+    
     const startGenerationHandler = new GenerateHandler(
         config,
         logger,
@@ -73,11 +76,16 @@ async function main() {
         logger,
         messageBus,
         generatorIndex,
+        messageTrackingCollection,
+    );
+    const messageTrackingHandler = new MessageTrackingHandler(
+        messageTrackingCollection,
     );
 
-    messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler);
+    messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler, messageTrackingHandler);
 
     messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generation-agents');
+    messageBus.subscribe(`services.generators.tracking.${generatorIndex}`);
     messageBus.subscribe(`requests.vehicles.generate`, 'generators');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
