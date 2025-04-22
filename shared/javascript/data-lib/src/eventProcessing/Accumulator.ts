@@ -7,7 +7,12 @@ interface Partition<TObject, TPartitionKey extends Comparable> {
     partialFlushCounter: number;
 }
 
-export abstract class Accumulator<TObject, TPartitionKey extends Comparable> {
+export type Accumulator<TObject> = {
+    write(obj: TObject): Promise<void>;
+    flush(): Promise<void>;
+}
+
+export abstract class BaseAccumulator<TObject, TPartitionKey extends Comparable> implements Accumulator<TObject> {
     private partitions: Partition<TObject, TPartitionKey>[] = [];
     private totalAccumulated = 0;
     private totalPartitions = 0;

@@ -85,7 +85,9 @@ async function main() {
     messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler, messageTrackingHandler);
 
     messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generation-agents');
-    messageBus.subscribe(`services.generators.tracking.${generatorIndex}`);
+    if (config.backpressure.enabled) {
+        messageBus.subscribe(`services.generators.tracking.${generatorIndex}`);
+    }
     messageBus.subscribe(`requests.vehicles.generate`, 'generators');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;

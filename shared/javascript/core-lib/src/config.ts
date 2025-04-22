@@ -108,7 +108,6 @@ export type GeneratorConfig = {
     refreshIntervalInSecs: number;
     realtime: boolean;
     sendFlush: boolean;
-    terminateCollector: boolean;
     startDate?: string;
     map: MapConfig;
     zoneSize: ZoneSize;

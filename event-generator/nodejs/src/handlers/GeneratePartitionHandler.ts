@@ -124,7 +124,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                     }
                 }
             }
-            if (!done) {
+            if (!done || useBackpressure) {
                 if (realtime) {
                     const delta = refreshIntervalInMS - accumulatedWaitInMS;
                     if (delta > 0) {
@@ -167,8 +167,8 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                     break;
                 }    
             } else {
+                // this.logger.debug('Backpressure has no state yet. Will wait...');
                 await sleep(event.request.pauseDelayInMSecs ?? 100);
-                break;
             }
             iterations += 1;
         }    

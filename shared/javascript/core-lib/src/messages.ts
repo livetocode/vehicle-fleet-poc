@@ -73,6 +73,14 @@ export interface FlushResponse {
     type: 'flush-response';
 }
 
+export interface PrepareRequest {
+    type: 'prepare-request';
+}
+
+export interface PrepareResponse {
+    type: 'prepare-response';
+}
+
 export type ProcessMemory = {
     rss: number;
     heapTotal: number;

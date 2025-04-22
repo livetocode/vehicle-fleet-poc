@@ -1,4 +1,4 @@
-import { ClearVehiclesDataRequest, ClearVehiclesDataResponse, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse } from "core-lib";
+import { ClearVehiclesDataRequest, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse, PrepareRequest, PrepareResponse } from "core-lib";
 
 
 export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateResponse> {
@@ -28,6 +28,34 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             timestamp: new Date().toISOString(),
         }
         this.messageBus.publish(`events.vehicles.generation.started`, startEvent);
+
+        // prepare collectors
+        const prepareReq: PrepareRequest = { type: 'prepare-request' };
+        const prepareRequests: RequestOptionsPair<PrepareRequest>[] = [];
+        for (let i = 0; i < this.config.collector.instances; i++) {
+            prepareRequests.push([
+                prepareReq, 
+                {
+                    subject: `services.collectors.assigned.${i}.requests.prepare`,
+                    limit: 1,
+                    timeout: 30000,
+                },
+            ]);
+        }
+        try {
+            this.logger.info(`Preparing ${prepareRequests.length} collectors`);
+            for await (const resp of this.messageBus.requestBatch(prepareRequests)) {
+                if (isResponseSuccess(resp)) {
+                    this.logger.debug('Received prepare response', resp.body);
+                }
+            }    
+        } catch(err: any) {
+            if (err instanceof RequestTimeoutError) {
+                this.logger.debug('Prepare requests timed out', err);
+            } else {
+                throw err;
+            }
+        }
 
         // delete existing events
         const clearRequest: ClearVehiclesDataRequest = {

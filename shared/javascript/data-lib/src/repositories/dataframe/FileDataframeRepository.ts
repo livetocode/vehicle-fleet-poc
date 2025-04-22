@@ -38,7 +38,9 @@ export class FileDataframeRepository implements DataFrameRepository {
     }
 
     async exists(name: string): Promise<boolean> {
-        return existsSync(path.join(this.folder, name));
+        const format = detectFormat(name);
+        const filename = path.join(this.folder, format, name);
+        return existsSync(filename);
     }
 
     async read(name: string): Promise<DataFrame> {
