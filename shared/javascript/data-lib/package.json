@@ -14,12 +14,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^22.9.0",
-    "typescript": "^5.6.3"
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@azure/storage-blob": "^12.26.0",
+    "@azure/storage-blob": "^12.27.0",
     "core-lib": "file:../../../shared/javascript/core-lib",
-    "nodejs-polars": "^0.16.0"
+    "nodejs-polars": "0.18.0"
   }
 }

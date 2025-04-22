@@ -1,4 +1,4 @@
-import { Config, VehicleQueryRequest, Logger, dateToUtcParts, calcTimeWindow, VehicleQueryResponse, VehicleQueryPartitionRequest, asyncChunks, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, VehicleQueryStartedEvent, VehicleQueryStoppedEvent } from 'core-lib';
+import { type Config, type VehicleQueryRequest, type Logger, dateToUtcParts, calcTimeWindow, type VehicleQueryResponse, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent } from 'core-lib';
 import path from 'path';
 import { polygonToGeohashes } from "../core/geospatial.js";
 import { Feature, Polygon } from "geojson";

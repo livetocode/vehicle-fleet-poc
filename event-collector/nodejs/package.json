@@ -16,16 +16,15 @@
   "license": "ISC",
   "devDependencies": {
     "@types/latlon-geohash": "^2.0.4",
-    "@types/node": "^22.9.0",
-    "typescript": "^5.6.3"
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
-    "apache-arrow": "^18.0.0",
     "core-lib": "file:../../shared/javascript/core-lib",
     "data-lib": "file:../../shared/javascript/data-lib",
     "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",
-    "nodejs-polars": "^0.16.0",
-    "yaml": "^2.6.0"
+    "nodejs-polars": "0.18.0",
+    "yaml": "^2.7.1"
   }
 }

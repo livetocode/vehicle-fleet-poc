@@ -16,21 +16,19 @@
   "license": "ISC",
   "devDependencies": {
     "@types/latlon-geohash": "^2.0.4",
-    "@types/node": "^22.9.0",
-    "typescript": "^5.6.3"
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
   },
   "dependencies": {
-    "@turf/helpers": "^7.1.0",
-    "@turf/turf": "^7.1.0",
-    "@types/geojson": "^7946.0.14",
-    "apache-arrow": "^18.0.0",
+    "@turf/helpers": "^7.2.0",
+    "@turf/turf": "^7.2.0",
+    "@types/geojson": "^7946.0.16",
     "core-lib": "file:../../shared/javascript/core-lib",
     "data-lib": "file:../../shared/javascript/data-lib",
-    "duckdb-async": "^1.1.1",
     "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",
     "ngeohash": "^0.6.3",
-    "nodejs-polars": "^0.16.0",
-    "yaml": "^2.6.0"
+    "nodejs-polars": "0.18.0",
+    "yaml": "^2.7.1"
   }
 }

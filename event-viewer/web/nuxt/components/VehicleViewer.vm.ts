@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, VehicleQueryStartedEvent,
+import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type VehicleQueryStartedEvent,
     type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQueryRequest, type VehicleQueryResult, type MessageBus } from 'core-lib';
 import type { Request } from 'core-lib';
 import Geohash from 'latlon-geohash';
