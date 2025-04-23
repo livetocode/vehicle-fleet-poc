@@ -12,8 +12,8 @@
   let servers = appConfig.hub.protocols.websockets.servers;
   const runtimeConfig = useRuntimeConfig();
   const serversOverride = runtimeConfig.public.natsServers
-  if (serversOverride.length > 0) {
-      servers = serversOverride;
+  if (serversOverride && serversOverride.length > 0) {
+      servers = serversOverride.split(',');
   }
   const connectionString = servers.join(',');
 
