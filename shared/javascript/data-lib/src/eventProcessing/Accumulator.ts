@@ -8,6 +8,7 @@ interface Partition<TObject, TPartitionKey extends Comparable> {
 }
 
 export type Accumulator<TObject> = {
+    init(): Promise<void>;
     write(obj: TObject): Promise<void>;
     flush(): Promise<void>;
 }
@@ -22,6 +23,10 @@ export abstract class BaseAccumulator<TObject, TPartitionKey extends Comparable>
     protected firstEventReceivedAt?: Date;
 
     constructor(protected logger: Logger, protected maxCapacity: number, protected maxActivePartitions: number) {}
+
+    async init(): Promise<void> {
+        this.firstEventReceivedAt = undefined;
+    }
 
     async write(obj: TObject): Promise<void> {
         if (!this.firstEventReceivedAt) {

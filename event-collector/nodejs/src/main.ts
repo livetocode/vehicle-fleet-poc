@@ -147,7 +147,7 @@ async function main() {
     );
     await assignedMoveCommandHandler.init();
     
-    const prepareHandler = new PrepareCollectorHandler(logger, trackingCollection);
+    const prepareHandler = new PrepareCollectorHandler(logger, trackingCollection, accumulator);
     const flushDataHandler = new FlushDataHandler(logger, accumulator);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 

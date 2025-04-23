@@ -158,11 +158,15 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
         private aggregateStore: AggregateStore<PersistedMoveCommand>,
         private collectorIndex: number,
     ) {
-        this.container = createEventPipeline<StoredEvent<PersistedMoveCommand>>({
+        this.container = this.createContainer();
+    }
+
+    private createContainer() {
+        return createEventPipeline<StoredEvent<PersistedMoveCommand>>({
             aggregationStrategy: 'geohashThenTime',
-            logger,
-            maxCapacity: config.partitioning.timePartition.maxCapacity,
-            maxActivePartitions: config.partitioning.timePartition.maxActivePartitions,
+            logger: this.logger,
+            maxCapacity: this.config.partitioning.timePartition.maxCapacity,
+            maxActivePartitions: this.config.partitioning.timePartition.maxActivePartitions,
             flushThresholdRatio: 0.24,
             geohashProvider: (item: StoredEvent<PersistedMoveCommand>) => item.partitionKey,
             timeRangeProvider: (item: StoredEvent<PersistedMoveCommand>) => this.getPartitionKey(item).toString(),
@@ -173,6 +177,11 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
         });
     }
     
+    async init(): Promise<void> {
+        this.firstEventReceivedAt = undefined;
+        this.container = this.createContainer();
+    }
+
     async write(obj: StoredEvent<PersistedMoveCommand>): Promise<void> {
         if (!this.firstEventReceivedAt) {
             this.firstEventReceivedAt = new Date();
