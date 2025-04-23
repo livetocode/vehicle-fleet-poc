@@ -1,5 +1,5 @@
 import { Construct } from 'constructs';
-import { Cpu, EnvValue, IPersistentVolumeClaim, Probe, StatefulSet, Volume, VolumeMount } from 'cdk8s-plus-28';
+import { Cpu, EnvValue, ImagePullPolicy, IPersistentVolumeClaim, Probe, StatefulSet, Volume, VolumeMount } from 'cdk8s-plus-28';
 import { Duration, Size } from 'cdk8s';
 
 export interface NatsServiceOptions {
@@ -75,6 +75,7 @@ export class NatsService extends Construct {
         {
           name: 'web',
           image: options.image,
+          imagePullPolicy: ImagePullPolicy.ALWAYS,
           portNumber: containerPort,
           liveness: Probe.fromHttpGet('/ping', {
             timeoutSeconds: Duration.seconds(15),
@@ -87,7 +88,7 @@ export class NatsService extends Construct {
           resources: {
             cpu: {
               request: Cpu.millis(100),
-              limit: Cpu.millis(500),
+              limit: Cpu.millis(1000),
             },
             memory: {
               request: Size.mebibytes(50),

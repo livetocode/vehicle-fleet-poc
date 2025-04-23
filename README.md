@@ -505,7 +505,7 @@ npm run synth
 Select the right Kubernetes cluster (either with the KUBECONFIG env var, or with a kubectl context).
 
 ```shell
-kubectl apply -f dist/*
+kubectl apply -f 'dist/*'
 ```
 
 Wait for everything to be created.

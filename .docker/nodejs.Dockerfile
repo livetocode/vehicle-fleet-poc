@@ -108,7 +108,8 @@ COPY --chown=node:node config.yaml /apps/config.yaml
 
 RUN npm run build
 
-CMD ["npm", "run", "preview"] 
+# CMD ["npm", "run", "preview"] 
+CMD ["node", ".output/server/index.mjs"]
 
 #-----------------------------------------------------------------------------------
 FROM app-${APP} AS final
