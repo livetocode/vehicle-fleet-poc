@@ -132,13 +132,17 @@ export interface VehicleGenerationStopped {
     elapsedTimeInMS: number;
 }
 
+export type Position = number[];
 
 export interface VehicleQueryRequest {
     type: 'vehicle-query-request';
     id: string;
     fromDate: string;
     toDate: string;
-    polygon: GpsCoordinates[];
+    geometry: {
+        type: 'MultiPolygon';
+        coordinates: Position[][][];
+    };
     vehicleTypes: string[],
     limit?: number;
     timeout?: number;

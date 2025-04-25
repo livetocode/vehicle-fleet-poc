@@ -27,7 +27,7 @@ onUnmounted(() => {
         <owl-stats :stats="_vm.statValues.value" />
         <VehicleQueryDialog 
             :periods="Object.keys(_vm.periods)" 
-            :polygons="Object.keys(_vm.polygons)" 
+            :geometries="Object.keys(_vm.geometries)" 
             :vehicleTypes="_vm.vehicleTypes" 
             @on-accept="(data) => _vm.startQuery(data)" />          
     </div>  

@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
-import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, KM, Rect, ViewPort, type VehicleQueryStartedEvent,
+import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, arrayToGps, KM, Rect, ViewPort, type VehicleQueryStartedEvent,
     type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQueryRequest, type VehicleQueryResult, type MessageBus } from 'core-lib';
 import type { Request } from 'core-lib';
 import Geohash from 'latlon-geohash';
@@ -159,9 +159,13 @@ export class VehicleViewerViewModel {
         this._query = ev.query;
         const viewport = this._viewPort;
         if (viewport) {
-            const points = ev.query.body.polygon.map(p => viewport.translatePoint(gpsToPoint(p)));
-            const shape = new Graphics().poly(points).stroke({ color: 0xff0000 })
-            this._zoneContainer?.addChild(shape);
+            for (const poly of ev.query.body.geometry.coordinates) {
+                if (poly.length > 0) {
+                    const points = poly[0].map(p => viewport.translatePoint(gpsToPoint(arrayToGps(p))));
+                    const shape = new Graphics().poly(points).stroke({ color: 0xff0000 })
+                    this._zoneContainer?.addChild(shape);    
+                }
+            }
         }
     }
 

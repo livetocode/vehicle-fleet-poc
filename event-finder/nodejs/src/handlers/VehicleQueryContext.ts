@@ -1,6 +1,6 @@
-import { Feature, GeoJsonProperties, Polygon } from "geojson";
+import * as turf from '@turf/turf';
+import { Feature, GeoJsonProperties, MultiPolygon } from "geojson";
 import { Config, VehicleQueryRequest, Stopwatch, VehicleQueryPartitionResponse, Request } from 'core-lib';
-import { gpsCoordinatesToPolyon } from "../core/geospatial.js";
 
 export class VehicleQueryContext {
     processedFilesCount = 0;
@@ -11,7 +11,7 @@ export class VehicleQueryContext {
     watch = new Stopwatch();
     fromDate: Date;
     toDate: Date;
-    polygon: Feature<Polygon, GeoJsonProperties>;
+    geometry: Feature<MultiPolygon, GeoJsonProperties>;
     timeout: number;
     parallelize: boolean;
     useChunking: boolean;
@@ -25,7 +25,7 @@ export class VehicleQueryContext {
         if (this.fromDate.getTime() > this.toDate.getTime()) {
             throw new Error('fromDate must be less than toDate');
         }
-        this.polygon = gpsCoordinatesToPolyon(event.body.polygon);
+        this.geometry = turf.multiPolygon(event.body.geometry.coordinates);
         this.timeout = event.timeout ?? this.config.finder.defaultTimeoutInMS;
         this.parallelize = event.body.parallelize ?? this.config.finder.parallelSearch;
         this.useChunking = event.body.useChunking ?? this.config.finder.useChunking;

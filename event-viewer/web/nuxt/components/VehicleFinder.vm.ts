@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQueryRequest, type VehicleQueryResponse, addOffsetToCoordinates, KM, type Config, RequestTimeoutError, isResponseSuccess, isVehicleQueryResponse } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQueryRequest, type VehicleQueryResponse, addOffsetToCoordinates, gpsToArray, KM, type Config, RequestTimeoutError, isResponseSuccess, isVehicleQueryResponse } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -6,7 +6,7 @@ export class VehicleFinderViewModel {
     public statValues = ref<StatValue[]>([]);
     public vehicleIds = ref<number[]>([]);
     public resultCount = ref<number>(0);
-    public polygons: any;
+    public geometries: any;
     public periods: any;
     public vehicleTypes: string[];
 
@@ -17,7 +17,7 @@ export class VehicleFinderViewModel {
     private _lastUpdateTimestamp?: Date;
     
     constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {
-        this.polygons = this.createPolygons();
+        this.geometries = this.createGeometries();
         this.periods = this.createPeriods();
         this.vehicleTypes = config.generator.vehicleTypes;
         this.reset();
@@ -41,6 +41,9 @@ export class VehicleFinderViewModel {
     }
 
     createPeriods() {
+        const startDate = this.config.generator.startDate ?? '2024-01-01T00:05:00-05:00';
+        const nextYearDate = new Date(startDate);
+        nextYearDate.setFullYear(new Date(startDate).getFullYear() + 1);
         return {
             '10 min': {
                 from: '2024-01-01T00:05:00-05:00',
@@ -58,58 +61,125 @@ export class VehicleFinderViewModel {
                 from: '2024-01-01T00:05:00-05:00',
                 to:   '2024-01-01T12:05:00-05:00',
             },
+            '1 year': {
+                from: startDate,
+                to:   nextYearDate.toISOString(),
+            },
         };
     }
 
-    createPolygons() {
+    createGeometries() {
         const anchor = this.config.generator.map.topLeftOrigin;
         return {
-            'Small box': [
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 10 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 10 * KM, 8 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 8 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-            ],
-            'Medium box': [
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 20 * KM, 10 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-            ],
-            'L-shape': [
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
-                addOffsetToCoordinates(anchor, 20 * KM, 15 * KM),
-                addOffsetToCoordinates(anchor, 14 * KM, 15 * KM),
-                addOffsetToCoordinates(anchor, 14 * KM, 10 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
-                addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
-            ],
+            'Small box': {
+                "type": "MultiPolygon",
+                "coordinates":
+                [
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 10 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 10 * KM, 8 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 8 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                        ].map(gpsToArray),
+                    ],
+                ],
+            },
+            'Medium box': {
+                "type": "MultiPolygon",
+                "coordinates":
+                [
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 20 * KM, 10 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                        ].map(gpsToArray),
+                    ],
+                ],
+            },
+            'Whole map': {
+                "type": "MultiPolygon",
+                "coordinates":
+                [
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 0 * KM, 0 * KM),
+                            addOffsetToCoordinates(anchor, this.config.generator.map.widthInKm * KM, 0 * KM),
+                            addOffsetToCoordinates(anchor, this.config.generator.map.widthInKm * KM, this.config.generator.map.heightInKm * KM),
+                            addOffsetToCoordinates(anchor, 0 * KM, this.config.generator.map.heightInKm * KM),
+                            addOffsetToCoordinates(anchor, 0 * KM, 0 * KM),
+                        ].map(gpsToArray),
+                    ],
+                ],
+            },
+            'L-shape': {
+                "type": "MultiPolygon",
+                "coordinates":
+                [
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 20 * KM, 5 * KM),
+                            addOffsetToCoordinates(anchor, 20 * KM, 15 * KM),
+                            addOffsetToCoordinates(anchor, 14 * KM, 15 * KM),
+                            addOffsetToCoordinates(anchor, 14 * KM, 10 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 10 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 5 * KM),
+                        ].map(gpsToArray),
+                    ],
+                ],
+            },
+            '2 boxes': {
+                "type": "MultiPolygon",
+                "coordinates":
+                [
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 5 * KM, 1 * KM),
+                            addOffsetToCoordinates(anchor, 15 * KM, 1 * KM),
+                            addOffsetToCoordinates(anchor, 15 * KM, 6 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 6 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 1 * KM),
+                        ].map(gpsToArray),
+                    ],
+                    [
+                        [
+                            addOffsetToCoordinates(anchor, 5 * KM, 12 * KM),
+                            addOffsetToCoordinates(anchor, 15 * KM, 12 * KM),
+                            addOffsetToCoordinates(anchor, 15 * KM, 17 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 17 * KM),
+                            addOffsetToCoordinates(anchor, 5 * KM, 12 * KM),
+                        ].map(gpsToArray),
+                    ],
+                ]
+            },
         };
     }
 
     startQuery(data: { 
         periodId: string,
-        polygonId: string,
+        geometryId: string,
         vehicleTypes: string[],
         limit: number,
         timeout: number,
         parallelize: boolean,
         useChunking: boolean,
     }) {
-        const polygonId = data.polygonId;
-        if (!polygonId) {
+        const geometryId = data.geometryId;
+        if (!geometryId) {
             return;
         }
         const periodId = data.periodId;
         if (!periodId) {
             return;
         }
-        this.logger.info(`Start ${polygonId} query for ${periodId}`);
-        const polygon = this.polygons[polygonId];
-        if (!polygon) {
+        this.logger.info(`Start ${geometryId} query for ${periodId}`);
+        const geometry = this.geometries[geometryId];
+        if (!geometry) {
             return;
         }
         const period = this.periods[periodId];        
@@ -121,7 +191,7 @@ export class VehicleFinderViewModel {
             id: randomUUID(),
             fromDate: period.from,
             toDate: period.to,
-            polygon,            
+            geometry,
             vehicleTypes: data.vehicleTypes,
             limit: data.limit ?? 1000000,
             parallelize: data.parallelize,

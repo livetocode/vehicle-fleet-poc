@@ -1,13 +1,26 @@
 import * as turf from '@turf/turf';
-import { Feature, Polygon } from 'geojson';
+import { Feature, GeoJsonProperties, MultiPolygon, Polygon } from 'geojson';
 import { GpsCoordinates } from 'core-lib';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const geohash = require('ngeohash');
 
+export function extractPolygons(feature: Feature<MultiPolygon | Polygon, GeoJsonProperties>): Polygon[] {
+    const result: Polygon[] = [];
+    if (feature.geometry.type === 'Polygon') {
+        // we should already have a polygon but we use turf to validate its content.
+        result.push(turf.polygon(feature.geometry.coordinates).geometry);
+    } else if (feature.geometry.type === 'MultiPolygon') {
+        for (const poly of feature.geometry.coordinates) {
+            result.push(turf.polygon(poly).geometry);
+        }
+    }
+    return result;
+}
+
 // This function was copied from https://github.com/Bonsanto/polygon-geohasher/blob/master/polygon_geohasher/polygon_geohasher.py
 // and converted by ChatGPT.
-export function polygonToGeohashes(polygon: Feature<Polygon>, precision: number, inner: boolean = true): Set<string> {
+export function polygonToGeohashes(polygon: Polygon, precision: number, inner: boolean = true): Set<string> {
     const innerGeohashes = new Set<string>();
     const outerGeohashes = new Set<string>();
 
@@ -50,6 +63,17 @@ export function polygonToGeohashes(polygon: Feature<Polygon>, precision: number,
     }
 
     return innerGeohashes;
+}
+
+export function polygonsToGeohashes(polygons: Polygon[], precision: number, inner: boolean = true): Set<string> {
+    const result = new Set<string>();
+    for (const polygon of polygons) {
+        const hashes = polygonToGeohashes(polygon, precision, inner);
+        for (const hash of hashes) {
+            result.add(hash);
+        }
+    }
+    return result;
 }
 
 export function geohashToPolygon(value: string): Feature<Polygon> {

@@ -221,6 +221,19 @@ export function gpsToPoint(gps: GpsCoordinates): Point {
     };
 }
 
+export function gpsToArray(gps: GpsCoordinates): number[] {
+    return [gps.lon, gps.lat, gps.alt];
+}
+
+export function arrayToGps(values: number[]): GpsCoordinates {
+    const result: GpsCoordinates = {
+        lon: values[0],
+        lat: values[1],
+        alt: values[2],
+    }
+    return result;
+}
+
 export function rad2deg(rad: number): number {
     return (rad * 180) / (Math.PI);
 }
@@ -229,7 +242,7 @@ export function deg2rad(deg: number): number {
     return (deg * Math.PI) / (180);
 }
 
-export function addOffsetToCoordinates(coords: GpsCoordinates, offsetX: number, offsetY: number) {
+export function addOffsetToCoordinates(coords: GpsCoordinates, offsetX: number, offsetY: number): GpsCoordinates {
     const earthRadius = 6378137; // Rayon de la Terre en mètres (utilisé pour le WGS84)
 
     // Conversion des offsets en radians

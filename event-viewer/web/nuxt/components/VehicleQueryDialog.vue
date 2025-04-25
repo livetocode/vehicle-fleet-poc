@@ -4,7 +4,7 @@ const props = defineProps({
         type: Array,
         default: [],
     },
-    polygons: {
+    geometries: {
         type: Array,
         default: [],
     },
@@ -31,11 +31,11 @@ const props = defineProps({
 });
 const emit = defineEmits<{
     (e: 'onCancel'): void,
-    (e: 'onAccept', payload: { periodId: string, polygonId: string, vehicleTypes: string[], limit: number, timeout: number }): void,
+    (e: 'onAccept', payload: { periodId: string, geometryId: string, vehicleTypes: string[], limit: number, timeout: number }): void,
 }>();
 
 let fldPeriodId = ref(props.periods[0] as string);
-let fldPolygonId = ref(props.polygons[0] as string);
+let fldGeometryId = ref(props.geometries[0] as string);
 let fldVehicleTypes = ref<string[]>([]);
 let fldLimit = ref(props.limit);
 let fldTimeout = ref(props.timeout);
@@ -51,7 +51,7 @@ function onAcceptDialog(isActive: Ref<boolean>) {
     isActive.value = false;
     const data = {
         periodId: fldPeriodId.value,
-        polygonId: fldPolygonId.value,
+        geometryId: fldGeometryId.value,
         vehicleTypes: fldVehicleTypes.value,
         limit: fldLimit.value,
         timeout: fldTimeout.value,
@@ -98,9 +98,9 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                   sm="6"
                 >
                   <v-select
-                    v-model="fldPolygonId"
-                    :items="props.polygons"
-                    label="Polygon*"
+                    v-model="fldGeometryId"
+                    :items="props.geometries"
+                    label="Geometry*"
                     required
                   ></v-select>
                 </v-col>

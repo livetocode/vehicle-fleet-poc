@@ -1,7 +1,7 @@
 import { type Config, type VehicleQueryRequest, type Logger, dateToUtcParts, calcTimeWindow, type VehicleQueryResponse, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent } from 'core-lib';
 import path from 'path';
-import { polygonToGeohashes } from "../core/geospatial.js";
-import { Feature, Polygon } from "geojson";
+import { extractPolygons, polygonsToGeohashes } from "../core/geospatial.js";
+import { Feature, GeoJsonProperties, MultiPolygon } from "geojson";
 import { DataFrameRepository, ListOptions, DataFrameDescriptor, stringToFormat } from "data-lib";
 import { VehicleQueryContext } from './VehicleQueryContext.js';
 import { VehicleQueryPartitionHandler } from './VehicleQueryPartitionHandler.js';
@@ -39,7 +39,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         // Warning: the viewer assumes it is the only one to receive this start event.
         this.messageBus.publish(req.body.replyTo, startingEvent);
         const ctx = new VehicleQueryContext(this.config, req.body);
-        const geohashes = this.createGeohashes(ctx.polygon);
+        const geohashes = this.createGeohashes(ctx.geometry);
         if (ctx.parallelize) {
             if (ctx.useChunking) {
                 await this.parallelSearchWithChunking(ctx, geohashes);
@@ -197,9 +197,10 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         ];
     }
 
-    private createGeohashes(polygon: Feature<Polygon>): Set<string> {
+    private createGeohashes(feature: Feature<MultiPolygon, GeoJsonProperties>): Set<string> {
         if (this.config.partitioning.dataPartition.type === 'geohash') {
-            return polygonToGeohashes(polygon, this.config.partitioning.dataPartition.hashLength, false);
+            const polygons = extractPolygons(feature);
+            return polygonsToGeohashes(polygons, this.config.partitioning.dataPartition.hashLength, false);
         }
         return new Set<string>();
     }

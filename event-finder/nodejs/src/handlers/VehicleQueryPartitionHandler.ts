@@ -112,7 +112,7 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
             const direction = row[idx_direction];
             if (timestamp >= ctx.fromDate && timestamp <= ctx.toDate) {
                 const pos = turf.point([gps_lon, gps_lat]);
-                const isInsidePolygon = turf.booleanContains(ctx.polygon, pos);
+                const isInsidePolygon = turf.pointsWithinPolygon(pos, ctx.geometry).features.length > 0;
                 const isValidVehicle = ctx.event.body.vehicleTypes.length === 0 || ctx.event.body.vehicleTypes.includes(vehicleType);
                 if (isInsidePolygon && isValidVehicle) {
                     vehicles_search_selected_events_total_counter.inc();
