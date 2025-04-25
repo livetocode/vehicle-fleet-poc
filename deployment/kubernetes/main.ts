@@ -4,7 +4,7 @@ import { KubeNamespace } from './imports/k8s';
 import { Config } from 'core-lib';
 import { readFileSync } from 'fs';
 import { parse as parseYaml } from 'yaml';
-import { ConfigMap, Cpu, Deployment, EnvValue, Ingress, IngressBackend, PersistentVolumeAccessMode, PersistentVolumeClaim, Probe, Protocol, ServiceType, Volume } from 'cdk8s-plus-28';
+import { ConfigMap, Cpu, Deployment, EnvValue, ImagePullPolicy, Ingress, IngressBackend, PersistentVolumeAccessMode, PersistentVolumeClaim, Probe, Protocol, ServiceType, Volume } from 'cdk8s-plus-28';
 import { NatsService } from './nats-service';
 
 export function loadConfig(filename: string): Config {
@@ -90,6 +90,7 @@ export class VehiclesChart extends Chart {
         { 
           name: 'nats-server',
           image: 'livetocode/vehicle-fleet-poc-event-hub:latest',
+          imagePullPolicy: ImagePullPolicy.ALWAYS,
           liveness: Probe.fromCommand(["curl", "-f", "http://localhost:8222/varz"]),
           securityContext: {
             ensureNonRoot: false,
@@ -148,6 +149,7 @@ export class VehiclesChart extends Chart {
       containers: [ 
         { 
           image: 'livetocode/vehicle-fleet-poc-event-viewer:latest',
+          imagePullPolicy: ImagePullPolicy.ALWAYS,
           liveness: Probe.fromHttpGet('/'),
           portNumber: 3000,
           securityContext: {
