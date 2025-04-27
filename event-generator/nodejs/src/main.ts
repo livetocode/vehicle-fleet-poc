@@ -84,7 +84,7 @@ async function main() {
 
     messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler, messageTrackingHandler);
 
-    messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generation-agents');
+    messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generators');
     if (config.backpressure.enabled) {
         messageBus.subscribe(`services.generators.tracking.${generatorIndex}`);
     }

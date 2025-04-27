@@ -74,9 +74,9 @@ async function main() {
     messageBus.registerHandlers(vehicleQueryHandler, vehicleQueryPartitionHandler);
 
     if (config.finder.parallelSearch) {
-        messageBus.subscribe(`services.finder.any.>`, 'vehicle-finder');
+        messageBus.subscribe(`services.finders.any.>`, 'finders');
     }    
-    messageBus.subscribe(`requests.vehicles.query`, 'vehicle-finder');
+    messageBus.subscribe(`requests.vehicles.query`, 'finders');
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.finder.httpPort, logger, identity);
