@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type GenerateRequest, RequestTimeoutError, isCancelResponse, isGenerateResponse } from "core-lib";
+import { LambdaMessageHandler, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type GenerateRequest, RequestTimeoutError, isCancelResponse, isGenerateResponse, type VehicleGenerationStopped } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -81,8 +81,9 @@ export class VehicleTrackingViewModel {
     private totalElapsedTimeInMS = 0;
     private totalRejectedMessagesInThePast = 0;
     private totalRejectedMessagesInTheFuture = 0;
-    private _statsHandler?: MessageHandler;
-    private _resetStatsHandler?: MessageHandler;
+    private _aggregatePeriodHandler?: MessageHandler;
+    private _startGenerationHandler?: MessageHandler;
+    private _stopGenerationHandler?: MessageHandler;
     private _timePartitions = new Set();
     private _memoryStat = new AggregatedStat('Memory used', 'B');
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
@@ -101,29 +102,39 @@ export class VehicleTrackingViewModel {
     }
 
     async init(): Promise<void> {
-        this._statsHandler = new LambdaMessageHandler<AggregatePeriodCreated>(
+        this._aggregatePeriodHandler = new LambdaMessageHandler<AggregatePeriodCreated>(
             ['aggregate-period-created'],
             'VehicleTrackingViewModel',
             'Receives a notification for each aggregate period created',
             async (ev: any) => { this.onAggregatePeriodCreated(ev); },
         );
-        this._resetStatsHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
+        this._startGenerationHandler = new LambdaMessageHandler<VehicleGenerationStarted>(
             ['vehicle-generation-started'],
             'VehicleTrackingViewModel',
             'Receives a notification when a new generation starts',
             async (ev: any) => { this.onVehicleGenerationStarted(ev); },
         );
-        this._messageBus.registerHandlers(this._statsHandler, this._resetStatsHandler);
+        this._stopGenerationHandler = new LambdaMessageHandler<VehicleGenerationStopped>(
+            ['vehicle-generation-stopped'],
+            'VehicleTrackingViewModel',
+            'Receives a notification when a active generation stops',
+            async (ev: any) => { this.onVehicleGenerationStopped(ev); },
+        );
+        this._messageBus.registerHandlers(this._aggregatePeriodHandler, this._startGenerationHandler, this._stopGenerationHandler);
     }
 
     async dispose(): Promise<void> {
-        if (this._statsHandler) {
-            this._messageBus?.unregisterHandler(this._statsHandler);
-            this._statsHandler = undefined;
+        if (this._aggregatePeriodHandler) {
+            this._messageBus?.unregisterHandler(this._aggregatePeriodHandler);
+            this._aggregatePeriodHandler = undefined;
         }
-        if (this._resetStatsHandler) {
-            this._messageBus?.unregisterHandler(this._resetStatsHandler);
-            this._resetStatsHandler = undefined;
+        if (this._startGenerationHandler) {
+            this._messageBus?.unregisterHandler(this._startGenerationHandler);
+            this._startGenerationHandler = undefined;
+        }
+        if (this._stopGenerationHandler) {
+            this._messageBus?.unregisterHandler(this._stopGenerationHandler);
+            this._stopGenerationHandler = undefined;
         }
     }
 
@@ -270,8 +281,12 @@ export class VehicleTrackingViewModel {
         this.statValues.value = this.createStats();
     }
 
-    private onAggregatePeriodCreated(ev: AggregatePeriodCreated): void {
+    private onVehicleGenerationStopped(ev: VehicleGenerationStarted): void {
         this.logger.debug(ev);
+    }
+
+    private onAggregatePeriodCreated(ev: AggregatePeriodCreated): void {
+        this.logger.trace(ev);
         this._timePartitions.add(ev.partitionKey);
         const evWithId = {
             ...ev,
