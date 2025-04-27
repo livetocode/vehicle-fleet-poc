@@ -43,6 +43,10 @@ function getPartitions() {
   return partitions;
 }
 
+const defaultHeaderProps = {
+  style: 'font-weight: 600',
+}
+
 </script>
 <template>
       <v-dialog
@@ -72,6 +76,7 @@ function getPartitions() {
 
             <v-card-text class="pt-0">
               <v-data-table-virtual
+                :headerProps="defaultHeaderProps"
                 :headers="headers"
                 :items="getPartitions()"
                 :sort-by="sortBy"

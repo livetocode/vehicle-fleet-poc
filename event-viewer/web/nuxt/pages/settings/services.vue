@@ -37,6 +37,10 @@ const breadcrumbs = [
   },
 ];
 
+const defaultHeaderProps = {
+  style: 'font-weight: 600',
+}
+
 onMounted(() => {
   _vm.init().catch(console.error);
 });
@@ -52,6 +56,7 @@ onUnmounted(() => {
     <v-row>
         <v-col cols="6">
             <v-data-table-virtual
+                        :headerProps="defaultHeaderProps"
                         :headers="headers"
                         :items="_services"
                         :sort-by="sortBy"

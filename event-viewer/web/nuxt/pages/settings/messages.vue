@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, inject } from 'vue';
 import { type MessageBus } from '../utils/messaging';
 import { MessagesViewModel } from './messages.vm';
+import { MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 
 useHead({
     title: 'Messages',
@@ -33,9 +35,10 @@ const handlersHeaders = [
 
 const routesHeaders = [
   { title: 'Sender', align: 'start', key: 'sender' },
-  { title: 'Subject / subscription', align: 'start', key: 'subject' },
   { title: 'Message Type', align: 'start', key: 'messageType' },
+  { title: 'Subject', align: 'start', key: 'subject' },
   { title: 'Receiver', align: 'start', key: 'receiver' },
+  { title: 'Subscription', align: 'start', key: 'subscription' },
 ];
 
 const breadcrumbs = [
@@ -57,7 +60,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   _vm.dispose().catch(console.error);
-});    
+});
+
+const defaultHeaderProps = {
+  style: 'font-weight: 600',
+}
+
 </script>
 <template>  
   <v-container>
@@ -70,7 +78,8 @@ onUnmounted(() => {
     >
       <v-tab :value="1">Subscriptions</v-tab>
       <v-tab :value="2">Message handlers</v-tab>
-      <v-tab :value="3">Message flow</v-tab>
+      <v-tab :value="3">Message routes</v-tab>
+      <v-tab :value="4">Documentation</v-tab>
     </v-tabs>      
     <v-tabs-window v-model="tab">
       <v-tabs-window-item :value="1">
@@ -78,6 +87,7 @@ onUnmounted(() => {
           <v-row>
             <v-data-table-virtual
                       class="mt-3"
+                      :headerProps="defaultHeaderProps"
                       :headers="subscriptionsHeaders"
                       :items="_subscriptions"
                       :loading="isFetching"
@@ -98,6 +108,7 @@ onUnmounted(() => {
           <v-row>
             <v-data-table-virtual
               class="mt-3"
+              :headerProps="defaultHeaderProps"
               :headers="handlersHeaders"
               :items="_handlers"
               :loading="isFetching"
@@ -130,6 +141,7 @@ onUnmounted(() => {
           <v-row>
             <v-data-table-virtual
               class="mt-3"
+              :headerProps="defaultHeaderProps"
               :headers="routesHeaders"
               :items="_routes"
               :loading="isFetching"
@@ -137,25 +149,39 @@ onUnmounted(() => {
               density="compact"
               fixed-header
             >
-              <template v-slot:item.subject="{ value, item }">
-                {{ value }} <br/> {{ item.subscription }}
-              </template>              
             </v-data-table-virtual>
           </v-row>
         </v-container>
 
       </v-tabs-window-item>
+
+      <v-tabs-window-item :value="4">
+        <v-container>
+          <v-row>
+            <MdPreview :modelValue="_vm.docs.value" />
+          </v-row>
+        </v-container>
+
+      </v-tabs-window-item>
+      
     </v-tabs-window>
 
     <v-row>
       <v-btn
-              class="text-none mt-8"
-              text="Refresh"
-              color="primary"
-              prepend-icon="mdi-refresh" 
-              v-on:click="_vm.refresh()"
-              ></v-btn>
-
+        class="text-none mt-8"
+        text="Refresh"
+        color="primary"
+        prepend-icon="mdi-refresh" 
+        v-on:click="_vm.refresh()"
+        ></v-btn>
+      <v-btn
+        v-if="tab === 4"
+        class="text-none mt-8 ml-4"
+        text="Copy as Markdown"
+        color="primary"
+        prepend-icon="mdi-content-copy" 
+        v-on:click="_vm.copy()"
+        ></v-btn>
     </v-row>
   </v-container>
 </template>

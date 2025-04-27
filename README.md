@@ -20,95 +20,129 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 
 ## Messages
 
-```
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| Topic                   | Consumer Group   | Event Type                 | Produced by    | Consumed by     | Usage                                    |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation              | generators       | start-generation           | viewer         | generator       | The viewer will initiate a generation    |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation.broadcast    |                  | stop-generation            | viewer         | generator       | The viewer will cancel any active        |
-|                         |                  |                            |                |                 | generation before starting a new one.    |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| generation.agent.*      |generation-agents | generate-partition         | generator      | generator       | The generator will partition its work    |
-|                         |                  |                            |                |                 | with its agents.                         |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| requests.collector      |requests-collector| clear-vehicles-data        | generator      | collector       | The generator will ask the collector to  |
-|                         |                  |                            |                |                 | clear all the files before starting the  |
-|                         |                  |                            |                |                 | generation.                              |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.generator.*       | generators       | generate-partition-stats   | viewer         | generator       | The viewer will initiate a generation    |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.generator.*       | generators       | clear-vehicles-data-result | collector      | generator       | The collector will report on the         |
-|                         |                  |                            |                |                 | completion of the destruction.           |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| commands.move.*         |                  | move                       | generator      | collector       | The collector will agregate the move     |
-|                         |                  |                            |                |                 | commands and persist them as a chunk.    |
-|                         |                  |                            |                +-----------------+------------------------------------------+
-|                         |                  |                            |                | viewer          | The viewer will display the move of      |
-|                         |                  |                            |                |                 | each vehicle.                            |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| commands.flush.*        |                  | flush                      | generator      | collector       | At the end of the generation, a flush    |
-|                         |                  |                            |                |                 | command is sent to force the collectors  |
-|                         |                  |                            |                |                 | to write the accumulated data.           |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| events                  |                  | aggregate-period-created   | collector      | viewer          | Every time a chunk of data is persisted  |
-|                         |                  |                            |                |                 | by the collector, some stats on the chunk|
-|                         |                  |                            |                |                 | will be sent to the viewer.              |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| events                  |                  | vehicle-generation-started | generator      | viewer          | Clear the map in the viewer when a new   |
-|                         |                  |                            |                |                 | generation begins.                       |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| query.vehicles          | vehicle-finder   | vehicle-query              | viewer         | finder          | A client is querying the persisted data. |
-|                         |                  |                            |                |                 | The finder will filter the chunks based  |
-|                         |                  |                            |                |                 | on the time period and the geohashes of  |
-|                         |                  |                            |                |                 | the polygon filter.                      |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-|query.vehicles.partitions| vehicle-finder-  | vehicle-query-partition    | finder         | finder          | The finder is delegating the file        |
-|                         | partitions       |                            |                |                 | processing to the cluster of finders.    |
-|                         |                  |                            |                |                 | The response will be sent using the      |
-|                         |                  |                            |                |                 | vehicle-query-partition-result-stats evt |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.viewer.<UID>      |                  | vehicle-query-result       | finder         | viewer          | While parsing the chunks, the finder     |
-|                         |                  |                            |                |                 | will send all the move commands that     |
-|                         |                  |                            |                |                 | match the criteria. The viewer will then |
-|                         |                  |                            |                |                 | be able to replay them.                  |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.viewer.<UID>      |                  | vehicle-query-result-stats | finder         | viewer          | Once the query is complete, the finder   |
-|                         |                  |                            |                |                 | will send some stats to the viewer, to   |
-|                         |                  |                            |                |                 | measure the performance and processing   |
-|                         |                  |                            |                |                 | that was required.                       |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-| inbox.finder.<UID>      |                  | vehicle-query-             | finder         | finder          | This is a partial result sent back to    |
-|                         |                  | partition-result-stats     |                |                 | the finder that delegated the            |
-|                         |                  |                            |                |                 | processing.                              |
-+-------------------------+------------------+----------------------------+----------------+-----------------+------------------------------------------+
-```
-
 Note that when a consumer uses a "consumer group" name, it means that the message will be handled only once by a member of the group.
 This is a regular work queue with competing consumers, which is different from the default pub/sub case.
+
+Note that the following sections are generated automatically from the http://localhost:3000/settings/messages page, section "Documentation",
+using the "Copy as Markdown" button, at the bottom of the page.
+
+### Subscriptions
+
+|Subject|Consumer Group|Services|
+|-------|--------------|--------|
+|commands.move||viewer|
+|commands.move|collectors|collector|
+|events.vehicles.*.*||viewer|
+|messaging.control.*||collector, finder, generator, viewer|
+|messaging.control.*.collector||collector|
+|messaging.control.*.finder||finder|
+|messaging.control.*.generator||generator|
+|messaging.control.*.viewer||viewer|
+|requests.vehicles.clear|collectors|collector|
+|requests.vehicles.generate|generators|generator|
+|requests.vehicles.query|finders|finder|
+|services.collectors.assigned.{int}.&gt;|collectors|collector|
+|services.finders.any.&gt;|finders|finder|
+|services.generators.assigned.{int}.&gt;|generators|generator|
+|services.generators.tracking.{int}||generator|
+
+### Message handlers
+
+|Handler Name|Message Types|Services|Description|
+|------------|-------------|--------|-----------|
+|AssignedMoveCommandHandler|enriched-move|collector|Dedicated collector that will accumulate events for its assigned partition key.|
+|CancelRequestHandler|cancel-request-id, cancel-request-parentId, cancel-request-type|collector, finder, generator, viewer|Finds and cancels active message handlers.|
+|ClearVehiclesDataHandler|clear-vehicles-data-request|collector|Deletes all vehicle positions before running a new simulation.|
+|FlushDataHandler|flush-request|collector|Forces the collector to flush its cached data.|
+|GenerateHandler|generate-request|generator|Coordinates the generation of the vehicle positions by partitioning the work into sub-generators|
+|GeneratePartitionHandler|generate-partition-request|generator|Generates the vehicle positions for a subset of the vehicles based on the configured partition key.|
+|InfoRequestHandler|info-request|collector, finder, generator, viewer|Returns information about the message types and the subscriptions|
+|MessageTrackingHandler|message-tracking-ack|generator|Receives the message processing status of the collectors, to decide if we need to apply back pressure.|
+|MoveCommandHandler|move|collector|Receives vehicle positions and dispatch them to dedicated collectors based on the configured partition key.|
+|PingRequestHandler|ping|collector, finder, generator, viewer|Returns information about the service that participates to the system|
+|PrepareCollectorHandler|prepare-request|collector|A collector should prepare to receive messages before a new generation.|
+|VehicleFinderViewModel|vehicle-query-result|viewer|Receives a vehicle position matching the search criteria|
+|VehicleQueryHandler|vehicle-query-request|finder|Coordinates the search of vehicle positions by partitioning the work across multiple search agents, using the configured partition key.|
+|VehicleQueryPartitionHandler|vehicle-query-partition-request|finder|This is a search agent that will search vehicle positions for its assigned partitions|
+|VehicleTrackingViewModel|aggregate-period-created|viewer|Receives a notification for each aggregate period created|
+|VehicleTrackingViewModel|vehicle-generation-started|viewer|Receives a notification when a new generation starts|
+|VehicleTrackingViewModel|vehicle-generation-stopped|viewer|Receives a notification when a active generation stops|
+|VehicleViewerViewModel|vehicle-generation-started|viewer|Receives a notification when a new generation starts|
+|VehicleViewerViewModel|move|viewer|Receives the vehicle positions|
+|VehicleViewerViewModel|vehicle-query-result|viewer|Receives a vehicle position matching the search criteria|
+|VehicleViewerViewModel|vehicle-query-started|viewer|Receives a notification when a new search starts|
+
+### Message routes
+
+|Sender|Message Type|Subject|Receiver|Subscription|
+|------|------------|-------|--------|------------|
+|collector|aggregate-period-created|events.vehicles.aggregate-period.created|viewer|events.vehicles.*.*|
+|collector|clear-vehicles-data-response|inbox.generator|generator|inbox.generator|
+|collector|flush-response|inbox.generator|generator|inbox.generator|
+|collector|prepare-response|inbox.generator|generator|inbox.generator|
+|collector|enriched-move|services.collectors.assigned.{int}.commands.move|collector|services.collectors.assigned.{int}.&gt;|
+|collector|message-tracking-ack|services.generators.tracking.{int}|generator|services.generators.tracking.{int}|
+|finder|vehicle-query-partition-response|inbox.finder|finder|inbox.finder|
+|finder|vehicle-query-response|inbox.viewer|viewer|inbox.viewer|
+|finder|vehicle-query-result|inbox.viewer|viewer|inbox.viewer|
+|finder|vehicle-query-started|inbox.viewer|viewer|inbox.viewer|
+|finder|vehicle-query-partition-request|services.finders.any.partitions|finder|services.finders.any.&gt;|
+|generator|move|commands.move|collector|commands.move|
+|generator|move|commands.move|viewer|commands.move|
+|generator|vehicle-generation-started|events.vehicles.generation.started|viewer|events.vehicles.*.*|
+|generator|vehicle-generation-stopped|events.vehicles.generation.stopped|viewer|events.vehicles.*.*|
+|generator|generate-partition-response|inbox.generator|generator|inbox.generator|
+|generator|cancel-response|inbox.viewer|viewer|inbox.viewer|
+|generator|generate-response|inbox.viewer|viewer|inbox.viewer|
+|generator|clear-vehicles-data-request|requests.vehicles.clear|collector|requests.vehicles.clear|
+|generator|flush-request|services.collectors.assigned.{int}.commands.flush|collector|services.collectors.assigned.{int}.&gt;|
+|generator|prepare-request|services.collectors.assigned.{int}.requests.prepare|collector|services.collectors.assigned.{int}.&gt;|
+|generator|generate-partition-request|services.generators.assigned.{int}.partitions|generator|services.generators.assigned.{int}.&gt;|
+|viewer|cancel-request-type|messaging.control.cancel.generator|generator|messaging.control.*.generator|
+|viewer|info-request|messaging.control.info|collector|messaging.control.*|
+|viewer|info-request|messaging.control.info|finder|messaging.control.*|
+|viewer|info-request|messaging.control.info|generator|messaging.control.*|
+|viewer|info-request|messaging.control.info|viewer|messaging.control.*|
+|viewer|generate-request|requests.vehicles.generate|generator|requests.vehicles.generate|
+|viewer|vehicle-query-request|requests.vehicles.query|finder|requests.vehicles.query|
+
 
 ### Collecting move commands
 
 ```mermaid
 sequenceDiagram
-    viewer ->>+ generator: topic:generation/type:start-generation
+    viewer ->>+ generator: topic:requests.vehicles.generate/type:generate-request
     activate generator-agent
-    generator ->> generator-agent: topic:generation-agent.*:generate-partition
+    generator ->> viewer: topic:events.vehicles.generation.started/type:vehicle-generation-started
+    loop for each collector
+        generator ->> collector: topic:services.collectors.assigned.{int}.requests.prepare/type:prepare-request
+        collector -->> generator: topic:inbox.generator/type:prepare-response
+    end
+    generator ->> collector: topic:requests.vehicles.clear/type:clear-vehicles-data-request
+    collector -->> generator: topic:inbox.generator/type:clear-vehicles-data-response
+    generator ->> generator-agent: topic:services.generators.assigned.{int}.partitions/type:generate-partition-request
     loop generate move events
         activate collector
         generator-agent ->> collector: topic:commands.move.*/type:move
+        collector ->> collector: topic:services.collectors.assigned.{int}.commands.move/type:enriched-move
         loop aggregate events
             collector ->> collector: bufferize, then flush
-            collector -->> viewer: topic:events/type:aggregate-period-created
+            collector -->> viewer: topic:events.vehicles.aggregate-period.created/type:aggregate-period-created
         end
         deactivate collector
     end
-    generator-agent ->> generator: topic:inbox.generator.*/type:generate-partition-stats
+    generator-agent ->> generator: topic:inbox.generator.*/type:generate-partition-response
     deactivate generator-agent
     note right of generator: force a flush at the end of the generation
-    generator ->>+ collector: topic:commands.flush.*/type:flush
-    collector -->>- viewer: topic:events/type:aggregate-period-created
-    generator ->>- viewer: topic:inbox.viewer.*/type:generation-stats
+    loop for each collector
+        activate collector
+        generator ->> collector: topic:services.collectors.assigned.{int}.commands.flush/type:flush-request
+        collector -->> viewer: topic:events.vehicles.aggregate-period.created/type:aggregate-period-created
+        collector -->> generator: topic:inbox.generator/type:flush-response
+        deactivate collector
+    end
+    generator ->> viewer: topic:events.vehicles.generation.stopped/type:vehicle-generation-stopped
+    generator ->>- viewer: topic:inbox.viewer.*/type:generate-response
 ```
 
 ### Querying move commands
@@ -117,28 +151,30 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    viewer ->>+ finder: topic:query.vehicles/type:vehicle-query
+    viewer ->>+ finder: topic:requests.vehicles.query/type:vehicle-query-request
+    finder -->> viewer: topic:inbox.viewer/type:vehicle-query-started
     loop read event files
         loop for each matching position
             finder ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
         end
     end
-    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
+    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-response
 ```
 
 #### Parallel processing
 
 ```mermaid
 sequenceDiagram
-    viewer ->>+ finder: topic:query.vehicles/type:vehicle-query
+    viewer ->>+ finder: topic:requests.vehicles.query/type:vehicle-query-request
+    finder -->> viewer: topic:inbox.viewer/type:vehicle-query-started
     par for each matching event file
-        finder ->>+ finder-agent: inbox.finder.*/type:vehicle-query-partition-result-stats
+        finder ->>+ finder-agent: services.finders.any.partitions/type:vehicle-query-partition-request
         loop for each matching position
             finder-agent ->> viewer: topic:inbox.viewer.*/type:vehicle-query-result
         end
-        finder-agent ->>- finder: topic:inbox.finder.*/type:vehicle-query-partition-result-stats
+        finder-agent ->>- finder: topic:inbox.finder.*/type:vehicle-query-partition-response
     end
-    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-result-stats
+    finder ->>- viewer: topic:inbox.viewer.*/type:vehicle-query-response
 ```
 
 ## Local dev

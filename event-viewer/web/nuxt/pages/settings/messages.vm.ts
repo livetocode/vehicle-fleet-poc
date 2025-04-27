@@ -17,6 +17,7 @@ export class MessagesViewModel {
     handlers = ref<Handler[]>([]);
     routes = ref<MessageRoute[]>([]);
     isFetching = ref(false);
+    docs = ref<string>('');
     
     constructor(private _messageBus: MessageBus, private logger: Logger) {}
 
@@ -42,7 +43,8 @@ export class MessagesViewModel {
             for await (const resp of this._messageBus.info({ timeout: 1000 })) {
                 for (const sub of resp.subscriptions) {
                     if (!sub.subject.startsWith('inbox.')) {
-                        const item = subscriptions.find(x => x.subject === sub.subject && x.consumerGroupName === sub.consumerGroupName);
+                        const subject = normalizeNumbers(sub.subject);
+                        const item = subscriptions.find(x => x.subject === subject && x.consumerGroupName === sub.consumerGroupName);
                         if (item) {
                             if (!item.services.includes(resp.identity.name)) {
                                 item.services.push(resp.identity.name)
@@ -52,6 +54,7 @@ export class MessagesViewModel {
                             subscriptions.push({
                                 id: nextSubscriptionId,
                                 ...sub,
+                                subject,
                                 services: [resp.identity.name],
                             });    
                         }    
@@ -73,8 +76,8 @@ export class MessagesViewModel {
                     }
                 }
                 for (const route of resp.routes) {
-                    route.subject = normalizeSubject(route.subject);
-                    route.subscription = normalizeSubject(route.subscription);
+                    route.subject = normalizeNumbers(normalizeSubject(route.subject));
+                    route.subscription = normalizeNumbers(normalizeSubject(route.subscription));
                     const routeId = makeRouteId(route);
                     routes.set(routeId, route);
                 }
@@ -105,9 +108,49 @@ export class MessagesViewModel {
             this.subscriptions.value = subscriptions;    
             this.handlers.value = handlers;    
             this.routes.value = [...routes.values()].sort(compareMessageRoute);
+
+            this.generateDocs();
         } finally {
             this.isFetching.value = false;
         }
+    }
+
+    private generateDocs() {
+        const docs: string[] = [];
+        docs.push('# Vehicles tracker documentation');
+        docs.push('');
+        docs.push('## Subscriptions');
+        docs.push('');
+        docs.push('|Subject|Consumer Group|Services|');
+        docs.push('|-------|--------------|--------|');
+        for (const sub of this.subscriptions.value) {
+            docs.push(`|${escapeHtmlChars(sub.subject)}|${sub.consumerGroupName ?? ''}|${sub.services.join(', ')}|`);
+        }
+        docs.push('');
+        docs.push('## Message handlers');
+        docs.push('');
+        docs.push('|Handler Name|Message Types|Services|Description|');
+        docs.push('|------------|-------------|--------|-----------|');
+        for (const handler of this.handlers.value) {
+            docs.push(`|${handler.name}|${handler.messageTypes.join(', ')}|${handler.services.join(', ')}|${handler.description}|`);
+        }
+        docs.push('');
+        docs.push('## Message routes');
+        docs.push('');
+        docs.push('|Sender|Message Type|Subject|Receiver|Subscription|');
+        docs.push('|------|------------|-------|--------|------------|');
+        for (const route of this.routes.value) {
+            docs.push(`|${route.sender}|${route.messageType}|${route.subject}|${route.receiver}|${escapeHtmlChars(route.subscription)}|`);
+        }
+        docs.push('');
+
+        this.docs.value = docs.join('\n');
+    }
+
+    copy() {
+        copyToClipboard(this.docs.value).catch(err => {
+            alert(err.message);
+        });
     }
 }
 
@@ -126,4 +169,43 @@ function compareMessageRoute(a: MessageRoute, b: MessageRoute): number {
         delta = a.receiver.localeCompare(b.receiver);
     }
     return delta;
+}
+
+const numberInTheMiddle = /[.]\d+[.]/gm;
+const numberAtTheEnd = /[.]\d+$/gm;
+
+function normalizeNumbers(value: string): string {
+    return value.replaceAll(numberInTheMiddle, '.{int}.').replaceAll(numberAtTheEnd, '.{int}');
+}
+
+function escapeHtmlChars(value: string): string {
+    return value.replaceAll('>', '&gt;').replaceAll('<', '&lt;');
+}
+
+async function copyToClipboard(textToCopy: string) {
+    // Copied from: https://stackoverflow.com/questions/51805395/navigator-clipboard-is-undefined
+
+    // Navigator clipboard api needs a secure context (https)
+    if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textToCopy);
+    } else {
+        // Use the 'out of viewport hidden text area' trick
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+            
+        // Move textarea out of the viewport so it's not visible
+        textArea.style.position = "absolute";
+        textArea.style.left = "-999999px";
+            
+        document.body.prepend(textArea);
+        textArea.select();
+
+        try {
+            document.execCommand('copy');
+        } catch (error) {
+            console.error(error);
+        } finally {
+            textArea.remove();
+        }
+    }
 }
