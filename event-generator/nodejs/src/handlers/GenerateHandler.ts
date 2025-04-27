@@ -12,7 +12,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
     }
 
     get description(): string {
-        return `Coordinates the generation of the vehicles' positions by partitioning the work into sub-generators`;
+        return `Coordinates the generation of the vehicle positions by partitioning the work into sub-generators`;
     }
 
     get messageTypes(): string[] {
@@ -118,7 +118,8 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             flushRequests.push([
                 flushReq, 
                 {
-                    subject: `services.collectors.assigned.${i}.requests.flush`,
+                    //subject: `services.collectors.assigned.${i}.requests.flush`,
+                    subject: `services.collectors.assigned.${i}.commands.flush`,
                     limit: 1,
                     timeout: 30000,
                 },
@@ -149,6 +150,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             timestamp: new Date().toISOString(),
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         }
+        this.logger.debug('sending stop event', stopEvent);
         this.messageBus.publish(`events.vehicles.generation.stopped`, stopEvent);
 
         // send response stats
