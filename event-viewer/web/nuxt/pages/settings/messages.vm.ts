@@ -124,7 +124,7 @@ export class MessagesViewModel {
         docs.push('|Subject|Consumer Group|Services|');
         docs.push('|-------|--------------|--------|');
         for (const sub of this.subscriptions.value) {
-            docs.push(`|${escapeHtmlChars(sub.subject)}|${sub.consumerGroupName ?? ''}|${sub.services.join(', ')}|`);
+            docs.push(`|${escapeMarkdownChars(sub.subject)}|${sub.consumerGroupName ?? ''}|${sub.services.join(', ')}|`);
         }
         docs.push('');
         docs.push('## Message handlers');
@@ -140,7 +140,7 @@ export class MessagesViewModel {
         docs.push('|Sender|Message Type|Subject|Receiver|Subscription|');
         docs.push('|------|------------|-------|--------|------------|');
         for (const route of this.routes.value) {
-            docs.push(`|${route.sender}|${route.messageType}|${route.subject}|${route.receiver}|${escapeHtmlChars(route.subscription)}|`);
+            docs.push(`|${route.sender}|${route.messageType}|${route.subject}|${route.receiver}|${escapeMarkdownChars(route.subscription)}|`);
         }
         docs.push('');
 
@@ -178,8 +178,21 @@ function normalizeNumbers(value: string): string {
     return value.replaceAll(numberInTheMiddle, '.{int}.').replaceAll(numberAtTheEnd, '.{int}');
 }
 
-function escapeHtmlChars(value: string): string {
-    return value.replaceAll('>', '&gt;').replaceAll('<', '&lt;');
+const specialChars = [
+    ['&', '&amp;'],
+    ['>', '&gt;'],
+    ['<', '&lt;'],
+    ['#', '&#35;'],
+    ['|', '&#124;'],
+    ['*', '&#42;'],
+];
+
+function escapeMarkdownChars(value: string): string {
+    let result = value;
+    for (const [search, replace] of specialChars) {
+        result = result.replaceAll(search, replace);
+    }
+    return result;
 }
 
 async function copyToClipboard(textToCopy: string) {
