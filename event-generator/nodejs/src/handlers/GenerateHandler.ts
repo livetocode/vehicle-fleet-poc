@@ -127,11 +127,19 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
         }
         try {
             this.logger.info(`Flushing ${flushRequests.length} collectors`);
-            for await (const resp of this.messageBus.requestBatch(flushRequests)) {
-                if (isResponseSuccess(resp)) {
-                    this.logger.debug('Received flush response', resp.body);
+            if (req.body.body.useBackpressure) {
+                for await (const resp of this.messageBus.requestBatch(flushRequests)) {
+                    if (isResponseSuccess(resp)) {
+                        this.logger.debug('Received flush response', resp.body);
+                    }
                 }
-            }    
+            } else {
+                // If we're not applying back pressure, we can't wait for the flush requests to complete since they might timeout.
+                // So, we're using a basic fire and forget.
+                for (const req of flushRequests) {
+                    this.messageBus.publish(req[1].subject, req[0], req[1].headers);
+                }
+            }
         } catch(err: any) {
             if (err instanceof RequestTimeoutError) {
                 this.logger.debug('Flush requests timed out', err);
