@@ -32,12 +32,12 @@ using the "Copy as Markdown" button, at the bottom of the page.
 |-------|--------------|--------|
 |commands.move||viewer|
 |commands.move|collectors|collector|
-|events.vehicles.*.*||viewer|
-|messaging.control.*||collector, finder, generator, viewer|
-|messaging.control.*.collector||collector|
-|messaging.control.*.finder||finder|
-|messaging.control.*.generator||generator|
-|messaging.control.*.viewer||viewer|
+|events.vehicles.&#42;.&#42;||viewer|
+|messaging.control.&#42;||collector, finder, generator, viewer|
+|messaging.control.&#42;.collector||collector|
+|messaging.control.&#42;.finder||finder|
+|messaging.control.&#42;.generator||generator|
+|messaging.control.&#42;.viewer||viewer|
 |requests.vehicles.clear|collectors|collector|
 |requests.vehicles.generate|generators|generator|
 |requests.vehicles.query|finders|finder|
@@ -76,7 +76,7 @@ using the "Copy as Markdown" button, at the bottom of the page.
 
 |Sender|Message Type|Subject|Receiver|Subscription|
 |------|------------|-------|--------|------------|
-|collector|aggregate-period-created|events.vehicles.aggregate-period.created|viewer|events.vehicles.*.*|
+|collector|aggregate-period-created|events.vehicles.aggregate-period.created|viewer|events.vehicles.&#42;.&#42;|
 |collector|clear-vehicles-data-response|inbox.generator|generator|inbox.generator|
 |collector|flush-response|inbox.generator|generator|inbox.generator|
 |collector|prepare-response|inbox.generator|generator|inbox.generator|
@@ -89,8 +89,8 @@ using the "Copy as Markdown" button, at the bottom of the page.
 |finder|vehicle-query-partition-request|services.finders.any.partitions|finder|services.finders.any.&gt;|
 |generator|move|commands.move|collector|commands.move|
 |generator|move|commands.move|viewer|commands.move|
-|generator|vehicle-generation-started|events.vehicles.generation.started|viewer|events.vehicles.*.*|
-|generator|vehicle-generation-stopped|events.vehicles.generation.stopped|viewer|events.vehicles.*.*|
+|generator|vehicle-generation-started|events.vehicles.generation.started|viewer|events.vehicles.&#42;.&#42;|
+|generator|vehicle-generation-stopped|events.vehicles.generation.stopped|viewer|events.vehicles.&#42;.&#42;|
 |generator|generate-partition-response|inbox.generator|generator|inbox.generator|
 |generator|cancel-response|inbox.viewer|viewer|inbox.viewer|
 |generator|generate-response|inbox.viewer|viewer|inbox.viewer|
@@ -98,14 +98,13 @@ using the "Copy as Markdown" button, at the bottom of the page.
 |generator|flush-request|services.collectors.assigned.{int}.commands.flush|collector|services.collectors.assigned.{int}.&gt;|
 |generator|prepare-request|services.collectors.assigned.{int}.requests.prepare|collector|services.collectors.assigned.{int}.&gt;|
 |generator|generate-partition-request|services.generators.assigned.{int}.partitions|generator|services.generators.assigned.{int}.&gt;|
-|viewer|cancel-request-type|messaging.control.cancel.generator|generator|messaging.control.*.generator|
-|viewer|info-request|messaging.control.info|collector|messaging.control.*|
-|viewer|info-request|messaging.control.info|finder|messaging.control.*|
-|viewer|info-request|messaging.control.info|generator|messaging.control.*|
-|viewer|info-request|messaging.control.info|viewer|messaging.control.*|
+|viewer|cancel-request-type|messaging.control.cancel.generator|generator|messaging.control.&#42;.generator|
+|viewer|info-request|messaging.control.info|collector|messaging.control.&#42;|
+|viewer|info-request|messaging.control.info|finder|messaging.control.&#42;|
+|viewer|info-request|messaging.control.info|generator|messaging.control.&#42;|
+|viewer|info-request|messaging.control.info|viewer|messaging.control.&#42;|
 |viewer|generate-request|requests.vehicles.generate|generator|requests.vehicles.generate|
 |viewer|vehicle-query-request|requests.vehicles.query|finder|requests.vehicles.query|
-
 
 ### Collecting move commands
 
