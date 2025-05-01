@@ -20,6 +20,9 @@ const _handlers = _vm.handlers;
 const _routes = _vm.routes;
 const isFetching = _vm.isFetching;
 const tab = ref(0);
+const searchSubscriptions = ref('');
+const searchHandlers = ref('');
+const searchRoutes = ref('');
 
 const subscriptionsHeaders = [
   { title: 'Subject', align: 'start', key: 'subject' },
@@ -85,12 +88,27 @@ const defaultHeaderProps = {
       <v-tabs-window-item :value="1">
         <v-container>
           <v-row>
+            <v-col cols="4">
+              <v-text-field
+                v-model="searchSubscriptions"
+                label="Search"
+                prepend-inner-icon="mdi-magnify"
+                variant="solo"
+                density="compact"
+                hide-details
+                single-line
+                clearable
+              ></v-text-field>              
+            </v-col>
+          </v-row>
+          <v-row>
             <v-data-table-virtual
                       class="mt-3"
                       :headerProps="defaultHeaderProps"
                       :headers="subscriptionsHeaders"
                       :items="_subscriptions"
                       :loading="isFetching"
+                      :search="searchSubscriptions"
                       item-value="id"
                       density="compact"
                       fixed-header
@@ -106,12 +124,27 @@ const defaultHeaderProps = {
       <v-tabs-window-item :value="2">
         <v-container>
           <v-row>
+            <v-col cols="4">
+              <v-text-field
+                v-model="searchHandlers"
+                label="Search"
+                prepend-inner-icon="mdi-magnify"
+                variant="solo"
+                density="compact"
+                hide-details
+                single-line
+                clearable
+              ></v-text-field>              
+            </v-col>
+          </v-row>
+          <v-row>
             <v-data-table-virtual
               class="mt-3"
               :headerProps="defaultHeaderProps"
               :headers="handlersHeaders"
               :items="_handlers"
               :loading="isFetching"
+              :search="searchHandlers"
               item-value="id"
               density="compact"
               show-expand
@@ -139,12 +172,27 @@ const defaultHeaderProps = {
       <v-tabs-window-item :value="3">
         <v-container>
           <v-row>
+            <v-col cols="4">
+              <v-text-field
+                v-model="searchRoutes"
+                label="Search"
+                prepend-inner-icon="mdi-magnify"
+                variant="solo"
+                density="compact"
+                hide-details
+                single-line
+                clearable
+              ></v-text-field>              
+            </v-col>
+          </v-row>
+          <v-row>
             <v-data-table-virtual
               class="mt-3"
               :headerProps="defaultHeaderProps"
               :headers="routesHeaders"
               :items="_routes"
               :loading="isFetching"
+              :search="searchRoutes"
               item-value="id"
               density="compact"
               fixed-header
