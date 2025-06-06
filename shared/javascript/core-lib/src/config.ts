@@ -105,6 +105,7 @@ export type GeneratorConfig = {
     vehicleCount: number;
     vehicleTypes: string[];
     maxNumberOfEvents: number;
+    messageChunkSize: number;
     refreshIntervalInSecs: number;
     realtime: boolean;
     sendFlush: boolean;
@@ -162,6 +163,7 @@ export type FinderConfig = {
     dataFormat: string;
     parallelSearch: boolean;
     useChunking: boolean;
+    messageChunkSize: number;
 }
 
 export type ViewerConfig = {

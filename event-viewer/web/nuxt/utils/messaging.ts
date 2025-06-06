@@ -53,6 +53,12 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         }
     }
 
+    async flush(): Promise<void> {
+        if (this.connection) {
+            await this.connection.flush();
+        }
+    }
+
     async waitForClose(): Promise<void> {
         if (this.connection) {
             const result = await this.connection.closed();

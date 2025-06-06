@@ -12,7 +12,7 @@ import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
-import { IMessageBus } from "./IMessageBus.js";
+import { IMessageBus, MessageOptionsPair } from "./IMessageBus.js";
 import { MessageSubscription, MessageSubscriptions } from "./MessageSubscriptions.js";
 import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
 import { MessageRoutes } from "./MessageRoutes.js";
@@ -98,6 +98,14 @@ export class MessageBus implements IMessageBus {
         }
         this.publishEnvelope(envelope);
     }
+    
+    async publishBatch(messages: MessageOptionsPair[]): Promise<void> {
+        for (const [msg, opt] of messages) {
+            this.publish(opt.subject, msg, opt.headers);
+        }
+        await this.driver.flush();
+    }
+
     
     publishEnvelope(message: MessageEnvelope): void {
         message.headers.serviceName = this.identity.name;

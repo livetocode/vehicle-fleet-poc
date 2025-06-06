@@ -14,6 +14,7 @@ export interface GenerateRequest {
     startDate?: string;
     pauseDelayInMSecs?: number;
     useBackpressure?: boolean;
+    messageChunkSize?: number;
 }
 
 export interface GenerateResponse {
@@ -57,6 +58,10 @@ export interface EnrichedMoveCommand {
     collectorIndex: number;
     geoHash: string;
     partitionKey: string;
+}
+
+export interface FlushCommand {
+    type: 'flush';
 }
 
 export interface MessageTrackingAck {

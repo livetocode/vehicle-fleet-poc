@@ -75,7 +75,7 @@ export class NatsService extends Construct {
         {
           name: 'web',
           image: options.image,
-          imagePullPolicy: ImagePullPolicy.ALWAYS,
+          imagePullPolicy: options.image.endsWith(':latest') ? ImagePullPolicy.ALWAYS : ImagePullPolicy.IF_NOT_PRESENT,
           portNumber: containerPort,
           liveness: Probe.fromHttpGet('/ping', {
             timeoutSeconds: Duration.seconds(15),

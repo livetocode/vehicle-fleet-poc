@@ -35,6 +35,7 @@ generator:
   httpPort: 7710
   vehicleCount: 1500
   maxNumberOfEvents: 5000000
+  messageChunkSize: 5000
   refreshIntervalInSecs: 5
   realtime: false
   sendFlush: true
@@ -97,6 +98,7 @@ finder:
   dataFormat: parquet
   parallelSearch: true
   useChunking: false
+  messageChunkSize: 5000
 
 viewer:
   logging:

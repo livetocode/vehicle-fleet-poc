@@ -4,6 +4,13 @@ import { Request, Response, RequestOptions, RequestOptionsPair } from "./Request
 import { TypedMessage } from "./TypedMessage.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
 
+export type MessageOptions = {
+    subject: string;
+    headers?: MessageHeaders;
+}
+
+export type MessageOptionsPair<TMessage extends TypedMessage = TypedMessage> = [TMessage, MessageOptions];
+
 export type IMessageBus = {
     get identity(): ServiceIdentity;
     get privateInboxName(): string;
@@ -11,6 +18,7 @@ export type IMessageBus = {
     unregisterHandler(handler: MessageHandler): void;
     subscribe(subject: string, consumerGroupName?: string): void;
     publish(subject: string, message: any, headers?: MessageHeaders): void;
+    publishBatch(messages: MessageOptionsPair[]): Promise<void>;
     publishEnvelope(message: MessageEnvelope): void;
     publishLocal(message: any, headers?: MessageHeaders): Promise<void> ;
     request(request: TypedMessage, options: RequestOptions): Promise<MessageEnvelope<Response>>;

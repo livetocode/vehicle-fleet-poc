@@ -15,7 +15,7 @@ import { IdGroupDataPartitionStrategy } from './core/data/IdGroupDataPartitionSt
 import { createDataFrameRepository, DataFrameFormat, DataFrameRepository, stringToFormat } from 'data-lib';
 import { ClearVehiclesDataHandler } from './handlers/ClearVehiclesDataHandler.js';
 import { MoveCommandAccumulator, PersistedMoveCommand } from './handlers/MoveCommandAccumulator.js';
-import { FlushDataHandler } from './handlers/FlushDataHandler.js';
+import { FlushDataHandler, FlushRequestHandler } from './handlers/FlushDataHandler.js';
 import { AssignedMoveCommandHandler } from './handlers/AssignedMoveCommandHandler.js';
 import { PrepareCollectorHandler } from './handlers/PrepareCollectorHandler.js';
 
@@ -149,9 +149,10 @@ async function main() {
     
     const prepareHandler = new PrepareCollectorHandler(logger, trackingCollection, accumulator);
     const flushDataHandler = new FlushDataHandler(logger, accumulator);
+    const flushRequestHandler = new FlushRequestHandler(logger, accumulator);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
-    messageBus.registerHandlers(moveCommandHandler, assignedMoveCommandHandler, prepareHandler, flushDataHandler, clearVehiclesDataHandler);
+    messageBus.registerHandlers(moveCommandHandler, assignedMoveCommandHandler, prepareHandler, flushDataHandler, flushRequestHandler, clearVehiclesDataHandler);
 
     messageBus.subscribe(`commands.move`, 'collectors');
     messageBus.subscribe(`requests.vehicles.clear`, 'collectors');

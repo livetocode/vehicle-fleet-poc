@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, Logger, VehicleQueryResult, VehicleQueryPartitionRequest, VehicleQueryPartitionResponse, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request } from 'core-lib';
+import { Config, Logger, VehicleQueryResult, VehicleQueryPartitionRequest, VehicleQueryPartitionResponse, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, asyncChunks, MessageOptionsPair } from 'core-lib';
 import * as turf from '@turf/turf';
 import { DataFrameRepository } from "data-lib";
 import { VehicleQueryContext } from "./VehicleQueryContext.js";
@@ -71,11 +71,20 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
     }
 
     private async executeProcessFile(ctx: VehicleQueryContext, filename: string, filesize: number) {
-        for await (const res of this.searchFile(ctx, filename, filesize)) {
-            this.messageBus.publish(ctx.event.replyTo, res);
-            ctx.selectedRecordCount += 1;
-            ctx.distinctVehicles.add(res.vehicleId);
-            if (ctx.checkIfLimitWasReached()) {
+        for await (const chunk of asyncChunks(this.searchFile(ctx, filename, filesize), this.config.finder.messageChunkSize)) {
+            const messageBatch: MessageOptionsPair[] = [];
+            let done = false;
+            for (const res of chunk) {
+                messageBatch.push([res, { subject: ctx.event.replyTo }]);
+                ctx.selectedRecordCount += 1;
+                ctx.distinctVehicles.add(res.vehicleId);
+                if (ctx.checkIfLimitWasReached() || ctx.checkTimeout()) {
+                    done = true;
+                    break;
+                }
+            }
+            await this.messageBus.publishBatch(messageBatch);
+            if (done) {
                 break;
             }
         }

@@ -12,6 +12,7 @@ export type Subscription = {
 export type MessageBusDriver = {
     start(connectionString: string): Promise<void>;
     stop(): Promise<void>;
+    flush(): Promise<void>;
     waitForClose(): Promise<void>;
     subscribe(subscription: Subscription): void;
     publish(msg: MessageEnvelope): void;

@@ -47,6 +47,12 @@ export class NatsMessageBusDriver implements MessageBusDriver {
             this.logger.info(`NATS connection closed after processing `, stats.inMsgs, " messages in ", this.watch.elapsedTimeAsString());
         }
     }
+    
+    async flush(): Promise<void> {
+        if (this.connection) {
+            await this.connection.flush();
+        }
+    }
 
     async waitForClose(): Promise<void> {
         if (this.connection) {

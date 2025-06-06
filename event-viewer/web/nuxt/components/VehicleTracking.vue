@@ -31,6 +31,7 @@ onUnmounted(() => {
         :vehicleCount="_generationParameters.vehicleCount"
         :vehicleTypes="_generationParameters.vehicleTypes"
         :maxNumberOfEvents="_generationParameters.maxNumberOfEvents"
+        :messageChunkSize="_generationParameters.messageChunkSize"
         :refreshIntervalInSecs="_generationParameters.refreshIntervalInSecs"
         :realtime="_generationParameters.realtime"
       />

@@ -69,6 +69,7 @@ export class VehicleTrackingViewModel {
         vehicleCount: number;
         vehicleTypes: string[];
         maxNumberOfEvents: number;
+        messageChunkSize: number;
         refreshIntervalInSecs: number;
         realtime: boolean;
         useBackpressure: boolean;
@@ -88,6 +89,7 @@ export class VehicleTrackingViewModel {
     private _memoryStat = new AggregatedStat('Memory used', 'B');
     private _loadAverageStat = new AggregatedStat('Load / 1 min', '%');
     private _nextEventStatsId = 1;
+    private _events: AggregatePeriodCreated[] = [];
     
     constructor(private config: Config, private _messageBus: MessageBus, private logger: Logger) {
         this.statValues.value = this.createStats();
@@ -95,6 +97,7 @@ export class VehicleTrackingViewModel {
             vehicleCount: this.config.generator.vehicleCount,
             vehicleTypes: this.config.generator.vehicleTypes,
             maxNumberOfEvents: this.config.generator.maxNumberOfEvents,
+            messageChunkSize: this.config.generator.messageChunkSize,
             refreshIntervalInSecs: this.config.generator.refreshIntervalInSecs,
             realtime: this.config.generator.realtime,
             useBackpressure: this.config.backpressure.enabled,
@@ -142,6 +145,7 @@ export class VehicleTrackingViewModel {
         vehicleCount: number;
         vehicleTypes: string[];
         maxNumberOfEvents: number;
+        messageChunkSize: number;
         refreshIntervalInSecs: number;
         realtime: boolean;
         pauseDelayInMSecs: number;
@@ -185,6 +189,7 @@ export class VehicleTrackingViewModel {
                 vehicleCount: data.vehicleCount,
                 vehicleTypes: data.vehicleTypes,
                 maxNumberOfEvents: data.maxNumberOfEvents,
+                messageChunkSize: data.messageChunkSize,
                 refreshIntervalInSecs: data.refreshIntervalInSecs,
                 realtime: data.realtime,
                 pauseDelayInMSecs: data.pauseDelayInMSecs,
@@ -275,6 +280,7 @@ export class VehicleTrackingViewModel {
         this.totalRejectedMessagesInThePast = 0;
         this.totalRejectedMessagesInTheFuture = 0;
         this.events.value = [];
+        this._events = [];
         this._timePartitions.clear();
         this._memoryStat.clear();
         this._loadAverageStat.clear();
@@ -293,10 +299,36 @@ export class VehicleTrackingViewModel {
             id: this._nextEventStatsId,
         }
         this._nextEventStatsId += 1;
-        const events = [...this.events.value, evWithId];
-        if (events.length > 100) {
-            events.shift();
+        this._events.push(evWithId);
+        const totalEvents = this._events.reduce((a, b) => a + b.partitions.length, 0);
+        if (totalEvents > 1000) {
+            this._events.shift();
         }
+        
+        const eventsByKey = new Map<string, AggregatePeriodCreated>();
+        for (const x of this._events) {
+            const key = `${x.collectorIndex}:${x.fromTime}:${x.toTime}`;
+            const val = eventsByKey.get(key);
+            if (val) {                
+                val.elapsedTimeInMS += x.elapsedTimeInMS;
+                val.totalElapsedTimeInMS = Math.max(val.totalElapsedTimeInMS, x.totalElapsedTimeInMS);
+                val.eventCount += x.eventCount;
+                val.isPartial = val.isPartial || x.isPartial;
+                val.partitions.push(...x.partitions);
+                val.totalRejectedMessagesInTheFuture += x.totalRejectedMessagesInTheFuture;
+                val.totalRejectedMessagesInThePast += x.totalRejectedMessagesInThePast;
+            } else {
+                eventsByKey.set(key, {
+                    ...x,
+                    partitions: [...x.partitions],
+                });
+            }
+        }
+        //const events = [...this.events.value, evWithId];
+        // if (events.length > 100) {
+        //     events.shift();
+        // }
+        const events = [...eventsByKey.values()];
         this.events.value = events;
         this.totalEventCount += ev.eventCount;
         this.totalTimePartitionCount = this._timePartitions.size;

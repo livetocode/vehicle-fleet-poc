@@ -13,6 +13,10 @@ const props = defineProps({
         type: Number,
         default: 1000000,
     },
+    messageChunkSize: {
+        type: Number,
+        default: 1000,
+    },
     refreshIntervalInSecs: {
         type: Number,
         default: 5,
@@ -23,7 +27,7 @@ const props = defineProps({
     },
     pauseDelayInMSecs: {
         type: Number,
-        default: 1,
+        default: 2,
     },
     useBackpressure: {
         type: Boolean,
@@ -37,6 +41,7 @@ const emit = defineEmits<{
       vehicleCount: number;
       vehicleTypes: string[];
       maxNumberOfEvents: number;
+      messageChunkSize: number;
       refreshIntervalInSecs: number;
       realtime: boolean;
       pauseDelayInMSecs: number;
@@ -46,6 +51,7 @@ const emit = defineEmits<{
 let fldVehicleCount = ref(props.vehicleCount);
 let fldVehicleTypes = ref<string[]>(props.vehicleTypes);
 let fldMaxNumberOfEvents = ref(props.maxNumberOfEvents);
+let fldMessageChunkSize = ref(props.messageChunkSize);
 let fldRefreshIntervalInSecs = ref(props.refreshIntervalInSecs);
 let fldRealtime = ref(props.realtime);
 let fldPauseDelayInMSecs = ref(props.pauseDelayInMSecs);
@@ -62,6 +68,7 @@ function onAcceptDialog(isActive: Ref<boolean>) {
       vehicleCount: fldVehicleCount.value * 1, // multiplication will force the value to become a number, even if it is a string
       vehicleTypes: fldVehicleTypes.value,
       maxNumberOfEvents: fldMaxNumberOfEvents.value * 1,
+      messageChunkSize: fldMessageChunkSize.value * 1,
       refreshIntervalInSecs: fldRefreshIntervalInSecs.value * 1,
       realtime: fldRealtime.value,
       pauseDelayInMSecs: fldPauseDelayInMSecs.value,
@@ -134,16 +141,30 @@ function onAcceptDialog(isActive: Ref<boolean>) {
                 </v-col>
                 <v-col
                   cols="12"
-                  sm="3"
+                  sm="6"
                 >
-                <v-checkbox label="Realtime" v-model="fldRealtime"></v-checkbox>
-              </v-col>
-              <v-col
+                  <v-text-field type="number" label="Message chunk size" v-model="fldMessageChunkSize"></v-text-field>
+                </v-col>
+              </v-row>
+
+              <v-row dense>
+                <v-col
                   cols="12"
                   sm="3"
                 >
-                <v-checkbox label="Back pressure" v-model="fldUseBackpressure"></v-checkbox>
-              </v-col>
+                  <v-checkbox label="Realtime" v-model="fldRealtime"></v-checkbox>
+                </v-col>
+                <v-col
+                    cols="12"
+                    sm="3"
+                  >
+                  <v-checkbox label="Back pressure" v-model="fldUseBackpressure"></v-checkbox>
+                </v-col>
+                <v-col
+                    cols="12"
+                    sm="3"
+                  >
+                </v-col>
               </v-row>
 
               <small class="text-caption text-medium-emphasis">*indicates required field</small>

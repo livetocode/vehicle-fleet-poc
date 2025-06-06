@@ -1,5 +1,5 @@
-import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection } from "core-lib";
-import { addOffsetToCoordinates, computeHashNumber, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
+import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection, MessageOptionsPair, chunks } from "core-lib";
+import { addOffsetToCoordinates, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
 export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRequest, GeneratePartitionResponse> {
@@ -63,18 +63,12 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
     
         const anchor: GpsCoordinates = this.config.generator.map.topLeftOrigin;
         const refreshIntervalInMS = refreshIntervalInSecs * 1000;
-        let distributedRefreshIntervalInMS;
-        let distributedRefreshFrequency;
-        if (vehicleCount < refreshIntervalInMS) {
-            distributedRefreshIntervalInMS = Math.trunc(refreshIntervalInMS / vehicleCount);
-            distributedRefreshFrequency = 1;
-        } else {
-            distributedRefreshFrequency = Math.trunc(vehicleCount / refreshIntervalInMS);
-            distributedRefreshIntervalInMS = Math.trunc(refreshIntervalInMS / distributedRefreshFrequency);
+        const chunkSize = Math.max(req.body.body.request.messageChunkSize ?? this.config.generator.messageChunkSize, 1);
+        let chunksPerIteration = Math.trunc(vehicleCount / chunkSize);
+        if (vehicleCount % chunkSize !== 0) {
+            chunksPerIteration += 1;
         }
-        if (realtime) {
-            this.logger.debug(`Realtime wait: ${distributedRefreshIntervalInMS} ms every ${distributedRefreshFrequency} vehicles`)
-        }
+        const chunkWaitDelayInMS = Math.max(1, Math.round((refreshIntervalInMS / chunksPerIteration) * 0.9));
         const watch = new Stopwatch();
         watch.start();
         const useBackpressure = this.config.backpressure.enabled && 
@@ -82,59 +76,66 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         let eventCount = 0;
         let done = false;
         while (!done) {
-            let accumulatedWaitInMS = 0;
             const commands = engine.execute();
-            let idx = 0;
-            for (const cmd of commands) {
-                this.logger.trace(cmd.timestamp, `Vehicle #${cmd.vehicle.id} ${cmd.newState.direction} ${formatPoint(cmd.vehicle.location)} speed=${cmd.newState.speed} localBounds=${cmd.newState.localBounds.toString()}, offset=${formatPoint(cmd.newState.offset)}`);
-                const loc = cmd.vehicle.location;
-                const gpsPos = addOffsetToCoordinates(anchor, loc.x, loc.y);
-                const msg: MoveCommand = {
-                    type: 'move',
-                    vehicleId: cmd.vehicle.id,
-                    vehicleType: cmd.vehicle.type,
-                    zoneId: cmd.newState.zone.id,
-                    direction: cmd.newState.direction,
-                    speed: cmd.newState.speed,
-                    gps: gpsPos,
-                    timestamp: cmd.timestamp.toISOString(),
-                }
-                if (useBackpressure) {
-                    msg.tracking = {
-                        sequence: eventCount,
-                        emitter: this.messageBus.identity,
+            const iterationWatch = Stopwatch.startNew();
+            for (const chunk of chunks(commands.values(), chunkSize)) {
+                const messageBatch: MessageOptionsPair[] = [];
+                for (const cmd of chunk) {
+                    if (this.config.generator.logging.level === "trace") {
+                        this.logger.trace(cmd.timestamp, `Vehicle #${cmd.vehicle.id} ${cmd.newState.direction} ${formatPoint(cmd.vehicle.location)} speed=${cmd.newState.speed} localBounds=${cmd.newState.localBounds.toString()}, offset=${formatPoint(cmd.newState.offset)}`);
+                    }
+                    const loc = cmd.vehicle.location;
+                    const gpsPos = addOffsetToCoordinates(anchor, loc.x, loc.y);
+                    const msg: MoveCommand = {
+                        type: 'move',
+                        vehicleId: cmd.vehicle.id,
+                        vehicleType: cmd.vehicle.type,
+                        zoneId: cmd.newState.zone.id,
+                        direction: cmd.newState.direction,
+                        speed: cmd.newState.speed,
+                        gps: gpsPos,
+                        timestamp: cmd.timestamp.toISOString(),
+                    }
+                    if (useBackpressure) {
+                        msg.tracking = {
+                            sequence: eventCount,
+                            emitter: this.messageBus.identity,
+                        }
+                    }
+                    messageBatch.push([msg, { subject: `commands.move` }]);
+                    eventCount++;
+                    if (eventCount >= event.maxNumberOfEvents) {
+                        done = true;
+                        break;
+                    }
+                    if (req.shouldCancel === true) {
+                        this.logger.warn('Sub-generator should stop immediatly!');
+                        done = true;
+                        break;
                     }
                 }
-                this.messageBus.publish(`commands.move`, msg);
-                eventCount++;
-                idx++;
-                if (eventCount >= event.maxNumberOfEvents) {
-                    done = true;
-                    break;
-                }
-                if (req.shouldCancel === true) {
-                    this.logger.warn('Sub-generator should stop immediatly!');
-                    done = true;
-                    break;
-                }
+                await this.messageBus.publishBatch(messageBatch);
+                
                 if (realtime) {
-                    if (idx % distributedRefreshFrequency === 0) {
-                        await sleep(distributedRefreshIntervalInMS);
-                        accumulatedWaitInMS += distributedRefreshIntervalInMS;
-                    }
-                }
-            }
-            if (!done || useBackpressure) {
-                if (realtime) {
-                    const delta = refreshIntervalInMS - accumulatedWaitInMS;
-                    if (delta > 0) {
-                        await sleep(delta);
-                    }
+                    await sleep(chunkWaitDelayInMS);
                 } else if (useBackpressure) {
                     await this.applyBackpressure(event, eventCount);
                 } else {
                     await sleep(event.request.pauseDelayInMSecs ?? 1);
-                }    
+                }
+
+                if (done) {
+                    break;
+                }
+            }
+
+            if (!done) {
+                if (realtime) {
+                    const delta = refreshIntervalInMS - iterationWatch.elapsedTimeInMS();
+                    if (delta > 0) {
+                        await sleep(delta);
+                    }
+                }
             }
         }
         watch.stop();

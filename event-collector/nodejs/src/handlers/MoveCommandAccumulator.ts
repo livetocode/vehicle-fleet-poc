@@ -219,20 +219,18 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
         this.persistCalls += 1;
         const formats = new Set<string>();
         const watch = Stopwatch.startNew();
-        let partitionStats: DataPartitionStats[] = [];
         const groupKey = objects[0].partitionKey;
         const groupItems = objects;
         const sortedItems = groupItems.map(x => x.event).sort(compareVehicles);
-        const groupWriteStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
+        const partitionStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
         watch.stop();
-        partitionStats.push(...groupWriteStats);
-        for (const file of groupWriteStats) {
+        for (const file of partitionStats) {
             formats.add(file.format);
         }
         vehicles_collector_partitions_total_counter.inc({ is_partial: isPartial.toString()});
         vehicles_collector_partitions_objects_total_counter.inc({ is_partial: isPartial.toString()}, sortedItems.length);
         vehicles_collector_partitions_duration_secs_total_counter.inc({ is_partial: isPartial.toString() }, watch.elapsedTimeInSecs());
-        const size = groupWriteStats.map(x => x.size).reduce((a, b) => a + b, 0);
+        const size = partitionStats.map(x => x.size).reduce((a, b) => a + b, 0);
         vehicles_collector_partitions_size_counter.inc({ is_partial: isPartial.toString() }, size);
         if (partitionStats.length === 0) {
             this.logger.warn('aggregateStore produced no stats! PartitionKey = ', partitionKey.toString());

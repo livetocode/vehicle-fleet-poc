@@ -1,4 +1,4 @@
-import { ClearVehiclesDataRequest, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse, PrepareRequest, PrepareResponse } from "core-lib";
+import { ClearVehiclesDataRequest, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse, PrepareRequest } from "core-lib";
 
 
 export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateResponse> {
@@ -112,39 +112,41 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
         }
         
         // flush collectors
-        const flushReq: FlushRequest = { type: 'flush-request' };
-        const flushRequests: RequestOptionsPair<FlushRequest>[] = [];
-        for (let i = 0; i < this.config.collector.instances; i++) {
-            flushRequests.push([
-                flushReq, 
-                {
-                    //subject: `services.collectors.assigned.${i}.requests.flush`,
-                    subject: `services.collectors.assigned.${i}.commands.flush`,
-                    limit: 1,
-                    timeout: 30000,
-                },
-            ]);
-        }
-        try {
-            this.logger.info(`Flushing ${flushRequests.length} collectors`);
-            if (req.body.body.useBackpressure) {
-                for await (const resp of this.messageBus.requestBatch(flushRequests)) {
-                    if (isResponseSuccess(resp)) {
-                        this.logger.debug('Received flush response', resp.body);
+        if (req.body.body.sendFlush) {
+            const flushReq: FlushRequest = { type: 'flush-request' };
+            const flushRequests: RequestOptionsPair<FlushRequest>[] = [];
+            for (let i = 0; i < this.config.collector.instances; i++) {
+                flushRequests.push([
+                    flushReq, 
+                    {
+                        //subject: `services.collectors.assigned.${i}.requests.flush`,
+                        subject: `services.collectors.assigned.${i}.commands.flush`,
+                        limit: 1,
+                        timeout: 30000,
+                    },
+                ]);
+            }
+            try {
+                this.logger.info(`Flushing ${flushRequests.length} collectors`);
+                if (req.body.body.useBackpressure) {
+                    for await (const resp of this.messageBus.requestBatch(flushRequests)) {
+                        if (isResponseSuccess(resp)) {
+                            this.logger.debug('Received flush response', resp.body);
+                        }
+                    }
+                } else {
+                    // If we're not applying back pressure, we can't wait for the flush requests to complete since they might timeout.
+                    // So, we're using a basic fire and forget.
+                    for (const req of flushRequests) {
+                        this.messageBus.publish(req[1].subject, { type: 'flush' }, req[1].headers);
                     }
                 }
-            } else {
-                // If we're not applying back pressure, we can't wait for the flush requests to complete since they might timeout.
-                // So, we're using a basic fire and forget.
-                for (const req of flushRequests) {
-                    this.messageBus.publish(req[1].subject, req[0], req[1].headers);
+            } catch(err: any) {
+                if (err instanceof RequestTimeoutError) {
+                    this.logger.debug('Flush requests timed out', err);
+                } else {
+                    throw err;
                 }
-            }
-        } catch(err: any) {
-            if (err instanceof RequestTimeoutError) {
-                this.logger.debug('Flush requests timed out', err);
-            } else {
-                throw err;
             }
         }
 
