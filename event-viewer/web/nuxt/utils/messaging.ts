@@ -1,17 +1,21 @@
-import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection, headers } from "nats.ws";
+import { JSONCodec, connect, type Msg, type MsgHdrs, type NatsConnection, headers, Match } from "nats.ws";
 import type {IncomingMessageEnvelope, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, Subscription } from "core-lib";
-import { type MessageBusDriver, MessageBus, NoopMessageBusMetrics, sleep, Stopwatch } from "core-lib";
+import { type MessageBusDriver, MessageBus, NoopMessageBusMetrics, ProtoBufRegistry, sleep, Stopwatch } from "core-lib";
 import type { Logger, ServiceIdentity } from "core-lib";
+
+const MessageTypeHeader = 'proto/type';
 
 export class NatsMessageBus extends MessageBus {
 
     constructor(identity: ServiceIdentity, logger: Logger) {
+        const protoBufRegistry = new ProtoBufRegistry();
         const driver = new NatsMessageBusDriver(
             (msg) => this.messageDispatcher.dispatch(msg),
             (req, res) => this.envelopeReply(req, res),
             logger,
+            protoBufRegistry,
         );
-        super(identity, logger, new NoopMessageBusMetrics(), driver);
+        super(identity, logger, new NoopMessageBusMetrics(), driver, protoBufRegistry);
     }
 }
 
@@ -24,6 +28,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         public readonly onReceiveMessage: ReceiveMessageCallback, 
         public readonly onReplyTo: ReplyToCallback, 
         private logger: Logger,
+        private protoBufRegistry: ProtoBufRegistry,
     ) {}
 
     async start(connectionString: string): Promise<void> {
@@ -91,11 +96,26 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     }
     
     publish(msg: MessageEnvelope): void {
-        this.connection?.publish(msg.subject, this.codec.encode(msg.body), { headers: convertToMsgHdrs(msg.headers)});
+        let data: Uint8Array;
+        const codec = this.protoBufRegistry.find(msg.body.type);
+        if (codec) {
+            data = codec.encode(msg.body);
+            msg.headers[MessageTypeHeader] = msg.body.type;
+        } else {
+            data = this.codec.encode(msg.body);
+        }
+        this.connection?.publish(msg.subject, data, { headers: convertToMsgHdrs(msg.headers)});
     }
 
     private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
-        const data: any = this.codec.decode(msg.data);
+        const messageType = msg.headers?.get(MessageTypeHeader, Match.Exact);
+        let data: any;
+        if (messageType) {
+            const codec = this.protoBufRegistry.get(messageType);
+            data = codec.decode(msg.data);
+        } else {
+            data = this.codec.decode(msg.data);
+        }
         const onReplyTo = this.onReplyTo;
         return {
             subject: msg.subject,

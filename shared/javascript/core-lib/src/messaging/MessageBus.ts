@@ -16,6 +16,7 @@ import { IMessageBus, MessageOptionsPair } from "./IMessageBus.js";
 import { MessageSubscription, MessageSubscriptions } from "./MessageSubscriptions.js";
 import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
 import { MessageRoutes } from "./MessageRoutes.js";
+import { ProtoBufCodec, ProtoBufRegistry } from "./ProtoBufRegistry.js";
 
 export class MessageBus implements IMessageBus {
     private started = false;
@@ -27,13 +28,14 @@ export class MessageBus implements IMessageBus {
     private cancelService: CancelRequestService;
     private handlers = new MessageHandlerRegistry();
     private subscriptions = new MessageSubscriptions();
-    protected messageDispatcher: MessageDispatcher;        
+    protected messageDispatcher: MessageDispatcher;
 
     constructor(
         private _identity: ServiceIdentity,
         protected logger: Logger,
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
+        protected protoBufRegistry: ProtoBufRegistry,
     ) {
         const activeEventHandlers = new Map<string, MessageHandlerContext>();
         const messageRoutes = new MessageRoutes();
@@ -78,6 +80,10 @@ export class MessageBus implements IMessageBus {
 
     unregisterHandler(handler: MessageHandler): void {
         this.handlers.unregister(handler);
+    }
+
+    registerMessageCodec(messageType: string, codec: ProtoBufCodec): void {
+        this.protoBufRegistry.register(messageType, codec);
     }
 
     subscribe(subject: string, consumerGroupName?: string): void {

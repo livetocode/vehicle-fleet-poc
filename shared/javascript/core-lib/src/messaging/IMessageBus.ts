@@ -3,6 +3,7 @@ import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageH
 import { Request, Response, RequestOptions, RequestOptionsPair } from "./Requests.js";
 import { TypedMessage } from "./TypedMessage.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
+import { ProtoBufCodec } from "./ProtoBufRegistry.js";
 
 export type MessageOptions = {
     subject: string;
@@ -16,6 +17,7 @@ export type IMessageBus = {
     get privateInboxName(): string;
     registerHandlers(...handlers: MessageHandler[]): void;
     unregisterHandler(handler: MessageHandler): void;
+    registerMessageCodec(messageType: string, codec: ProtoBufCodec): void;
     subscribe(subject: string, consumerGroupName?: string): void;
     publish(subject: string, message: any, headers?: MessageHeaders): void;
     publishBatch(messages: MessageOptionsPair[]): Promise<void>;

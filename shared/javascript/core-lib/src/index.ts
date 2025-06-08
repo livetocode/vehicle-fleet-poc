@@ -9,3 +9,4 @@ export * from './stopwatch.js';
 export * from './text.js';
 export * from './collections.js';
 export * from './messaging/index.js';
+export * from './proto/index.js';

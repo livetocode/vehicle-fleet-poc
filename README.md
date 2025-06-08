@@ -184,6 +184,7 @@ sequenceDiagram
 - distributed services using a message broker
 - durable storage of events
 - distributed event generation with multiple instances for higher throughput
+- multiple serialization formats (json, ProtoBuf)
 - multiple data formats (parquet, csv, json, arrow)
 - multiple storage providers (filesystem, S3...)
 - flexible aggregation of events
@@ -471,6 +472,22 @@ Python3 for running some scripts.
 
 `python3 -m venv .venv`
 `.venv/bin/pip3 install -r scripts/requirements.txt`
+
+### Regen ProtoBuf javascript files
+
+Ensure that the CLI is properly installed:
+```shell
+npm install -g protobufjs-cli
+```
+
+Then execute the script that generate the javascript file and its associated Typescript definition file :
+```shell
+bash scripts/nodejs/regen-proto.sh
+```
+
+Note that you should make sure that the [proto file](./shared/javascript/core-lib/src/proto/messages.proto) and 
+the [message types](./shared/javascript/core-lib/src/messages.ts) are properly in sync, and everytime they change,
+you should regen the files.
 
 ## NodeJS
 

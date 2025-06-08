@@ -9,6 +9,7 @@ export type LoggingConfig = {
 
 export type NatsHubConfig = {
     type: 'nats';
+    enableProtoBuf: boolean;
     protocols: {
         nats: {
             servers: string[];                
@@ -21,6 +22,7 @@ export type NatsHubConfig = {
 
 export type RabbitHubConfig = {
     type: 'rabbit';
+    enableProtoBuf: boolean;
     // todo: define other properties
 }
 

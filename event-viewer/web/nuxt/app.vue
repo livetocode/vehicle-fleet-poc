@@ -1,4 +1,6 @@
 <script setup>
+  import { registerCodecs } from 'core-lib';
+  
   const appConfig = useAppConfig();
   const identity = {
     name: 'viewer',
@@ -18,6 +20,9 @@
   const connectionString = servers.join(',');
 
   const messageBus = new NatsMessageBus(identity, logger);
+  if (appConfig.hub.enableProtoBuf) {
+    registerCodecs(messageBus);
+  }
   provide('messageBus', messageBus);
 
 onMounted(() => {

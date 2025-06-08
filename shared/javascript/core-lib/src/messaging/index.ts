@@ -13,6 +13,7 @@ export * from './MessageRoutes.js';
 export * from './MessageSubscriptions.js';
 export * from './MessageTrackingCollection.js';
 export * from './NoopMessageBusMetrics.js';
+export * from './ProtoBufRegistry.js';
 export * from './Requests.js';
 export * from './RequestHandler.js';
 export * from './ResponseMatcher.js';

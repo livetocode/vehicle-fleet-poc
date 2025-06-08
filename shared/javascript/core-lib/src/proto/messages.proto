@@ -1,0 +1,64 @@
+// messages.proto
+syntax = "proto3";
+
+// ServiceIdentity correspond au type TypeScript ServiceIdentity
+message ServiceIdentity {
+  string name = 1;
+  int32 instance = 2;
+}
+
+// GpsCoordinates correspond à l'interface TypeScript GpsCoordinates
+message GpsCoordinates {
+  double lat = 1;
+  double lon = 2;
+  double alt = 3;
+}
+
+// MessageTracking correspond à l'interface TypeScript MessageTracking
+message MessageTracking {
+  int32 sequence = 1;
+  ServiceIdentity emitter = 2; // Utilise le message ServiceIdentity défini ci-dessus
+}
+
+// MoveCommand correspond à l'interface TypeScript MoveCommand
+message MoveCommand {
+  // Le champ 'type' n'est généralement pas nécessaire en Protobuf car le type du message est implicite.
+  // Si vous avez besoin de le conserver pour des raisons de compatibilité, vous pouvez le faire.
+  // string type = 1; // 'move'
+
+  string vehicleId = 1; // Commencez les numéros de champ à 1
+  string vehicleType = 2;
+  string zoneId = 3; // 'optional' pour les champs optionnels (si non défini, il prendra la valeur par défaut pour le type)
+  string direction = 4;
+  double speed = 5;
+  GpsCoordinates gps = 6; // Utilise le message GpsCoordinates défini ci-dessus
+  string timestamp = 7;
+  MessageTracking tracking = 8; // Utilise le message MessageTracking défini ci-dessus
+}
+
+// EnrichedMoveCommand correspond à l'interface TypeScript EnrichedMoveCommand
+message EnrichedMoveCommand {
+  // Le champ 'type' n'est généralement pas nécessaire en Protobuf car le type du message est implicite.
+  // Si vous avez besoin de le conserver pour des raisons de compatibilité, vous pouvez le faire.
+  // string type = 1; // 'enriched-move'
+
+  MoveCommand command = 1; // Utilise le message MoveCommand défini ci-dessus
+  int32 collectorIndex = 2;
+  string geoHash = 3;
+  string partitionKey = 4;
+}
+
+// VehicleQueryResult correspond à l'interface TypeScript VehicleQueryResult
+message VehicleQueryResult {
+    // Le champ 'type' n'est généralement pas nécessaire en Protobuf car le type du message est implicite.
+    // string type = 1; // 'vehicle-query-result'
+  
+    string queryId = 1; // Commencez le numéro de champ à 1
+    string timestamp = 2;
+    string vehicleId = 3;
+    string vehicleType = 4;
+    GpsCoordinates gps = 5; // Utilise le message GpsCoordinates déjà défini
+    string direction = 6;
+    double speed = 7;
+    string geoHash = 8;
+  }

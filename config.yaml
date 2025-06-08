@@ -1,5 +1,6 @@
 hub:
   type: nats
+  enableProtoBuf: true
   protocols:
     nats:
       servers:

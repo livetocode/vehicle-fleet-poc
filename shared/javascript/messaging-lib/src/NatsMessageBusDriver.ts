@@ -1,6 +1,8 @@
-import { IncomingMessageEnvelope, Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
-import { JSONCodec, Msg, MsgHdrs, NatsConnection, connect, headers } from "nats";
+import { IncomingMessageEnvelope, Logger, MessageBusDriver, MessageEnvelope, MessageHeaders, ProtoBufRegistry, ReceiveMessageCallback, ReplyToCallback, sleep, Stopwatch, Subscription } from "core-lib";
+import { JSONCodec, Match, Msg, MsgHdrs, NatsConnection, connect, headers } from "nats";
 import { gracefulTerminationService } from "./GracefulTerminationService.js";
+
+const MessageTypeHeader = 'proto/type';
 
 export class NatsMessageBusDriver implements MessageBusDriver {
     private connection?: NatsConnection;
@@ -11,6 +13,7 @@ export class NatsMessageBusDriver implements MessageBusDriver {
         public readonly onReceiveMessage: ReceiveMessageCallback, 
         public readonly onReplyTo: ReplyToCallback, 
         private logger: Logger,
+        private protoBufRegistry: ProtoBufRegistry,
     ) {}
 
     async start(connectionString: string): Promise<void> {
@@ -86,11 +89,26 @@ export class NatsMessageBusDriver implements MessageBusDriver {
     }
     
     publish(msg: MessageEnvelope): void {
-        this.connection?.publish(msg.subject, this.codec.encode(msg.body), { headers: convertToMsgHdrs(msg.headers)});
+        let data: Uint8Array;
+        const codec = this.protoBufRegistry.find(msg.body.type);
+        if (codec) {
+            data = codec.encode(msg.body);
+            msg.headers[MessageTypeHeader] = msg.body.type;
+        } else {
+            data = this.codec.encode(msg.body);
+        }
+        this.connection?.publish(msg.subject, data, { headers: convertToMsgHdrs(msg.headers)});
     }
 
     private createMessageEnvelope(subject: string, msg: Msg): IncomingMessageEnvelope {
-        const data: any = this.codec.decode(msg.data);
+        const messageType = msg.headers?.get(MessageTypeHeader, Match.Exact);
+        let data: any;
+        if (messageType) {
+            const codec = this.protoBufRegistry.get(messageType);
+            data = codec.decode(msg.data);
+        } else {
+            data = this.codec.decode(msg.data);
+        }
         const onReplyTo = this.onReplyTo;
         return {
             subject: msg.subject,
