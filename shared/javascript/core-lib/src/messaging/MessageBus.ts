@@ -2,7 +2,7 @@ import { MessageHandler, MessageHandlerContext } from "./MessageHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
-import { randomUUID, sleep } from "../utils.js";
+import { randomUUID } from "../utils.js";
 import { PingOptions, PingResponse, PingService } from "./handlers/ping.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageBusDriver } from "./MessageBusDriver.js";
@@ -161,7 +161,7 @@ export class MessageBus implements IMessageBus {
                 for (const resp of matcher.getMatches()) {
                     yield resp;
                 }
-                await sleep(100);
+                await matcher.wait();
             }
         } finally {
             this.responseMatchers.release(matcher);

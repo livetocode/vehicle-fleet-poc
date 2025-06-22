@@ -1,6 +1,7 @@
 import { Stopwatch } from "../stopwatch.js";
 import { Response, RequestOptions, RequestTimeoutError } from "./Requests.js";
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
+import { sleep } from "../utils.js";
 
 export class RequestResponseContext {
     receivedResponseCount = 0;
@@ -55,5 +56,9 @@ export class ResponseMatcher {
         const result = this.receivedResponses;
         this.receivedResponses = [];
         return result;
+    }
+
+    wait(): Promise<void> {
+        return sleep(2);
     }
 }
