@@ -1,13 +1,13 @@
 import { ChaosEngineeringConfig, Logger, MessageBusFeatures, ProtoBufRegistry, ServiceIdentity } from "core-lib";
 import { MessageBus } from "core-lib";
 import { PrometheusMessageBusMetrics } from "./PrometheusMessageBusMetrics.js";
-import { NatsMessageBusDriver } from "./NatsMessageBusDriver.js";
+import { AzureServiceBusMessageBusDriver } from "./AzureServiceBusMessageBusDriver.js";
 
-export class NatsMessageBus extends MessageBus {
+export class AzureServiceBusMessageBus extends MessageBus {
 
     constructor(identity: ServiceIdentity, logger: Logger, chaosEngineering: ChaosEngineeringConfig) {
         const protoBufRegistry = new ProtoBufRegistry();
-        const driver = new NatsMessageBusDriver(
+        const driver = new AzureServiceBusMessageBusDriver(
             (msg) => this.messageDispatcher.dispatch(msg),
             (req, res) => this.envelopeReply(req, res),
             identity,
@@ -19,9 +19,8 @@ export class NatsMessageBus extends MessageBus {
 
     get features(): MessageBusFeatures {
         return {
-            supportsAbstractSubjects: true, // NATS allows multiple subscribers of a same subject to decide wether they will consume the messages as a queue or pub/sub
-            supportsTemporaryQueues: true, // NATS has temporary queues by default and when a subscriber disconnects, all messages get deleted.
+            supportsAbstractSubjects: false, // Azure does not allow to share the same name for a queue and a topic
+            supportsTemporaryQueues: false, // Azure requires the queue to be created in advance and won't delete it once the client has been disconnected.
         }
     }
-
 }

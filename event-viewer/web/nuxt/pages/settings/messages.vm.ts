@@ -1,10 +1,16 @@
-import { type Logger, type MessageBus, type MessageSubscription, type MessageHandlerInfo, type MessageRoute, normalizeSubject } from "core-lib";
+import { type Logger, type MessageBus, type MessageSubscription, type MessageHandlerInfo, type MessageRoute, normalizeSubject, type PathSegment } from "core-lib";
 import { makeRouteId } from "core-lib/dist/messaging/MessageRoutes";
 
 
-export type Subscription = MessageSubscription & {
+export type Subscription = {
     id: number;
+    formattedPath: string;
     services: string[];
+    type: string;
+    path: {
+        segments: PathSegment[];
+        vars: Record<string, string>;    
+    };
 }
 
 export type Handler = MessageHandlerInfo & {
@@ -42,22 +48,21 @@ export class MessagesViewModel {
             let nextHandlerId = 0;
             for await (const resp of this._messageBus.info({ timeout: 1000 })) {
                 for (const sub of resp.subscriptions) {
-                    if (!sub.subject.startsWith('inbox.')) {
-                        const subject = normalizeNumbers(sub.subject);
-                        const item = subscriptions.find(x => x.subject === subject && x.consumerGroupName === sub.consumerGroupName);
-                        if (item) {
-                            if (!item.services.includes(resp.identity.name)) {
-                                item.services.push(resp.identity.name)
-                            }
-                        } else {
-                            nextSubscriptionId += 1
-                            subscriptions.push({
-                                id: nextSubscriptionId,
-                                ...sub,
-                                subject,
-                                services: [resp.identity.name],
-                            });    
-                        }    
+                    const formattedPath = formatPath(sub.path);
+                    const item = subscriptions.find(x => x.formattedPath === formattedPath && x.type === sub.type);
+                    if (item) {
+                        if (!item.services.includes(resp.identity.name)) {
+                            item.services.push(resp.identity.name)
+                        }
+                    } else {
+                        nextSubscriptionId += 1
+                        subscriptions.push({
+                            id: nextSubscriptionId,
+                            path: sub.path,
+                            type: sub.type,
+                            formattedPath,
+                            services: [resp.identity.name],
+                        });    
                     }
                 }
                 for (const h of resp.handlers) {
@@ -83,20 +88,11 @@ export class MessagesViewModel {
                 }
             }
             subscriptions.sort((a, b) => {
-                const delta = a.subject.localeCompare(b.subject);
+                const delta = a.formattedPath.localeCompare(b.formattedPath);
                 if (delta !== 0) {
                     return delta;
                 }
-                if (a.consumerGroupName === undefined && b.consumerGroupName === undefined) {
-                    return 0;
-                }
-                if (a.consumerGroupName !== undefined && b.consumerGroupName === undefined) {
-                    return 1;
-                }
-                if (a.consumerGroupName === undefined && b.consumerGroupName !== undefined) {
-                    return -1;
-                }
-                return a.consumerGroupName?.localeCompare(b.consumerGroupName ?? '') ?? 0;
+                return a.type.localeCompare(b.type);
             });
             for (const sub of subscriptions) {
                 sub.services.sort();
@@ -121,10 +117,10 @@ export class MessagesViewModel {
         docs.push('');
         docs.push('## Subscriptions');
         docs.push('');
-        docs.push('|Subject|Consumer Group|Services|');
+        docs.push('|Path   |Type          |Services|');
         docs.push('|-------|--------------|--------|');
         for (const sub of this.subscriptions.value) {
-            docs.push(`|${escapeMarkdownChars(sub.subject)}|${sub.consumerGroupName ?? ''}|${sub.services.join(', ')}|`);
+            docs.push(`|${escapeMarkdownChars(sub.formattedPath)}|${sub.type ?? ''}|${sub.services.join(', ')}|`);
         }
         docs.push('');
         docs.push('## Message handlers');
@@ -221,4 +217,42 @@ async function copyToClipboard(textToCopy: string) {
             textArea.remove();
         }
     }
+}
+
+function formatPath(path: {
+    segments: PathSegment[];
+    vars: Record<string, string>;
+}): string {
+    if (path.segments.length === 3 && path.segments[0].type === 'string' && path.segments[0].value === 'inbox') {
+        if (path.segments[1].type === 'var' && path.segments[2].type === 'var') {
+            const name = path.segments[1].name;
+            const val = path.vars[name];
+            const idName = path.segments[2].name ?? 'id';
+            if (val) {
+                return `inbox/${val}/{${idName}}`;
+            }
+        }
+    }
+    const segments: string[] = [];
+    for (const segment of path.segments) {
+        if (segment.type === 'string') {
+            segments.push(segment.value);
+        } else if (segment.type === 'var') {
+            const val = path.vars[segment.name];
+            if (val && segment.isRequired) {
+                if (parseInt(val).toString() === val) {
+                    segments.push('{int}');
+                } else {
+                    segments.push(val);
+                }
+            } else if (val && segment.defaultValue) {
+                segments.push(`{${segment.name}:${segment.defaultValue}}`);
+            } else {
+                segments.push(`{${segment.name}}`);
+            }
+        } else if (segment.type === 'rest') {
+            segments.push('...');
+        }
+    }
+    return segments.join('/');
 }

@@ -4,7 +4,7 @@ import { MoveCommandHandler } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
-import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity, MessageTrackingCollection } from 'core-lib';
+import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity, MessageTrackingCollection, commands, requests, services } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
@@ -18,6 +18,7 @@ import { MoveCommandAccumulator, PersistedMoveCommand } from './handlers/MoveCom
 import { FlushDataHandler, FlushRequestHandler } from './handlers/FlushDataHandler.js';
 import { AssignedMoveCommandHandler } from './handlers/AssignedMoveCommandHandler.js';
 import { PrepareCollectorHandler } from './handlers/PrepareCollectorHandler.js';
+import { DispatchFlushDataHandler, DispatchFlushRequestHandler } from './handlers/DispatchFlushDataHandler.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -117,7 +118,7 @@ async function main() {
     const aggregateStore = createAggregateStore(config.collector, logger, repo);
     const dataPartitionStrategy = createDataPartitionStrategy(config.partitioning.dataPartition, collectorIndex);
 
-    const messageBus = await createMessageBus(config.hub, identity, logger);
+    const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);
     
     const accumulator = new MoveCommandAccumulator(
         config,
@@ -150,13 +151,24 @@ async function main() {
     const prepareHandler = new PrepareCollectorHandler(logger, trackingCollection, accumulator);
     const flushDataHandler = new FlushDataHandler(logger, accumulator);
     const flushRequestHandler = new FlushRequestHandler(logger, accumulator);
+    const dispatchFlushDataHandler = new DispatchFlushDataHandler(logger, messageBus, config);
+    const dispatchFlushRequestHandler = new DispatchFlushRequestHandler(logger, messageBus, config);
     const clearVehiclesDataHandler = new ClearVehiclesDataHandler(logger, repo);
 
-    messageBus.registerHandlers(moveCommandHandler, assignedMoveCommandHandler, prepareHandler, flushDataHandler, flushRequestHandler, clearVehiclesDataHandler);
+    messageBus.registerHandlers(
+        moveCommandHandler, 
+        assignedMoveCommandHandler, 
+        prepareHandler, 
+        flushDataHandler, 
+        flushRequestHandler, 
+        dispatchFlushDataHandler,
+        dispatchFlushRequestHandler,
+        clearVehiclesDataHandler,
+    );
 
-    messageBus.subscribe(`commands.move`, 'collectors');
-    messageBus.subscribe(`requests.vehicles.clear`, 'collectors');
-    messageBus.subscribe(`services.collectors.assigned.${collectorIndex}.>`, 'collectors');
+    messageBus.subscribe({ type: 'queue', path: commands.move.subscribe({}) });
+    messageBus.subscribe({ type: 'queue', path: requests.vehicles.clear.subscribe({}) });
+    messageBus.subscribe({ type: 'queue', path: services.collectors.assigned.subscribe({ index: collectorIndex.toString() }) });
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.collector.httpPort, logger, identity);

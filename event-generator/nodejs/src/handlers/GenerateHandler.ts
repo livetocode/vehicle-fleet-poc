@@ -1,4 +1,4 @@
-import { ClearVehiclesDataRequest, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse, PrepareRequest } from "core-lib";
+import { ClearVehiclesDataRequest, Config, FlushRequest, GenerateResponse, RequestHandler, Logger, IMessageBus, IncomingMessageEnvelope, Request, RequestOptionsPair, VehicleGenerationStarted, GenerateRequest, Stopwatch, RequestCancelledError, RequestTimeoutError, isResponseSuccess, VehicleGenerationStopped, GeneratePartitionRequest, isClearVehiclesDataResponse, PrepareRequest, services, events, requests, DispatchFlushRequest, commands, DispatchFlushCommand } from "core-lib";
 
 
 export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateResponse> {
@@ -26,8 +26,9 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
         const startEvent: VehicleGenerationStarted = {
             type: 'vehicle-generation-started',
             timestamp: new Date().toISOString(),
-        }
-        this.messageBus.publish(`events.vehicles.generation.started`, startEvent);
+        };
+        const startedPath = events.vehicles.byTypeAndSubType.publish({ type: 'generation', subType: 'started'});
+        await this.messageBus.publish(startedPath, startEvent);
 
         // prepare collectors
         const prepareReq: PrepareRequest = { type: 'prepare-request' };
@@ -36,7 +37,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             prepareRequests.push([
                 prepareReq, 
                 {
-                    subject: `services.collectors.assigned.${i}.requests.prepare`,
+                    path: services.collectors.assigned.publish({ index: i.toString(), rest: 'requests/prepare' }),
                     limit: 1,
                     timeout: 30000,
                 },
@@ -62,7 +63,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             type: 'clear-vehicles-data-request', 
         };
         const clearResponse = await this.messageBus.request(clearRequest, { 
-            subject: `requests.vehicles.clear`,
+            path: requests.vehicles.clear.publish({}),
             parentId: req.body.id,
             limit: 1,
         });
@@ -99,7 +100,7 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
                 startDate,
                 request: event,
             }, {
-                subject: `services.generators.assigned.${i}.partitions`,
+                path: services.generators.assigned.publish({ index: i.toString(), rest: 'partitions' }),
                 parentId: req.body.id,
                 limit: 1,
             }]);
@@ -113,33 +114,24 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
         
         // flush collectors
         if (req.body.body.sendFlush) {
-            const flushReq: FlushRequest = { type: 'flush-request' };
-            const flushRequests: RequestOptionsPair<FlushRequest>[] = [];
-            for (let i = 0; i < this.config.collector.instances; i++) {
-                flushRequests.push([
-                    flushReq, 
-                    {
-                        //subject: `services.collectors.assigned.${i}.requests.flush`,
-                        subject: `services.collectors.assigned.${i}.commands.flush`,
+            try {
+                this.logger.info(`Flushing collectors`);
+                if (req.body.body.useBackpressure) {
+                    const flushReq: DispatchFlushRequest = { type: 'dispatch-flush-request' };
+                    const resp = await this.messageBus.request(flushReq, {
+                        path: commands.move.publish({}),
                         limit: 1,
                         timeout: 30000,
-                    },
-                ]);
-            }
-            try {
-                this.logger.info(`Flushing ${flushRequests.length} collectors`);
-                if (req.body.body.useBackpressure) {
-                    for await (const resp of this.messageBus.requestBatch(flushRequests)) {
-                        if (isResponseSuccess(resp)) {
-                            this.logger.debug('Received flush response', resp.body);
-                        }
-                    }
+
+                    });
+                    if (isResponseSuccess(resp)) {
+                        this.logger.debug('Received flush response', resp.body);
+                    }                    
                 } else {
                     // If we're not applying back pressure, we can't wait for the flush requests to complete since they might timeout.
                     // So, we're using a basic fire and forget.
-                    for (const req of flushRequests) {
-                        this.messageBus.publish(req[1].subject, { type: 'flush' }, req[1].headers);
-                    }
+                    const flushCmd: DispatchFlushCommand = { type: 'dispatch-flush' };
+                    await this.messageBus.publish(commands.move.publish({}), flushCmd);
                 }
             } catch(err: any) {
                 if (err instanceof RequestTimeoutError) {
@@ -161,7 +153,8 @@ export class GenerateHandler extends RequestHandler<GenerateRequest, GenerateRes
             elapsedTimeInMS: watch.elapsedTimeInMS(),
         }
         this.logger.debug('sending stop event', stopEvent);
-        this.messageBus.publish(`events.vehicles.generation.stopped`, stopEvent);
+        const stoppedPath = events.vehicles.byTypeAndSubType.publish({ type: 'generation', subType: 'stopped'});
+        await this.messageBus.publish(stoppedPath, stopEvent);
 
         // send response stats
         return {

@@ -2,7 +2,7 @@ import { TypedMessage } from "./TypedMessage";
 
 export type MessageHeaders = Record<string, string>;
 
-export type ReplyMessageCallback = (msg: BaseMessageEnvelope) => void;
+export type ReplyMessageCallback = (msg: BaseMessageEnvelope) => Promise<void>;
 
 export type BaseMessageEnvelope<T extends TypedMessage = TypedMessage> = {
     headers: MessageHeaders;

@@ -1,4 +1,4 @@
-import { MessageHandler, Logger, EnrichedMoveCommand, IncomingMessageEnvelope, MessageTracking, BackpressureConfig, IMessageBus, MessageTrackingAck, MessageTrackingCollection, TrackingState } from 'core-lib';
+import { MessageHandler, Logger, EnrichedMoveCommand, IncomingMessageEnvelope, MessageTracking, BackpressureConfig, IMessageBus, MessageTrackingAck, MessageTrackingCollection, TrackingState, services } from 'core-lib';
 import { EventStore, StoredEvent } from "../core/persistence/EventStore.js";
 import { MoveCommandAccumulator, PersistedMoveCommand } from "./MoveCommandAccumulator.js";
 
@@ -63,7 +63,7 @@ export class AssignedMoveCommandHandler extends MessageHandler<EnrichedMoveComma
         await this.eventStore.write(storedEvent);
         await this.accumulator.write(storedEvent);
         if (msg.body.command.tracking) {
-            this.checkTracking(msg.body.command.tracking);
+            await this.checkTracking(msg.body.command.tracking);
         }
     }
 
@@ -82,30 +82,33 @@ export class AssignedMoveCommandHandler extends MessageHandler<EnrichedMoveComma
     private onTimer() {
         for (const state of this.trackingCollection.list()) {
             if (state.dirty) {
-                this.sendTracking(state, 'timer');
+                this.sendTracking(state, 'timer').catch(err => {
+                    this.logger.error(err);
+                });
             }
         }
     }
 
-    private checkTracking(tracking: MessageTracking) {
+    private async checkTracking(tracking: MessageTracking): Promise<void> {
         if (!this.backpressure.enabled) {
             return;
         }
         const state = this.trackingCollection.add(tracking);
         const thresholdReached = state.counter >= this.backpressure.notificationThreshold;
         if (thresholdReached) {
-            this.sendTracking(state, 'threshold');
+            await this.sendTracking(state, 'threshold');
         }
     }
 
-    private sendTracking(state: TrackingState, trigger: 'timer' | 'threshold') {
+    private async sendTracking(state: TrackingState, trigger: 'timer' | 'threshold') {
         this.logger.debug(`Send tracking after ${state.counter} messages. Trigger = ${trigger} / Seq = ${state.tracking.sequence}`);
         const ack: MessageTrackingAck = {
             type: 'message-tracking-ack',
             messageType: 'move',
             tracking: state.tracking,
         }
-        this.messageBus.publish(`services.generators.tracking.${state.tracking.emitter.instance}`, ack);
+        const path = services.generators.tracking.publish({ index: `${state.tracking.emitter.instance}`});
+        await this.messageBus.publish(path, ack);
         state.dirty = false;
         state.counter = 0;
     }

@@ -4,6 +4,7 @@ import { IncomingMessageEnvelope } from "../MessageEnvelopes.js";
 import { isResponseSuccess, Request, RequestTimeoutError } from "../Requests.js";
 import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
+import { MessagePath } from "../MessagePath.js";
 
 export type PingOptions = {
     serviceName?: string;
@@ -53,11 +54,16 @@ export class PingRequestHandler extends RequestHandler<PingRequest, PingResponse
 
 export class PingService {
     private handler: PingRequestHandler;
+    private globalPath: MessagePath;
+    private specificPath: MessagePath;
 
     constructor(private messageBus: IMessageBus, private logger: Logger, identity: ServiceIdentity) {
         this.handler = new PingRequestHandler(logger, identity);
         this.messageBus.registerHandlers(this.handler);
-        this.messageBus.subscribe('messaging.control.*');
+        this.globalPath = MessagePath.fromPath('messaging/control');
+        this.specificPath = MessagePath.fromPath('messaging/control/{name(required)}');
+        this.messageBus.subscribe({ type: 'topic', path: this.globalPath.subscribe({}) });
+        this.messageBus.subscribe({ type: 'topic', path: this.specificPath.subscribe({ name: identity.name })});
 }
 
     async *ping(options?: PingOptions): AsyncGenerator<PingResponse> {
@@ -70,7 +76,7 @@ export class PingService {
             this.logger.debug('Sending ping request...');
 
             for await (const resp of this.messageBus.requestMany(req, {
-                subject: serviceName ? `messaging.control.ping.${serviceName}` : 'messaging.control.ping',
+                path: serviceName ? this.specificPath.publish({ name: serviceName }) : this.globalPath.publish({}),
                 timeout: options?.timeout ?? 3*1000,
                 limit: 1000,
             })) {

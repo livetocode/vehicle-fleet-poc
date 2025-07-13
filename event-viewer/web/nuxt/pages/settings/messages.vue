@@ -25,8 +25,8 @@ const searchHandlers = ref('');
 const searchRoutes = ref('');
 
 const subscriptionsHeaders = [
-  { title: 'Subject', align: 'start', key: 'subject' },
-  { title: 'Consumer Group', align: 'start', key: 'consumerGroupName' },
+  { title: 'Path', align: 'start', key: 'formattedPath' },
+  { title: 'Type', align: 'start', key: 'type' },
   { title: 'Services', align: 'start', key: 'services' },
 ];
 

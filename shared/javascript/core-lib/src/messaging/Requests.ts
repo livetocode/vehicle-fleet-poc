@@ -1,4 +1,5 @@
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
+import { PublicationMessagePath } from "./MessagePath.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
 import { TypedMessage } from "./TypedMessage.js";
 
@@ -66,7 +67,7 @@ export type Response = ResponseSuccess | ResponseError;
 export type ResponseValidator = (resp: Response) => boolean;
 
 export type RequestOptions = {
-    subject: string;
+    path: PublicationMessagePath;
     id?: string;
     parentId?: string;
     limit?: number;

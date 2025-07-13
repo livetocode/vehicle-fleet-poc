@@ -8,6 +8,9 @@ hub:
     websockets:
       servers:
       - ws://localhost:4243
+  # type: azureServiceBus
+  # enableProtoBuf: true
+  # connectionString: Endpoint=sb://foobar.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=redacted
 
 partitioning:
   timePartition:
@@ -27,6 +30,11 @@ backpressure:
   notificationPeriodInMS: 100
   waitTimeoutInMS: 10000
   waitThreshold: 1000
+
+chaosEngineering:
+  enabled: false
+  messageReadDelayInMS: 100
+  messageWriteDelayInMS: 0
 
 generator:
   logging:

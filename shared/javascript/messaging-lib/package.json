@@ -18,6 +18,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@azure/service-bus": "^7.9.5",
     "core-lib": "file:../../../shared/javascript/core-lib",
     "express": "^5.1.0",
     "express-prom-bundle": "^8.0.0",

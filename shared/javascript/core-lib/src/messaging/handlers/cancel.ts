@@ -7,6 +7,7 @@ import { IncomingMessageEnvelope, MessageEnvelope } from "../MessageEnvelopes.js
 import { RequestHandler } from "../RequestHandler.js";
 import { Request, Response, CancelRequest, CancelResponse, RequestOptions, CancelRequestByType, CancelRequestById, isRequest, RequestOptionsPair, isCancelResponse, CancelRequestByParentId, RequestTimeoutError } from "../Requests.js";
 import { ServiceIdentity } from "../ServiceIdentity.js";
+import { MessagePath, PublicationMessagePath } from "../MessagePath.js";
 
 export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelResponse> {
     
@@ -15,6 +16,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
         private logger: Logger,
         public identity: ServiceIdentity,
         private activeHandlers: Map<string, MessageHandlerContext>,
+        private globalPath: PublicationMessagePath,
     ) {
         super();
     }
@@ -134,7 +136,7 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
                 depth: depth + 1,
             } as CancelRequestByParentId, 
             {
-                subject: 'messaging.control.cancel',
+                path: this.globalPath,
                 parentId: req.body.id,
                 timeout: childTimeout,
                 limit: 1000,
@@ -184,6 +186,8 @@ export class CancelRequestHandler extends RequestHandler<CancelRequest, CancelRe
 
 export class CancelRequestService {
     private handler: CancelRequestHandler;
+    private globalPath: MessagePath;
+    private specificPath: MessagePath;
 
     constructor(
         private messageBus: IMessageBus,
@@ -191,25 +195,28 @@ export class CancelRequestService {
         identity: ServiceIdentity,
         activeHandlers: Map<string, MessageHandlerContext>,
     ) {
-        this.handler = new CancelRequestHandler(messageBus, logger, identity, activeHandlers);
+        this.globalPath = MessagePath.fromPath('messaging/control');
+        this.specificPath = MessagePath.fromPath('messaging/control/{name(required)}');
+        this.handler = new CancelRequestHandler(messageBus, logger, identity, activeHandlers, this.globalPath.subscribe({}));
         this.messageBus.registerHandlers(this.handler);
-        this.messageBus.subscribe('messaging.control.*');
-        this.messageBus.subscribe(`messaging.control.*.${identity.name}`);
+        this.messageBus.subscribe({ type: 'topic', path: this.globalPath.subscribe({}) });
+        this.messageBus.subscribe({ type: 'topic', path: this.specificPath.subscribe({ name: identity.name })});
     }
 
     cancel(request: CancelRequestById, options: Partial<RequestOptions>): Promise<MessageEnvelope<Response>> {        
         const opt: RequestOptions = {
             ...options,
-            subject: options.subject ?? 'messaging.control.cancel',
+            path: options.path ?? this.globalPath.publish({}),
         }
         return this.messageBus.request(request, opt);
     }
 
     async *cancelMany(request: CancelRequestByType, options: Partial<RequestOptions>): AsyncGenerator<MessageEnvelope<Response>> {
-        const defaultSubject = request.serviceName ? `messaging.control.cancel.${request.serviceName}` : 'messaging.control.cancel';
+        const defaultPath = request.serviceName ? this.specificPath.publish({ name: request.serviceName }) : this.globalPath.publish({});
+
         const opt: RequestOptions = {
             ...options,
-            subject: options.subject ?? defaultSubject,
+            path: options.path ?? defaultPath,
         }
         for await (const resp of this.messageBus.requestBatch([[request, opt]])) {
             yield resp;

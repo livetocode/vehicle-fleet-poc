@@ -1,21 +1,20 @@
-export type MessageSubscription = {
-    subject: string;
-    consumerGroupName?: string;
-}
+// export type MessageSubscription = {
+//     subject: string;
+//     consumerGroupName?: string;
+// }
+
+import { MessageSubscription } from "./MessageSubscription";
 
 export class MessageSubscriptions {
     private subscriptions = new Map<string, MessageSubscription>();
 
     add(subscription: MessageSubscription): boolean {
-        if (this.subscriptions.has(subscription.subject)) {
+        const key = makeKey(subscription)
+        if (this.subscriptions.has(key)) {
             return false;
         }
-        this.subscriptions.set(subscription.subject, subscription);
+        this.subscriptions.set(key, subscription);
         return true;
-    }
-
-    find(subject: string): MessageSubscription | undefined {
-        return this.subscriptions.get(subject);
     }
 
     entries() {
@@ -25,4 +24,9 @@ export class MessageSubscriptions {
     get size() {
         return this.subscriptions.size;
     }
+}
+
+function makeKey(subscription: MessageSubscription) {
+    const path = subscription.path.toString();
+    return `${subscription.type}:${path}`;
 }

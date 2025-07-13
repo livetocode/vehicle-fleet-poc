@@ -1,5 +1,5 @@
 import { Counter } from "messaging-lib";
-import { Config, Logger, VehicleQueryResult, VehicleQueryPartitionRequest, VehicleQueryPartitionResponse, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, asyncChunks, MessageOptionsPair } from 'core-lib';
+import { Config, Logger, VehicleQueryResult, VehicleQueryPartitionRequest, VehicleQueryPartitionResponse, IMessageBus, IncomingMessageEnvelope, RequestHandler, Request, asyncChunks, MessageOptionsPair, MessagePath } from 'core-lib';
 import * as turf from '@turf/turf';
 import { DataFrameRepository } from "data-lib";
 import { VehicleQueryContext } from "./VehicleQueryContext.js";
@@ -75,7 +75,7 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
             const messageBatch: MessageOptionsPair[] = [];
             let done = false;
             for (const res of chunk) {
-                messageBatch.push([res, { subject: ctx.event.replyTo }]);
+                messageBatch.push([res, { path: MessagePath.fromReplyTo(ctx.event.replyTo) }]);
                 ctx.selectedRecordCount += 1;
                 ctx.distinctVehicles.add(res.vehicleId);
                 if (ctx.checkIfLimitWasReached() || ctx.checkTimeout()) {

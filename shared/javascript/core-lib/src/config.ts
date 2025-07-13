@@ -20,13 +20,19 @@ export type NatsHubConfig = {
     }
 }
 
+export type AzureServiceBusHubConfig = {
+    type: 'azureServiceBus';
+    enableProtoBuf: boolean;
+    connectionString: string;
+}
+
 export type RabbitHubConfig = {
     type: 'rabbit';
     enableProtoBuf: boolean;
     // todo: define other properties
 }
 
-export type HubConfig = NatsHubConfig | RabbitHubConfig;
+export type HubConfig = NatsHubConfig | AzureServiceBusHubConfig | RabbitHubConfig;
 
 export type NoopEventStoreConfig = {
     type: 'noop';
@@ -87,6 +93,12 @@ export type BackpressureConfig = {
     notificationPeriodInMS: number;
     waitTimeoutInMS: number;
     waitThreshold: number;
+}
+
+export type ChaosEngineeringConfig = {
+    enabled: boolean;
+    messageReadDelayInMS: number;
+    messageWriteDelayInMS: number;
 }
 
 export type MapConfig = {
@@ -176,6 +188,7 @@ export type Config = {
     hub: HubConfig;
     partitioning: PartitioningConfig;
     backpressure: BackpressureConfig;
+    chaosEngineering: ChaosEngineeringConfig;
     generator: GeneratorConfig;
     collector: CollectorConfig;  
     finder: FinderConfig;

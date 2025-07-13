@@ -8,11 +8,14 @@ import { Response, isRequest, isResponse } from "./Requests.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageRoutes } from "./MessageRoutes.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
+import { sleep } from "../utils.js";
+import { ChaosEngineeringConfig } from "../config.js";
 
 export class MessageDispatcher {
     constructor (
         private logger: Logger,
         protected identity: ServiceIdentity,
+        private chaosEngineering: ChaosEngineeringConfig,
         private metrics: MessageBusMetrics,
         private messageRoutes: MessageRoutes,
         private handlers: MessageHandlerRegistry,
@@ -24,6 +27,9 @@ export class MessageDispatcher {
         if (isResponse(msg)) {
             this.processResponse(msg);
             return;
+        }
+        if (this.chaosEngineering.enabled) {
+            await sleep(this.chaosEngineering.messageReadDelayInMS);
         }
         const msgRequest = isRequest(msg) ? msg : undefined;
         const bodyType = msgRequest ? msgRequest.body.body.type : msg.body.type;

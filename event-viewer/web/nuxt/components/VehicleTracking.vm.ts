@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type GenerateRequest, RequestTimeoutError, isCancelResponse, isGenerateResponse, type VehicleGenerationStopped } from "core-lib";
+import { LambdaMessageHandler, type MessageHandler, type MessageBus, formatBytes, formatCounts, roundDecimals, sleep, type AggregatePeriodCreated, type Config, type Logger, type VehicleGenerationStarted, type GenerateRequest, RequestTimeoutError, isCancelResponse, isGenerateResponse, type VehicleGenerationStopped, requests } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -198,7 +198,7 @@ export class VehicleTrackingViewModel {
                 startDate: this.config.generator.startDate,        
             }
             this.logger.info('Starting generation', request);
-            const result = await this._messageBus.request(request, { subject: 'requests.vehicles.generate' });
+            const result = await this._messageBus.request(request, { path: requests.vehicles.generate.publish({}) });
             if (result.body.type === 'response-success') {
                 const resp = result.body.body;
                 if (isGenerateResponse(resp)) {

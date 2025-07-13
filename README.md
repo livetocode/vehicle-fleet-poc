@@ -20,31 +20,32 @@ Execute the `estimate.py` script to compute the estimates in the [event-estimato
 
 ## Messages
 
-Note that when a consumer uses a "consumer group" name, it means that the message will be handled only once by a member of the group.
-This is a regular work queue with competing consumers, which is different from the default pub/sub case.
-
 Note that the following sections are generated automatically from the http://localhost:3000/settings/messages page, section "Documentation",
 using the "Copy as Markdown" button, at the bottom of the page.
 
 ### Subscriptions
 
-|Subject|Consumer Group|Services|
+|Path   |Type          |Services|
 |-------|--------------|--------|
-|commands.move||viewer|
-|commands.move|collectors|collector|
-|events.vehicles.&#42;.&#42;||viewer|
-|messaging.control.&#42;||collector, finder, generator, viewer|
-|messaging.control.&#42;.collector||collector|
-|messaging.control.&#42;.finder||finder|
-|messaging.control.&#42;.generator||generator|
-|messaging.control.&#42;.viewer||viewer|
-|requests.vehicles.clear|collectors|collector|
-|requests.vehicles.generate|generators|generator|
-|requests.vehicles.query|finders|finder|
-|services.collectors.assigned.{int}.&gt;|collectors|collector|
-|services.finders.any.&gt;|finders|finder|
-|services.generators.assigned.{int}.&gt;|generators|generator|
-|services.generators.tracking.{int}||generator|
+|commands/move|queue|collector|
+|commands/move|topic|viewer|
+|events/vehicles/{type}/{subType}|topic|viewer|
+|inbox/collector/{id}|queue|collector|
+|inbox/finder/{id}|queue|finder|
+|inbox/generator/{id}|queue|generator|
+|inbox/viewer/{id}|queue|viewer|
+|messaging/control|topic|collector, finder, generator, viewer|
+|messaging/control/collector|topic|collector|
+|messaging/control/finder|topic|finder|
+|messaging/control/generator|topic|generator|
+|messaging/control/viewer|topic|viewer|
+|requests/vehicles/clear|queue|collector|
+|requests/vehicles/generate|queue|generator|
+|requests/vehicles/query|queue|finder|
+|services/collectors/assigned/{int}/...|queue|collector|
+|services/finders/any/...|queue|finder|
+|services/generators/assigned/{int}/...|queue|generator|
+|services/generators/tracking/{int}|queue|generator|
 
 ### Message handlers
 
@@ -53,7 +54,10 @@ using the "Copy as Markdown" button, at the bottom of the page.
 |AssignedMoveCommandHandler|enriched-move|collector|Dedicated collector that will accumulate events for its assigned partition key.|
 |CancelRequestHandler|cancel-request-id, cancel-request-parentId, cancel-request-type|collector, finder, generator, viewer|Finds and cancels active message handlers.|
 |ClearVehiclesDataHandler|clear-vehicles-data-request|collector|Deletes all vehicle positions before running a new simulation.|
-|FlushDataHandler|flush-request|collector|Forces the collector to flush its cached data.|
+|DispatchFlushDataHandler|dispatch-flush|collector|Dispatches a flush command to the assigned collectors. (fire and forget command)|
+|DispatchFlushRequestHandler|dispatch-flush-request|collector|Dispatches a flush command to the assigned collectors (request/reply)|
+|FlushDataHandler|flush|collector|Forces the collector to flush its cached data. (fire and forget command)|
+|FlushRequestHandler|flush-request|collector|Forces the collector to flush its cached data. (sync request/reply)|
 |GenerateHandler|generate-request|generator|Coordinates the generation of the vehicle positions by partitioning the work into sub-generators|
 |GeneratePartitionHandler|generate-partition-request|generator|Generates the vehicle positions for a subset of the vehicles based on the configured partition key.|
 |InfoRequestHandler|info-request|collector, finder, generator, viewer|Returns information about the message types and the subscriptions|
@@ -67,42 +71,42 @@ using the "Copy as Markdown" button, at the bottom of the page.
 |VehicleTrackingViewModel|aggregate-period-created|viewer|Receives a notification for each aggregate period created|
 |VehicleTrackingViewModel|vehicle-generation-started|viewer|Receives a notification when a new generation starts|
 |VehicleTrackingViewModel|vehicle-generation-stopped|viewer|Receives a notification when a active generation stops|
-|VehicleViewerViewModel|vehicle-generation-started|viewer|Receives a notification when a new generation starts|
-|VehicleViewerViewModel|move|viewer|Receives the vehicle positions|
 |VehicleViewerViewModel|vehicle-query-result|viewer|Receives a vehicle position matching the search criteria|
 |VehicleViewerViewModel|vehicle-query-started|viewer|Receives a notification when a new search starts|
+|VehicleViewerViewModel|vehicle-generation-started|viewer|Receives a notification when a new generation starts|
+|VehicleViewerViewModel|move, enriched-move|viewer|Receives the vehicle positions|
 
 ### Message routes
 
 |Sender|Message Type|Subject|Receiver|Subscription|
 |------|------------|-------|--------|------------|
-|collector|aggregate-period-created|events.vehicles.aggregate-period.created|viewer|events.vehicles.&#42;.&#42;|
+|collector|flush-response|inbox.collector|collector|inbox.collector|
 |collector|clear-vehicles-data-response|inbox.generator|generator|inbox.generator|
-|collector|flush-response|inbox.generator|generator|inbox.generator|
+|collector|dispatch-flush-response|inbox.generator|generator|inbox.generator|
 |collector|prepare-response|inbox.generator|generator|inbox.generator|
+|collector|info-response|inbox.viewer|viewer|inbox.viewer|
+|collector|flush-request|services.collectors.assigned.{int}.commands.flush|collector|services.collectors.assigned.{int}.&gt;|
 |collector|enriched-move|services.collectors.assigned.{int}.commands.move|collector|services.collectors.assigned.{int}.&gt;|
 |collector|message-tracking-ack|services.generators.tracking.{int}|generator|services.generators.tracking.{int}|
 |finder|vehicle-query-partition-response|inbox.finder|finder|inbox.finder|
-|finder|vehicle-query-response|inbox.viewer|viewer|inbox.viewer|
-|finder|vehicle-query-result|inbox.viewer|viewer|inbox.viewer|
-|finder|vehicle-query-started|inbox.viewer|viewer|inbox.viewer|
+|finder|info-response|inbox.viewer|viewer|inbox.viewer|
 |finder|vehicle-query-partition-request|services.finders.any.partitions|finder|services.finders.any.&gt;|
-|generator|move|commands.move|collector|commands.move|
-|generator|move|commands.move|viewer|commands.move|
-|generator|vehicle-generation-started|events.vehicles.generation.started|viewer|events.vehicles.&#42;.&#42;|
-|generator|vehicle-generation-stopped|events.vehicles.generation.stopped|viewer|events.vehicles.&#42;.&#42;|
+|generator|dispatch-flush-request|commands.move|collector|commands.move|
 |generator|generate-partition-response|inbox.generator|generator|inbox.generator|
-|generator|cancel-response|inbox.viewer|viewer|inbox.viewer|
-|generator|generate-response|inbox.viewer|viewer|inbox.viewer|
+|generator|info-response|inbox.viewer|viewer|inbox.viewer|
 |generator|clear-vehicles-data-request|requests.vehicles.clear|collector|requests.vehicles.clear|
-|generator|flush-request|services.collectors.assigned.{int}.commands.flush|collector|services.collectors.assigned.{int}.&gt;|
 |generator|prepare-request|services.collectors.assigned.{int}.requests.prepare|collector|services.collectors.assigned.{int}.&gt;|
 |generator|generate-partition-request|services.generators.assigned.{int}.partitions|generator|services.generators.assigned.{int}.&gt;|
-|viewer|cancel-request-type|messaging.control.cancel.generator|generator|messaging.control.&#42;.generator|
-|viewer|info-request|messaging.control.info|collector|messaging.control.&#42;|
-|viewer|info-request|messaging.control.info|finder|messaging.control.&#42;|
-|viewer|info-request|messaging.control.info|generator|messaging.control.&#42;|
-|viewer|info-request|messaging.control.info|viewer|messaging.control.&#42;|
+|unknown|move|commands.move|collector|commands.move|
+|viewer|info-response|inbox.viewer|viewer|inbox.viewer|
+|viewer|info-request|messaging.control|collector|messaging.control|
+|viewer|info-request|messaging.control|finder|messaging.control|
+|viewer|info-request|messaging.control|generator|messaging.control|
+|viewer|info-request|messaging.control|viewer|messaging.control|
+|viewer|ping|messaging.control|collector|messaging.control|
+|viewer|ping|messaging.control|finder|messaging.control|
+|viewer|ping|messaging.control|generator|messaging.control|
+|viewer|cancel-request-type|messaging.control.generator|generator|messaging.control.generator|
 |viewer|generate-request|requests.vehicles.generate|generator|requests.vehicles.generate|
 |viewer|vehicle-query-request|requests.vehicles.query|finder|requests.vehicles.query|
 

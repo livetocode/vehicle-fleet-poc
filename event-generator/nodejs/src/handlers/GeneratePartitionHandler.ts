@@ -1,4 +1,4 @@
-import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection, MessageOptionsPair, chunks } from "core-lib";
+import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection, MessageOptionsPair, chunks, commands } from "core-lib";
 import { addOffsetToCoordinates, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
@@ -29,6 +29,9 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         const refreshIntervalInSecs = event.request.refreshIntervalInSecs;
         const realtime = event.request.realtime;
         const startDate = event.startDate;
+        const commandMovePath = commands.move.publish({});
+        const commandMove2Path = commands.move2.publish({});
+        const duplicateMove = this.messageBus.features.supportsAbstractSubjects === false;
         let vehiclePredicate: VehiclePredicate | undefined;
         if (this.config.generator.instances > 1) {
             vehiclePredicate = (idx, id) => idx % this.config.generator.instances === this.generatorIndex;
@@ -63,7 +66,10 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
     
         const anchor: GpsCoordinates = this.config.generator.map.topLeftOrigin;
         const refreshIntervalInMS = refreshIntervalInSecs * 1000;
-        const chunkSize = Math.max(req.body.body.request.messageChunkSize ?? this.config.generator.messageChunkSize, 1);
+        let chunkSize = Math.max(req.body.body.request.messageChunkSize ?? this.config.generator.messageChunkSize, 1);
+        if (duplicateMove) {
+            chunkSize = Math.max(1, chunkSize / 2);
+        }
         let chunksPerIteration = Math.trunc(vehicleCount / chunkSize);
         if (vehicleCount % chunkSize !== 0) {
             chunksPerIteration += 1;
@@ -102,7 +108,14 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                             emitter: this.messageBus.identity,
                         }
                     }
-                    messageBatch.push([msg, { subject: `commands.move` }]);
+                    messageBatch.push([msg, { path: commandMovePath }]);
+                    if (duplicateMove) {
+                        // When the MessageBus does not allow to subscribe both as a queue and as a topic for the same subject,
+                        // we have to split the usage in two distinct subjects.
+                        // This one will be used by the viewer to map the position of the vehicles on the display.
+                        messageBatch.push([msg, { path: commandMove2Path }]);
+                    }
+
                     eventCount++;
                     if (eventCount >= event.maxNumberOfEvents) {
                         done = true;
@@ -119,7 +132,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                 if (realtime) {
                     await sleep(chunkWaitDelayInMS);
                 } else if (useBackpressure) {
-                    await this.applyBackpressure(event, eventCount);
+                    await this.applyBackpressure(req, eventCount);
                 } else {
                     await sleep(event.request.pauseDelayInMSecs ?? 1);
                 }
@@ -138,6 +151,10 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                 }
             }
         }
+        if (useBackpressure) {
+            this.logger.debug('Waiting for final backpressure...');
+            await this.applyBackpressure(req, eventCount, true);
+        }
         watch.stop();
         this.logger.info(`Done generating ${eventCount} out of ${event.request.maxNumberOfEvents} events in ${watch.elapsedTimeAsString()}`);
         return {
@@ -147,20 +164,32 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         };
     }
 
-    private async applyBackpressure(event: GeneratePartitionRequest, eventCount: number) {
-        const threshold = this.config.collector.instances > 1 ? 
+    private async applyBackpressure(req: IncomingMessageEnvelope<Request<GeneratePartitionRequest>>, eventCount: number, isFinal?: boolean) {
+        let threshold = this.config.collector.instances > 1 ? 
                             this.config.backpressure.waitThreshold * this.config.collector.instances * 0.6 :
                             this.config.backpressure.waitThreshold;
+        if (isFinal === true) {
+            threshold = 0;
+        }
         const waitWatch = Stopwatch.startNew();
+        const timeoutWatch = Stopwatch.startNew();
         let iterations = 0;
         while (true) {
-            const state = this.messageTrackingCollection.find(this.messageBus.identity);
-            if (waitWatch.elapsedTimeInMS() >= this.config.backpressure.waitTimeoutInMS) {
-                this.logger.debug(`back pressure timed out after ${waitWatch.elapsedTimeAsString()}`, 'seq=', state?.tracking.sequence, 'counter=', state?.counter);
+            if (req.shouldCancel) {
+                this.logger.warn('While waiting for back pressure, sub-generator should stop immediatly!');
                 break;
             }
+            const state = this.messageTrackingCollection.find(this.messageBus.identity);
+            if (timeoutWatch.elapsedTimeInMS() >= this.config.backpressure.waitTimeoutInMS) {
+                this.logger.debug(`back pressure timed out after ${timeoutWatch.elapsedTimeAsString()}`, 'seq=', state?.tracking.sequence, 'counter=', state?.counter);
+                if (isFinal) {
+                    timeoutWatch.restart();
+                } else {
+                    break;
+                }
+            }
             if (state) {
-                const delta = eventCount - state.tracking.sequence;
+                const delta = eventCount - (state.tracking.sequence + 1);
                 if (delta > threshold) {
                     // this.logger.debug(`${iterations}: delta = ${eventCount} - ${state.tracking.sequence} = ${delta}`);
                     await sleep(5);
@@ -169,7 +198,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                 }    
             } else {
                 // this.logger.debug('Backpressure has no state yet. Will wait...');
-                await sleep(event.request.pauseDelayInMSecs ?? 100);
+                await sleep(req.body.body.request.pauseDelayInMSecs ?? 100);
             }
             iterations += 1;
         }    

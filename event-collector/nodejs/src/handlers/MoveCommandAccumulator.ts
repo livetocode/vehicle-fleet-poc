@@ -1,7 +1,7 @@
 import { Counter } from "messaging-lib";
 import { getProcessStats } from "../core/diagnostics/processStats.js";
 import { Accumulator, BaseAccumulator, ArrayContainer, Container, ContainerManager, ContainerPersister, ContainerPersisterArgs, KeyProvider, MapContainer, OutOfOrderError, SortedContainer, Splitter } from "data-lib";
-import { TimeRange, Config, Logger, MessageBus, calcTimeWindow, Stopwatch, DataPartitionStats, AggregatePeriodCreated } from "core-lib";
+import { TimeRange, Config, Logger, MessageBus, calcTimeWindow, Stopwatch, DataPartitionStats, AggregatePeriodCreated, events } from "core-lib";
 import { AggregateStore } from "../core/persistence/AggregateStore.js";
 import { StoredEvent, EventStore } from "../core/persistence/EventStore.js";
 
@@ -109,8 +109,9 @@ export class MoveCommandAccumulatorV1 extends BaseAccumulator<StoredEvent<Persis
             processStats: getProcessStats(),
             totalRejectedMessagesInTheFuture: this.totalRejectedMessagesInTheFuture,
             totalRejectedMessagesInThePast: this.totalRejectedMessagesInThePast,
-        }
-        this.messageBus.publish('events.vehicles.aggregate-period.created', statsEvent);
+        };
+        const path = events.vehicles.byTypeAndSubType.publish({ type: 'aggregate-period', subType: 'created'});
+        await this.messageBus.publish(path, statsEvent);
         await this.eventStore.delete(partitionKey, this.collectorIndex);
     }
 
@@ -253,8 +254,9 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
             processStats: getProcessStats(),
             totalRejectedMessagesInTheFuture: 0, // this.totalRejectedMessagesInTheFuture,
             totalRejectedMessagesInThePast: this.totalRejectedMessagesInThePast,
-        }
-        this.messageBus.publish('events.vehicles.aggregate-period.created', statsEvent);
+        };
+        const path = events.vehicles.byTypeAndSubType.publish({ type: 'aggregate-period', subType: 'created'});
+        await this.messageBus.publish(path, statsEvent);
         await this.eventStore.delete(partitionKey, this.collectorIndex);
         this.totalRejectedMessagesInThePast = 0;
     }

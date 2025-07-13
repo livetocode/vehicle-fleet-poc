@@ -1,6 +1,6 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity } from 'core-lib';
+import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity, services, requests } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
 import { createDataFrameRepository } from 'data-lib';
@@ -57,7 +57,7 @@ async function main() {
     const repo = createDataFrameRepository(config.collector.output);
     await repo.init();
 
-    const messageBus = await createMessageBus(config.hub, identity, logger);
+    const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);
 
     const vehicleQueryHandler = new VehicleQueryHandler(
         config,
@@ -74,9 +74,9 @@ async function main() {
     messageBus.registerHandlers(vehicleQueryHandler, vehicleQueryPartitionHandler);
 
     if (config.finder.parallelSearch) {
-        messageBus.subscribe(`services.finders.any.>`, 'finders');
+        messageBus.subscribe({ type: 'queue', path: services.finders.any.subscribe({}) });
     }    
-    messageBus.subscribe(`requests.vehicles.query`, 'finders');
+    messageBus.subscribe({ type: 'queue', path: requests.vehicles.query.subscribe({}) });
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.finder.httpPort, logger, identity);

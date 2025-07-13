@@ -2,7 +2,7 @@ import { MessageHandler, MessageHandlerContext } from "./MessageHandler.js";
 import { Request, Response, RequestOptions, RequestOptionsPair, isRequest, CancelRequestByType, CancelRequestById, isReplyResponse } from './Requests.js';
 import { BaseMessageEnvelope, IncomingMessageEnvelope, MessageEnvelope, MessageHeaders } from "./MessageEnvelopes.js";
 import { Logger } from "../logger.js";
-import { randomUUID } from "../utils.js";
+import { randomUUID, sleep } from "../utils.js";
 import { PingOptions, PingResponse, PingService } from "./handlers/ping.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { MessageBusDriver } from "./MessageBusDriver.js";
@@ -12,16 +12,18 @@ import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
-import { IMessageBus, MessageOptionsPair } from "./IMessageBus.js";
-import { MessageSubscription, MessageSubscriptions } from "./MessageSubscriptions.js";
+import { IMessageBus, MessageBusFeatures, MessageOptionsPair } from "./IMessageBus.js";
+import { MessageSubscriptions } from "./MessageSubscriptions.js";
 import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
 import { MessageRoutes } from "./MessageRoutes.js";
 import { ProtoBufCodec, ProtoBufRegistry } from "./ProtoBufRegistry.js";
+import { MessageSubscription } from "./MessageSubscription.js";
+import { PublicationMessagePath } from "./MessagePath.js";
+import { ChaosEngineeringConfig } from "../config.js";
 
-export class MessageBus implements IMessageBus {
+export abstract class MessageBus implements IMessageBus {
     private started = false;
-    private uid = randomUUID();
-    private pendingSubscriptions: MessageSubscription[] = [];
+    private inboxPath: PublicationMessagePath;
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
     private infoService: InfoService;
@@ -33,14 +35,26 @@ export class MessageBus implements IMessageBus {
     constructor(
         private _identity: ServiceIdentity,
         protected logger: Logger,
+        protected chaosEngineering: ChaosEngineeringConfig,
         protected metrics: MessageBusMetrics,
         protected driver: MessageBusDriver,
         protected protoBufRegistry: ProtoBufRegistry,
     ) {
         const activeEventHandlers = new Map<string, MessageHandlerContext>();
         const messageRoutes = new MessageRoutes();
-        this.messageDispatcher = new MessageDispatcher(logger, _identity, metrics, messageRoutes, this.handlers, this.responseMatchers, activeEventHandlers);
-        this.subscribe(this.privateInboxName);
+        this.messageDispatcher = new MessageDispatcher(
+            logger, 
+            _identity, 
+            chaosEngineering,
+            metrics, 
+            messageRoutes, 
+            this.handlers, 
+            this.responseMatchers, 
+            activeEventHandlers,
+        );
+        const inbox = driver.privateInboxPath;
+        this.inboxPath = inbox.publish;
+        this.subscribe({ type: 'queue', path: inbox.subscribe });
         this.pingService = new PingService(this, logger, _identity);
         this.infoService = new InfoService(this, logger, _identity, this.subscriptions, this.handlers, messageRoutes);
         this.cancelService = new CancelRequestService(this, logger, _identity, activeEventHandlers);
@@ -50,22 +64,28 @@ export class MessageBus implements IMessageBus {
         return this._identity;
     }
 
-    get privateInboxName(): string {
-        return `inbox.${this.identity.name}.${this.uid}`;
+    abstract get features(): MessageBusFeatures;
+
+    get privateInbox(): PublicationMessagePath {
+        return this.inboxPath;
     }
 
     async start(connectionString: string): Promise<void> {
+        if (this.started) {
+            throw new Error('MessageBus is already started!');
+        }
         await this.driver.start(connectionString);
         this.started = true;
-        for (const pendingSubscription of this.pendingSubscriptions) {
-            this.driver.subscribe(pendingSubscription);
+        for (const subscription of this.subscriptions.entries()) {
+            this.driver.subscribe(subscription);
         }
-        this.pendingSubscriptions = [];
     }
     
     async stop(): Promise<void> {
-        await this.driver.stop();
-        this.started = false;
+        if (this.started) {
+            await this.driver.stop();
+            this.started = false;    
+        }
     }
 
     waitForClose(): Promise<void> {
@@ -86,37 +106,43 @@ export class MessageBus implements IMessageBus {
         this.protoBufRegistry.register(messageType, codec);
     }
 
-    subscribe(subject: string, consumerGroupName?: string): void {
-        if (this.subscriptions.add({ subject, consumerGroupName })) {
+    subscribe(subscription: MessageSubscription): void {
+        if (this.subscriptions.add(subscription)) {
             if (this.started) {
-                this.driver.subscribe({ subject, consumerGroupName });
-            } else {
-                this.pendingSubscriptions.push({ subject, consumerGroupName });
-            }    
+                this.driver.subscribe(subscription);
+            }
         }
     }
 
-    publish(subject: string, message: TypedMessage, headers?: MessageHeaders): void {
+    publish(path: PublicationMessagePath, message: TypedMessage, headers?: MessageHeaders): Promise<void> {
         const envelope: MessageEnvelope = {
-            subject,
+            subject: this.driver.renderPath(path),
             body: message,
             headers: headers ?? {},
         }
-        this.publishEnvelope(envelope);
+        return this.publishEnvelope(envelope);
     }
     
     async publishBatch(messages: MessageOptionsPair[]): Promise<void> {
-        for (const [msg, opt] of messages) {
-            this.publish(opt.subject, msg, opt.headers);
+        if (this.chaosEngineering.enabled) {
+            await sleep(this.chaosEngineering.messageWriteDelayInMS);
         }
-        await this.driver.flush();
+        const envelopes = messages.map(([msg, opt]) => ({
+            subject: this.driver.renderPath(opt.path),
+            body: msg,
+            headers: opt.headers ?? {},
+        }));
+        await this.driver.publishBatch(envelopes);
     }
 
     
-    publishEnvelope(message: MessageEnvelope): void {
+    async publishEnvelope(message: MessageEnvelope): Promise<void> {
+        if (this.chaosEngineering.enabled) {
+            await sleep(this.chaosEngineering.messageWriteDelayInMS);
+        }
         message.headers.serviceName = this.identity.name;
-        this.driver.publish(message);
         this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
+        return this.driver.publish(message);
     }
 
     publishLocal(message: TypedMessage, headers?: MessageHeaders): Promise<void> {
@@ -130,7 +156,7 @@ export class MessageBus implements IMessageBus {
                 senderName: this.identity.name,
             },
             reply(replyMsg) {
-                self.publishLocal(replyMsg.body, replyMsg.headers).catch(err => self.logger.error(err));
+                return self.publishLocal(replyMsg.body, replyMsg.headers);
             }
         }
         return this.messageDispatcher.dispatch(envelope);
@@ -152,11 +178,13 @@ export class MessageBus implements IMessageBus {
     async *requestBatch(requests: RequestOptionsPair[]): AsyncGenerator<MessageEnvelope<Response>> {
         const matcher = this.responseMatchers.acquire();
         try {
-            for (const [req, opt] of requests) {
-                const envelope = this.createRequestEnvelope(req, opt)
+            const envelopes = requests.map(([req, opt]) => {
+                const envelope = this.createRequestEnvelope(req, opt);
                 matcher.register(envelope.body.id, opt);
-                this.publishEnvelope(envelope);
-            }
+                return envelope;
+            });
+            await this.driver.publishBatch(envelopes);
+
             while (!matcher.isDone) {
                 for (const resp of matcher.getMatches()) {
                     yield resp;
@@ -168,11 +196,11 @@ export class MessageBus implements IMessageBus {
         }
     }
 
-    reply(request: IncomingMessageEnvelope<Request>, response: BaseMessageEnvelope<Response>): void {
+    reply(request: IncomingMessageEnvelope<Request>, response: BaseMessageEnvelope<Response>): Promise<void> {
         if (response.body.requestId !== request.body.id) {
             throw new Error(`Response mismatch error: expected response's requestId "${response.body.requestId}" to match request ID "${request.body.id}"`);
         }
-        this.publishEnvelope({
+        return this.publishEnvelope({
             ...response,
             subject: request.body.replyTo,
         });
@@ -194,14 +222,14 @@ export class MessageBus implements IMessageBus {
         return this.infoService.info(options);
     }
 
-    protected envelopeReply(request: IncomingMessageEnvelope, response: BaseMessageEnvelope): void {
+    protected envelopeReply(request: IncomingMessageEnvelope, response: BaseMessageEnvelope): Promise<void> {
         if (!isRequest(request)) {
             throw new Error('Cannot reply to message because it is not a request');
         }
         if (!isReplyResponse(response)) {
             throw new Error('Submitted message is not a response');
         }
-        this.reply(request, response);
+        return this.reply(request, response);
     }
     
     private createRequestEnvelope(req: TypedMessage, opt: RequestOptions): MessageEnvelope<Request> {
@@ -217,11 +245,11 @@ export class MessageBus implements IMessageBus {
         }
         return {
             headers: opt.headers ?? {},
-            subject: opt.subject,
+            subject: this.driver.renderPath(opt.path),
             body: {
                 type: 'request',
                 id: opt.id ?? randomUUID(),
-                replyTo: this.privateInboxName,
+                replyTo: this.driver.renderPath(this.privateInbox),
                 parentId: opt.parentId,
                 timeout: opt.timeout,
                 expiresAt: computeExpiresAt(opt.timeout),

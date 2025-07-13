@@ -1,4 +1,4 @@
-import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQueryRequest, type VehicleQueryResponse, addOffsetToCoordinates, gpsToArray, KM, type Config, RequestTimeoutError, isResponseSuccess, isVehicleQueryResponse } from "core-lib";
+import { LambdaMessageHandler, randomUUID, type MessageHandler, type MessageBus, type VehicleQueryResult, type Logger, type VehicleQueryRequest, type VehicleQueryResponse, addOffsetToCoordinates, gpsToArray, KM, type Config, RequestTimeoutError, isResponseSuccess, isVehicleQueryResponse, requests } from "core-lib";
 import type { StatValue } from "../utils/types";
 import { ref } from 'vue';
 
@@ -269,7 +269,7 @@ export class VehicleFinderViewModel {
         this._lastUpdateTimestamp = new Date();
         try {
             const resp = await this._messageBus.request(q, {
-                subject: 'requests.vehicles.query',
+                path: requests.vehicles.query.publish({}),
                 id: q.id,
                 timeout,            
             });

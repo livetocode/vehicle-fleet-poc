@@ -22,7 +22,7 @@ export abstract class RequestHandler<TRequestBody extends TypedMessage, TRespons
         if (event.expiresAt) {
             const expiredAt = new Date(event.expiresAt);
             if (expiredAt < new Date()) {
-                msg.reply({
+                await msg.reply({
                     headers: {},
                     body: {
                         type: 'response-error',
@@ -58,10 +58,10 @@ export abstract class RequestHandler<TRequestBody extends TypedMessage, TRespons
                     }
                 };    
             }
-            msg.reply(resp);
+            await msg.reply(resp);
         } catch(err : any) {
             if (err instanceof RequestCancelledError) {
-                msg.reply({
+                await msg.reply({
                     headers: {},
                     body: {
                         type: 'response-error',
@@ -72,7 +72,7 @@ export abstract class RequestHandler<TRequestBody extends TypedMessage, TRespons
                     }
                 } as BaseMessageEnvelope<ResponseError>);    
             } else {
-                msg.reply({
+                await msg.reply({
                     headers: {},
                     body: {
                         type: 'response-error',

@@ -64,6 +64,10 @@ export interface FlushCommand {
     type: 'flush';
 }
 
+export interface DispatchFlushCommand {
+    type: 'dispatch-flush';
+}
+
 export interface MessageTrackingAck {
     type: 'message-tracking-ack';
     messageType: string;
@@ -76,6 +80,14 @@ export interface FlushRequest {
 
 export interface FlushResponse {
     type: 'flush-response';
+}
+
+export interface DispatchFlushRequest {
+    type: 'dispatch-flush-request';
+}
+
+export interface DispatchFlushResponse {
+    type: 'dispatch-flush-response';
 }
 
 export interface PrepareRequest {

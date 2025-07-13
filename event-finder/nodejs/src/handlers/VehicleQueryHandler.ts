@@ -1,4 +1,4 @@
-import { type Config, type VehicleQueryRequest, type Logger, dateToUtcParts, calcTimeWindow, type VehicleQueryResponse, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent } from 'core-lib';
+import { type Config, type VehicleQueryRequest, type Logger, dateToUtcParts, calcTimeWindow, type VehicleQueryResponse, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent, MessagePath, events, services } from 'core-lib';
 import path from 'path';
 import { extractPolygons, polygonsToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, MultiPolygon } from "geojson";
@@ -37,7 +37,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         // Send it to our inbox to let the viewer display the polygon shape and clear the data
         // TODO: keep this optimization or send to subject 'events.vehicles.query.started'?
         // Warning: the viewer assumes it is the only one to receive this start event.
-        this.messageBus.publish(req.body.replyTo, startingEvent);
+        await this.messageBus.publish(MessagePath.fromReplyTo(req.body.replyTo), startingEvent);
         const ctx = new VehicleQueryContext(this.config, req.body);
         const geohashes = this.createGeohashes(ctx.geometry);
         if (ctx.parallelize) {
@@ -68,8 +68,9 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
             type: 'vehicle-query-stopped',
             query: req.body,
             response: response,            
-        }
-        this.messageBus.publish('events.vehicles.query.stopped', stoppedEvent);
+        };
+        const path = events.vehicles.byTypeAndSubType.publish({ type: 'query', subType: 'stopped'});
+        await this.messageBus.publish(path, stoppedEvent);
         return response;
     }
 
@@ -190,7 +191,7 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         return [
             subQuery,
             {
-                subject: 'services.finders.any.partitions',
+                path: services.finders.any.publish({ rest: 'partitions'}),
                 parentId: ctx.event.id,
                 timeout: ctx.timeout,
             }

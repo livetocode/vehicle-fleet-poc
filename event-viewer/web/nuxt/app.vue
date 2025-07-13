@@ -1,6 +1,7 @@
 <script setup>
-  import { registerCodecs } from 'core-lib';
-  
+  import { registerCodecs, commands, events } from 'core-lib';
+  import { NatsMessageBus, AzureServiceBusMessageBus } from './utils/messaging';
+
   const appConfig = useAppConfig();
   const identity = {
     name: 'viewer',
@@ -8,27 +9,39 @@
   }
   const logger = createLogger(appConfig.viewer.logging, identity.name);
   logger.info('App is initializing...');
-  if (appConfig.hub.type !== 'nats') {
+  const runtimeConfig = useRuntimeConfig();
+  let messageBus;
+  let connectionString;
+  if (appConfig.hub.type === 'nats') {
+    let servers = appConfig.hub.protocols.websockets.servers;
+    const serversOverride = runtimeConfig.public.natsServers
+    if (serversOverride && serversOverride.length > 0) {
+        servers = serversOverride.split(',');
+    }
+    connectionString = servers.join(',');
+
+    messageBus = new NatsMessageBus(identity, logger, appConfig.chaosEngineering);
+  } else if (appConfig.hub.type === 'azureServiceBus') {
+    messageBus = new AzureServiceBusMessageBus(identity, logger, appConfig.chaosEngineering);
+    connectionString =  appConfig.hub.connectionString;
+  } else {
     throw new Error('Expected a NATS hub');
   }
-  let servers = appConfig.hub.protocols.websockets.servers;
-  const runtimeConfig = useRuntimeConfig();
-  const serversOverride = runtimeConfig.public.natsServers
-  if (serversOverride && serversOverride.length > 0) {
-      servers = serversOverride.split(',');
-  }
-  const connectionString = servers.join(',');
-
-  const messageBus = new NatsMessageBus(identity, logger);
+  
   if (appConfig.hub.enableProtoBuf) {
     registerCodecs(messageBus);
   }
+  if (messageBus.features.supportsAbstractSubjects) {
+    messageBus.subscribe({ type: 'topic', path: commands.move.subscribe({})});
+  } else {
+    messageBus.subscribe({ type: 'topic', path: commands.move2.subscribe({})});
+  }
+  messageBus.subscribe({ type: 'topic', path: events.vehicles.byTypeAndSubType.subscribe({})});
+
   provide('messageBus', messageBus);
 
 onMounted(() => {
   logger.debug('App is mounting...');
-  messageBus.subscribe('commands.move');
-  messageBus.subscribe('events.vehicles.*.*');
   messageBus.start(connectionString).catch(console.error);
   logger.debug('App is mounted');
 });

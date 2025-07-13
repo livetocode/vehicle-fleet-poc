@@ -1,4 +1,4 @@
-import { Config, ConsoleLogger, LoggingConfig, Logger, NoopLogger, ServiceIdentity, MessageTrackingCollection } from 'core-lib';
+import { Config, ConsoleLogger, LoggingConfig, Logger, NoopLogger, ServiceIdentity, MessageTrackingCollection, services, requests } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import fs from 'fs';
 import YAML from 'yaml';
@@ -62,7 +62,7 @@ async function main() {
         instance: generatorIndex,
     }
     const logger =  createLogger(config.generator.logging, `${identity.name} #${generatorIndex}`);
-    const messageBus = await createMessageBus(config.hub, identity, logger);
+    const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);
 
     const messageTrackingCollection = new MessageTrackingCollection();
     
@@ -84,11 +84,12 @@ async function main() {
 
     messageBus.registerHandlers(startGenerationHandler, generatePartitionHandler, messageTrackingHandler);
 
-    messageBus.subscribe(`services.generators.assigned.${generatorIndex}.>`, 'generators');
+    
+    messageBus.subscribe({ type: 'queue', path: services.generators.assigned.subscribe({ index: generatorIndex.toString() }) });
     if (config.backpressure.enabled) {
-        messageBus.subscribe(`services.generators.tracking.${generatorIndex}`);
+        messageBus.subscribe({ type: 'queue', path: services.generators.tracking.subscribe({ index: generatorIndex.toString() }) });
     }
-    messageBus.subscribe(`requests.vehicles.generate`, 'generators');
+    messageBus.subscribe({ type: 'queue', path: requests.vehicles.generate.subscribe({})});
 
     const httpPortOverride = process.env.NODE_HTTP_PORT ? parseInt(process.env.NODE_HTTP_PORT) : undefined;
     const server = createWebServer(httpPortOverride ?? config.generator.httpPort, logger, identity);

@@ -4,9 +4,10 @@ import { IncomingMessageEnvelope } from "../MessageEnvelopes.js";
 import { isResponseSuccess, Request, RequestTimeoutError } from "../Requests.js";
 import { ServiceIdentity } from "../ServiceIdentity.js";
 import { IMessageBus } from "../IMessageBus.js";
-import { MessageSubscription, MessageSubscriptions } from "../MessageSubscriptions.js";
+import { MessageSubscriptions } from "../MessageSubscriptions.js";
 import { MessageHandlerRegistry } from "../MessageHandlerRegistry.js";
 import { MessageRoute, MessageRoutes } from "../MessageRoutes.js";
+import { MessagePath, PathSegment } from "../MessagePath.js";
 
 export type InfoOptions = {
     serviceName?: string;
@@ -24,10 +25,18 @@ export type MessageHandlerInfo = {
     description: string;
 }
 
+export type ExportedMessageSubscription = {
+    type: string;
+    path: {
+        segments: PathSegment[];
+        vars: Record<string, string>;
+    }    
+}
+
 export type InfoResponse = {
     type: 'info-response';
     identity: ServiceIdentity;
-    subscriptions: MessageSubscription[],
+    subscriptions: ExportedMessageSubscription[],
     handlers: MessageHandlerInfo[],
     routes: MessageRoute[],
 };
@@ -65,7 +74,12 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
         return {
             type: 'info-response',
             identity: this.identity,
-            subscriptions: this.subscriptions.entries(),
+            subscriptions: this.subscriptions.entries().map(x => ({ 
+                type: x.type, 
+                path: {
+                    segments: x.path.segments,
+                    vars: x.path.vars,
+                }})),
             handlers: this.registry.handlers().map(x => ({
                 name: x.name,
                 messageTypes: x.messageTypes,
@@ -78,6 +92,8 @@ export class InfoRequestHandler extends RequestHandler<InfoRequest, InfoResponse
 
 export class InfoService {
     private handler: InfoRequestHandler;
+    private globalPath: MessagePath;
+    private specificPath: MessagePath;
 
     constructor(
         private messageBus: IMessageBus,
@@ -89,7 +105,10 @@ export class InfoService {
     ) {
         this.handler = new InfoRequestHandler(logger, identity, subscriptions, registry, routes);
         this.messageBus.registerHandlers(this.handler);
-        this.messageBus.subscribe('messaging.control.*');
+        this.globalPath = MessagePath.fromPath('messaging/control');
+        this.specificPath = MessagePath.fromPath('messaging/control/{name(required)}');
+        this.messageBus.subscribe({ type: 'topic', path: this.globalPath.subscribe({}) });
+        this.messageBus.subscribe({ type: 'topic', path: this.specificPath.subscribe({ name: identity.name })});
 }
 
     async *info(options?: InfoOptions): AsyncGenerator<InfoResponse> {
@@ -102,7 +121,7 @@ export class InfoService {
             this.logger.debug('Sending info request...');
 
             for await (const resp of this.messageBus.requestMany(req, {
-                subject: serviceName ? `messaging.control.info.${serviceName}` : 'messaging.control.info',
+                path: serviceName ? this.specificPath.publish({ name: serviceName }) : this.globalPath.publish({}),
                 timeout: options?.timeout ?? 3*1000,
                 limit: 1000,
             })) {

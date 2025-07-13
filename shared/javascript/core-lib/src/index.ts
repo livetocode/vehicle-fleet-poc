@@ -1,6 +1,7 @@
 export * from './utils.js';
 export * from './geometry.js';
 export * from './messages.js';
+export * from './messagePaths.js';
 export * from './dates.js';
 export * from './math.js';
 export * from './config.js';

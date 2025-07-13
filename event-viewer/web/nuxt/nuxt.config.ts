@@ -2,6 +2,7 @@
 import fs from 'fs';
 import YAML from 'yaml';
 import vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 const file = fs.readFileSync('../../../config.yaml', 'utf8');
 const config = YAML.parse(file);
@@ -25,6 +26,8 @@ export default defineNuxtConfig({
       nuxt.hooks.hook('vite:extendConfig', (config) => {
         // @ts-expect-error
         config.plugins.push(vuetify({ autoImport: true }))
+        // @ts-expect-error
+        config.plugins.push(nodePolyfills())
       })
     },
     //...

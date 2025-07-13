@@ -1,7 +1,7 @@
 import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { MessageHandler, LambdaMessageHandler, addOffsetToCoordinates, gpsToPoint, arrayToGps, KM, Rect, ViewPort, type VehicleQueryStartedEvent,
     type Config, type Logger, type MoveCommand, type VehicleGenerationStarted, type VehicleQueryRequest, type VehicleQueryResult, type MessageBus } from 'core-lib';
-import type { Request } from 'core-lib';
+import type { EnrichedMoveCommand, Request } from 'core-lib';
 import Geohash from 'latlon-geohash';
 
 export interface AssetRef {
@@ -88,7 +88,7 @@ export class VehicleViewerViewModel {
         });
         if (this.mode === 'tracking') {
             this._moveHandler = new LambdaMessageHandler<MoveCommand>(
-                ['move'],
+                ['move', 'enriched-move'],
                 'VehicleViewerViewModel',
                 'Receives the vehicle positions',
                 async (ev: any) => { this.onProcessCommand(ev); },
@@ -142,11 +142,15 @@ export class VehicleViewerViewModel {
         app?.destroy();
     }
 
-    private onProcessCommand(cmd: MoveCommand) {
+    private onProcessCommand(cmd: MoveCommand | EnrichedMoveCommand) {
         if (!this._app) {
             return;
         }
-        this.onMoveVehicle(cmd);
+        if (cmd.type === 'move') {
+            this.onMoveVehicle(cmd);
+        } else if (cmd.type === 'enriched-move') {
+            this.onMoveVehicle(cmd.command);
+        }
     }
     
     private onVehicleGenerationStarted(ev: VehicleGenerationStarted) {
