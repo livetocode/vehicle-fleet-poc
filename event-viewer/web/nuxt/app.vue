@@ -1,4 +1,5 @@
 <script setup>
+  import { onMounted, onUnmounted, provide } from 'vue';
   import { registerCodecs, commands, events } from 'core-lib';
   import { NatsMessageBus, AzureServiceBusMessageBus } from './utils/messaging';
 
@@ -25,7 +26,7 @@
     messageBus = new AzureServiceBusMessageBus(identity, logger, appConfig.chaosEngineering);
     connectionString =  appConfig.hub.connectionString;
   } else {
-    throw new Error('Expected a NATS hub');
+    throw new Error('Expected a valid hub');
   }
   
   if (appConfig.hub.enableProtoBuf) {
@@ -34,11 +35,12 @@
   if (messageBus.features.supportsAbstractSubjects) {
     messageBus.subscribe({ type: 'topic', path: commands.move.subscribe({})});
   } else {
-    messageBus.subscribe({ type: 'topic', path: commands.move2.subscribe({})});
+    messageBus.subscribe({ type: 'topic', path: events.vehicles.moved.subscribe({})});
   }
   messageBus.subscribe({ type: 'topic', path: events.vehicles.byTypeAndSubType.subscribe({})});
-
+  
   provide('messageBus', messageBus);
+  provide('connectionString', connectionString);
 
 onMounted(() => {
   logger.debug('App is mounting...');
@@ -56,9 +58,11 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <NuxtLoadingIndicator />
-    <NuxtLayout>
-      <NuxtPage />
-    </NuxtLayout>
+    <owl-app-connected>
+      <NuxtLoadingIndicator />
+      <NuxtLayout>
+        <NuxtPage />
+      </NuxtLayout>
+    </owl-app-connected>
   </div>
 </template>

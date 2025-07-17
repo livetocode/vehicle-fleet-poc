@@ -1,5 +1,6 @@
 import { MessageHandler } from './MessageHandler.js';
 
+export * from './CustomEventEmitter.js';
 export * from './IMessageBus.js';
 export * from './LambdaMessageHandler.js';
 export * from './MessageBus.js';

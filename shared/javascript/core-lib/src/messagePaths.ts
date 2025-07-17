@@ -22,12 +22,12 @@ export namespace requests {
 
 export namespace commands {
     export const move = MessagePath.fromPath('commands/move');
-    export const move2 = MessagePath.fromPath('commands/move2'); // Only used when the MessageBus does not support abstract subjects
 }
 
 export namespace events {
     export namespace vehicles {
         export const byTypeAndSubType = MessagePath.fromPath('events/vehicles/{type}/{subType}');
+        export const moved = MessagePath.fromPath('events/vehicles/moved'); // Only used when the MessageBus does not support abstract subjects
     }
 }
 

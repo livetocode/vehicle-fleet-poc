@@ -12,7 +12,7 @@ import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageDispatcher } from "./MessageDispatcher.js";
 import { CancelRequestService } from "./handlers/cancel.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
-import { IMessageBus, MessageBusFeatures, MessageOptionsPair } from "./IMessageBus.js";
+import { ConnectionInfo, ConnectionStatus, IMessageBus, MessageBusFeatures, MessageOptionsPair } from "./IMessageBus.js";
 import { MessageSubscriptions } from "./MessageSubscriptions.js";
 import { InfoOptions, InfoResponse, InfoService } from "./handlers/info.js";
 import { MessageRoutes } from "./MessageRoutes.js";
@@ -20,9 +20,11 @@ import { ProtoBufCodec, ProtoBufRegistry } from "./ProtoBufRegistry.js";
 import { MessageSubscription } from "./MessageSubscription.js";
 import { PublicationMessagePath } from "./MessagePath.js";
 import { ChaosEngineeringConfig } from "../config.js";
+import { CustomEventEmitter } from "./CustomEventEmitter.js";
 
-export abstract class MessageBus implements IMessageBus {
-    private started = false;
+export abstract class MessageBus extends CustomEventEmitter implements IMessageBus {
+    private connectionStatus: ConnectionStatus = 'stopped';
+    private connectionError?: any;
     private inboxPath: PublicationMessagePath;
     private responseMatchers = new ResponseMatcherCollection();
     private pingService: PingService;
@@ -40,6 +42,7 @@ export abstract class MessageBus implements IMessageBus {
         protected driver: MessageBusDriver,
         protected protoBufRegistry: ProtoBufRegistry,
     ) {
+        super();
         const activeEventHandlers = new Map<string, MessageHandlerContext>();
         const messageRoutes = new MessageRoutes();
         this.messageDispatcher = new MessageDispatcher(
@@ -66,25 +69,38 @@ export abstract class MessageBus implements IMessageBus {
 
     abstract get features(): MessageBusFeatures;
 
+    get connectionInfo(): ConnectionInfo {
+        return {
+            status: this.connectionStatus,
+            connectionError: this.connectionError,
+        };
+    }
+
     get privateInbox(): PublicationMessagePath {
         return this.inboxPath;
     }
 
     async start(connectionString: string): Promise<void> {
-        if (this.started) {
+        if (this.connectionStatus === 'connected') {
             throw new Error('MessageBus is already started!');
         }
-        await this.driver.start(connectionString);
-        this.started = true;
+        try {
+            this.setConnectionInfoAttributes('connecting');
+            await this.driver.start(connectionString);
+            this.setConnectionInfoAttributes('connected');
+        } catch(err: any) {
+            this.setConnectionInfoAttributes('error', err);
+            throw err;
+        }
         for (const subscription of this.subscriptions.entries()) {
             this.driver.subscribe(subscription);
         }
     }
     
     async stop(): Promise<void> {
-        if (this.started) {
+        if (this.connectionStatus === 'connected') {
             await this.driver.stop();
-            this.started = false;    
+            this.setConnectionInfoAttributes('stopped');
         }
     }
 
@@ -108,7 +124,7 @@ export abstract class MessageBus implements IMessageBus {
 
     subscribe(subscription: MessageSubscription): void {
         if (this.subscriptions.add(subscription)) {
-            if (this.started) {
+            if (this.connectionStatus === 'connected') {
                 this.driver.subscribe(subscription);
             }
         }
@@ -136,13 +152,17 @@ export abstract class MessageBus implements IMessageBus {
     }
 
     
-    async publishEnvelope(message: MessageEnvelope): Promise<void> {
-        if (this.chaosEngineering.enabled) {
-            await sleep(this.chaosEngineering.messageWriteDelayInMS);
+    publishEnvelope(message: MessageEnvelope): Promise<void> {
+        const publish = (): Promise<void> => {
+            message.headers.serviceName = this.identity.name;
+            this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
+            return this.driver.publish(message);    
         }
-        message.headers.serviceName = this.identity.name;
-        this.metrics.publish(normalizeSubject(message.subject), message.body.type ?? 'unknown');
-        return this.driver.publish(message);
+        if (this.chaosEngineering.enabled) {
+            return sleep(this.chaosEngineering.messageWriteDelayInMS).then(publish);
+        } else {
+            return publish();
+        }
     }
 
     publishLocal(message: TypedMessage, headers?: MessageHeaders): Promise<void> {
@@ -256,6 +276,12 @@ export abstract class MessageBus implements IMessageBus {
                 body: req,    
             },
         }
+    }
+
+    private setConnectionInfoAttributes(status: ConnectionStatus, error?: any) {
+        this.connectionStatus = status;
+        this.connectionError = error;
+        this.emit('connectionInfoChanged', this.connectionInfo);
     }
 }
 

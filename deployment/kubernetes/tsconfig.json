@@ -6,7 +6,7 @@
     "inlineSourceMap": true,
     "inlineSources": true,
     "lib": [
-      "es2016"
+      "es2022"
     ],
     "module": "CommonJS",
     "noEmit": false,
@@ -22,7 +22,7 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "stripInternal": true,
-    "target": "ES2017"
+    "target": "es2022"
   },
   "include": [
     "**/*.ts"

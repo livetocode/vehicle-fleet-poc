@@ -18,10 +18,17 @@ export type MessageBusFeatures = {
     supportsAbstractSubjects: boolean;
     supportsTemporaryQueues: boolean;
 }
+export type ConnectionStatus = 'stopped' | 'connecting' | 'connected' | 'error';
+
+export type ConnectionInfo = {
+    status: ConnectionStatus;
+    connectionError?: any;
+}
 
 export type IMessageBus = {
     get identity(): ServiceIdentity;
     get features(): MessageBusFeatures;
+    get connectionInfo(): ConnectionInfo;
     get privateInbox(): PublicationMessagePath;
     registerHandlers(...handlers: MessageHandler[]): void;
     unregisterHandler(handler: MessageHandler): void;

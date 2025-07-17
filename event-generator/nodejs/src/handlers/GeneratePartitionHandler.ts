@@ -1,4 +1,4 @@
-import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection, MessageOptionsPair, chunks, commands } from "core-lib";
+import { GeneratePartitionResponse, RequestHandler, IncomingMessageEnvelope, Request, GeneratePartitionRequest, MessageTrackingCollection, MessageOptionsPair, chunks, commands, events } from "core-lib";
 import { addOffsetToCoordinates, Config, formatPoint, GpsCoordinates, KM, Logger, IMessageBus, MoveCommand, Rect, sleep, Stopwatch } from "core-lib";
 import { VehiclePredicate, Engine } from "../simulation/engine.js";
 
@@ -30,7 +30,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
         const realtime = event.request.realtime;
         const startDate = event.startDate;
         const commandMovePath = commands.move.publish({});
-        const commandMove2Path = commands.move2.publish({});
+        const vehicleMovedPath = events.vehicles.moved.publish({});
         const duplicateMove = this.messageBus.features.supportsAbstractSubjects === false;
         let vehiclePredicate: VehiclePredicate | undefined;
         if (this.config.generator.instances > 1) {
@@ -113,7 +113,7 @@ export class GeneratePartitionHandler extends RequestHandler<GeneratePartitionRe
                         // When the MessageBus does not allow to subscribe both as a queue and as a topic for the same subject,
                         // we have to split the usage in two distinct subjects.
                         // This one will be used by the viewer to map the position of the vehicles on the display.
-                        messageBatch.push([msg, { path: commandMove2Path }]);
+                        messageBatch.push([msg, { path: vehicleMovedPath }]);
                     }
 
                     eventCount++;
