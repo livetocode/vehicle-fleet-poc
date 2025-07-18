@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { inject, ref } from 'vue';
-import { type MessageBus, type ConnectionInfo } from 'core-lib';
+import { inject, ref, onMounted, onUnmounted } from 'vue';
+import { type MessageBus, type ConnectionInfo, type EventCallback } from 'core-lib';
 
 const messageBus = inject<MessageBus>('messageBus');
 if (!messageBus) {
@@ -14,12 +14,20 @@ if (!connectionString) {
 const connectionStatus = ref(messageBus?.connectionInfo?.status);
 const isConnected = ref(false);
 const connectionError = ref();
-messageBus.on('connectionInfoChanged', (info: ConnectionInfo) => {
-  connectionStatus.value = info.status;
-  connectionError.value = info.connectionError;
-  isConnected.value = info.status === 'connected';
-});
+const connectionInfoChanged: EventCallback = (info: ConnectionInfo) => {
+    connectionStatus.value = info.status;
+    connectionError.value = info.connectionError;
+    isConnected.value = info.status === 'connected';
+};
 const start = () => messageBus.start(connectionString).catch(console.error);
+
+onMounted(() => {
+  messageBus.on('connectionInfoChanged', connectionInfoChanged);
+});
+
+onUnmounted(() => {
+  messageBus.off('connectionInfoChanged', connectionInfoChanged);
+});
 
 </script>
 
