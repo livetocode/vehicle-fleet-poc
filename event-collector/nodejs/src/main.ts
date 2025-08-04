@@ -4,7 +4,7 @@ import { MoveCommandHandler } from "./handlers/MoveCommandHandler.js";
 import { FileAggregateStore } from "./core/persistence/FileAggregateStore.js";
 // import { DuckDbEventStore } from "./core/persistence/DuckDbEventStore.js";
 import { NoOpEventStore } from "./core/persistence/NoOpEventStore.js";
-import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity, MessageTrackingCollection, commands, requests, services } from 'core-lib';
+import { CollectorConfig, Config, EventStoreConfig, ConsoleLogger, Logger, DataPartitionStrategyConfig, LoggingConfig, NoopLogger, ServiceIdentity, MessageTrackingCollection, commands, requests, services, IMessageBus, EventDispatcherConfig, ConcreteEventDispatcherConfig } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { InMemoryEventStore } from './core/persistence/InMemoryEventStore.js';
 import { AggregateStore } from './core/persistence/AggregateStore.js';
@@ -19,6 +19,7 @@ import { FlushDataHandler, FlushRequestHandler } from './handlers/FlushDataHandl
 import { AssignedMoveCommandHandler } from './handlers/AssignedMoveCommandHandler.js';
 import { PrepareCollectorHandler } from './handlers/PrepareCollectorHandler.js';
 import { DispatchFlushDataHandler, DispatchFlushRequestHandler } from './handlers/DispatchFlushDataHandler.js';
+import { AzureEventHubMoveEventDispatcher, MessageBusMoveEventDispatcher, MoveEventDispatcher, MoveEventDispatcherProxy } from './core/persistence/EventDispatchers.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -69,6 +70,27 @@ function createDataPartitionStrategy(config: DataPartitionStrategyConfig, collec
         return new GeohashDataPartitionStrategy(config.hashLength);
     }
     throw new Error('Unknown data partition strategy');
+}
+
+function createConcreteMoveEventDispatcher(config: ConcreteEventDispatcherConfig, messageBus: IMessageBus, logger: Logger): MoveEventDispatcher {
+    if (config.type === 'messageBus') {
+        return new MessageBusMoveEventDispatcher(messageBus);        
+    }
+    if (config.type === 'azureEventHub') {
+        return new AzureEventHubMoveEventDispatcher(logger, config);
+    }
+    throw new Error(`Unknown concrete event dispatcher config type '${(config as any).type}'`);
+}
+
+function createMoveEventDispatcher(config: CollectorConfig, messageBus: IMessageBus, logger: Logger): MoveEventDispatcher {
+    if (config.eventDispatcher.type === 'proxy') {
+        const dispatchers = config.eventDispatcher.dispatchers.map(x => createConcreteMoveEventDispatcher(x, messageBus, logger));
+        if (dispatchers.length === 1) {
+            return dispatchers[0];
+        }
+        return new MoveEventDispatcherProxy(dispatchers);
+    }
+    return createConcreteMoveEventDispatcher(config.eventDispatcher, messageBus, logger);
 }
 
 function createLogger(logging: LoggingConfig, name: string): Logger {
@@ -129,12 +151,14 @@ async function main() {
         collectorIndex,
     );
 
+    const moveEventDispatcher = createMoveEventDispatcher(config.collector, messageBus, logger);
+
     const trackingCollection = new MessageTrackingCollection();
 
     const moveCommandHandler = new MoveCommandHandler(
         config,
-        messageBus,
         dataPartitionStrategy,
+        moveEventDispatcher,
     );
 
     const assignedMoveCommandHandler = new AssignedMoveCommandHandler(

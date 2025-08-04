@@ -90,11 +90,17 @@ export class RequestCancelledError extends Error {
     }
 }
 
+export function isTypedMessage(msg: IncomingMessageEnvelope): msg is IncomingMessageEnvelope<TypedMessage> { 
+    return !!msg.body && !!msg.body.type;
+}
+
 export function isRequest(msg: IncomingMessageEnvelope): msg is IncomingMessageEnvelope<Request> { 
     if (msg.body.type === 'request') {
         const body = msg.body as any;
-        return body.id &&
-            body.replyTo;
+        return !!body.id &&
+            !!body.body &&
+            !!body.body.type &&
+            !!body.replyTo;
     }
     return false;
 }
@@ -102,15 +108,16 @@ export function isRequest(msg: IncomingMessageEnvelope): msg is IncomingMessageE
 export function isResponse(msg: MessageEnvelope): msg is MessageEnvelope<Response> { 
     if (msg.body.type === 'response-success') {
         const body = msg.body as any;
-        return body.id &&
-            body.requestId &&
-            body.body;
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.body &&
+            !!body.body.type;
     }
     if (msg.body.type === 'response-error') {
         const body = msg.body as any;
-        return body.id &&
-            body.requestId &&
-            body.code;        
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.code;        
     }
     return false;
 }
@@ -118,9 +125,20 @@ export function isResponse(msg: MessageEnvelope): msg is MessageEnvelope<Respons
 export function isResponseSuccess(msg: MessageEnvelope): msg is MessageEnvelope<ResponseSuccess> { 
     if (msg.body.type === 'response-success') {
         const body = msg.body as any;
-        return body.id &&
-            body.requestId &&
-            body.body;
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.body &&
+            !!body.body.type;
+    }
+    return false;
+}
+
+export function isResponseError(msg: MessageEnvelope): msg is MessageEnvelope<ResponseError> { 
+    if (msg.body.type === 'response-error') {
+        const body = msg.body as any;
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.code;
     }
     return false;
 }
@@ -128,14 +146,15 @@ export function isResponseSuccess(msg: MessageEnvelope): msg is MessageEnvelope<
 export function isReplyResponse(msg: BaseMessageEnvelope): msg is BaseMessageEnvelope<Response> { 
     const body = msg.body as any;
     if (msg.body.type === 'response-success') {
-        return body.id &&
-            body.requestId &&
-            body.body;
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.body &&
+            !!body.body.type;
     }
     if (msg.body.type === 'response-error') {
-        return body.id &&
-            body.requestId &&
-            body.code;        
+        return !!body.id &&
+            !!body.requestId &&
+            !!body.code;        
     }
     return false;
 }
@@ -144,10 +163,10 @@ export function isCancelRequest(msg: IncomingMessageEnvelope): msg is IncomingMe
     if (isRequest(msg)) {
         const body = msg.body.body as any;
         if (body.type === 'cancel-request-id') {
-            return body.requestId;
+            return !!body.requestId;
         }
         if (body.type === 'cancel-request-type') {
-            return body.requestType;
+            return !!body.requestType;
         }    
     }
     return false;

@@ -7,7 +7,7 @@ export function createDataFrameRepository(config: OutputConfig) {
         return new FileDataframeRepository(config.storage.folder);
     }
     if (config.storage.type === 'azure-blob') {
-        const connectionString = process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING ?? config.storage.connectionString;
+        const connectionString = process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING || config.storage.connectionString;
       
       if (!connectionString) {
         throw Error('Azure Storage Connection string not found: VEHICLES_AZURE_STORAGE_CONNECTION_STRING');

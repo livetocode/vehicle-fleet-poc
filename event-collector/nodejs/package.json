@@ -20,6 +20,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@azure/event-hubs": "^6.0.0",
     "core-lib": "file:../../shared/javascript/core-lib",
     "data-lib": "file:../../shared/javascript/data-lib",
     "latlon-geohash": "^2.0.0",

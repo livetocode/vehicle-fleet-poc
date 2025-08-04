@@ -1,14 +1,15 @@
-import { Config, MessageHandler, MoveCommand, computeHashNumber, IncomingMessageEnvelope, EnrichedMoveCommand, IMessageBus, services } from 'core-lib';
+import { Config, MessageHandler, MoveCommand, computeHashNumber, IncomingMessageEnvelope, EnrichedMoveCommand } from 'core-lib';
 import { DataPartitionStrategy } from "../core/data/DataPartitionStrategy.js";
 import { GeohashDataPartitionStrategy } from "../core/data/GeohashDataPartitionStrategy.js";
+import { MoveEventDispatcher } from '../core/persistence/EventDispatchers.js';
 
 export class MoveCommandHandler extends MessageHandler<MoveCommand> {
     private geohashPartitioner: GeohashDataPartitionStrategy;
 
     constructor(
         private config: Config,
-        private messageBus: IMessageBus,
         private dataPartitionStrategy: DataPartitionStrategy<MoveCommand>,
+        private eventDispatcher: MoveEventDispatcher,
     ) {
         super();
         this.geohashPartitioner = new GeohashDataPartitionStrategy(config.collector.geohashLength);
@@ -36,7 +37,6 @@ export class MoveCommandHandler extends MessageHandler<MoveCommand> {
             geoHash,
             command: event,
         };
-        const path = services.collectors.assigned.publish({ index: collectorIndex.toString(), rest: 'commands/move' });
-        return this.messageBus.publish(path, vehicleMovedEvent);
+        return this.eventDispatcher.dispatch(vehicleMovedEvent);
     }
 }

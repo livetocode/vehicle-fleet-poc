@@ -160,12 +160,33 @@ export type OutputConfig = {
     storage: StorageConfig;
 }
 
+export type MessageBusEventDispatcherConfig = {
+    type: 'messageBus'
+}
+
+export type AzureEventHubEventDispatcherConfig = {
+    type: 'azureEventHub'
+    connectionString: string;
+    sendDelayInMS: number;
+    sendParallelism: number;
+}
+
+export type ConcreteEventDispatcherConfig = MessageBusEventDispatcherConfig | AzureEventHubEventDispatcherConfig;
+
+export type ProxyEventDispatcherConfig = {
+    type: 'proxy'
+    dispatchers: ConcreteEventDispatcherConfig[];
+}
+
+export type EventDispatcherConfig = ConcreteEventDispatcherConfig | ProxyEventDispatcherConfig;
+
 export type CollectorConfig = {
     logging: LoggingConfig;
     instances: number;
     httpPort: number;
     geohashLength: number;
     eventStore: EventStoreConfig;
+    eventDispatcher: EventDispatcherConfig;
     output: OutputConfig;
 }  
 

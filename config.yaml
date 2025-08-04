@@ -10,7 +10,7 @@ hub:
       - ws://localhost:4243
   # type: azureServiceBus
   # enableProtoBuf: true
-  # connectionString: Endpoint=sb://foobar.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=redacted
+  # connectionString: Endpoint=sb://foobar.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=<redacted>
 
 partitioning:
   timePartition:
@@ -28,7 +28,7 @@ backpressure:
   enabled: true
   notificationThreshold: 1000
   notificationPeriodInMS: 100
-  waitTimeoutInMS: 10000
+  waitTimeoutInMS: 60000
   waitThreshold: 1000
 
 chaosEngineering:
@@ -74,12 +74,21 @@ generator:
 collector:
   logging:
     enabled: true
-    level: info
-  instances: 3
+    level: debug
+  instances: 5
   httpPort: 7720
   geohashLength: 7 # 152.9m x 152.4m
   eventStore:
     type: noop # noop, memory, duckdb
+  eventDispatcher:
+    type: proxy
+    dispatchers:
+    - type: messageBus
+    # - type: azureEventHub
+    #   connectionString: EntityPath=move;Endpoint=sb://morgan-vehicle-events.servicebus.windows.net/;<REDACTED>
+    #   sendDelayInMS: 5000
+    #   sendParallelism: 5
+
   output:
     overwriteExistingFiles: false
     flatLayout: true
@@ -93,6 +102,7 @@ collector:
 
       # type: azure-blob
       # containerName: events
+      # # connectionString: 
 
       type: file
       folder: ../../output/data

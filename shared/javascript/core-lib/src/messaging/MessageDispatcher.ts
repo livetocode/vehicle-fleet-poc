@@ -4,7 +4,7 @@ import { ActiveMessageHandlers, MessageHandler } from "./MessageHandler.js";
 import { MessageHandlerRegistry } from "./MessageHandlerRegistry.js";
 import { MessageBusMetrics, normalizeSubject } from "./MessageBusMetrics.js";
 import { IncomingMessageEnvelope } from "./MessageEnvelopes.js";
-import { Response, isRequest, isResponse } from "./Requests.js";
+import { Response, isRequest, isResponse, isResponseSuccess, isTypedMessage } from "./Requests.js";
 import { ResponseMatcherCollection } from "./ResponseMatcherCollection.js";
 import { MessageRoutes } from "./MessageRoutes.js";
 import { ServiceIdentity } from "./ServiceIdentity.js";
@@ -24,6 +24,10 @@ export class MessageDispatcher {
     ) {}
     
     async dispatch(msg: IncomingMessageEnvelope) {
+        if (!isTypedMessage(msg)) {
+            this.logger.warn('Received message has no type and cannot be dispatched:', msg);
+            return;
+        }
         if (isResponse(msg)) {
             this.processResponse(msg);
             return;
@@ -31,8 +35,10 @@ export class MessageDispatcher {
         if (this.chaosEngineering.enabled) {
             await sleep(this.chaosEngineering.messageReadDelayInMS);
         }
-        const msgRequest = isRequest(msg) ? msg : undefined;
-        const bodyType = msgRequest ? msgRequest.body.body.type : msg.body.type;
+        let bodyType = msg.body.type;
+        if (isRequest(msg)) {
+            bodyType = msg.body.body.type;
+        }
         const handlers = this.handlers.find(bodyType);
         if (handlers) {
             this.messageRoutes.add({
@@ -94,15 +100,16 @@ export class MessageDispatcher {
 
     private processResponse(msg: IncomingMessageEnvelope<Response>) {
         if (this.responseMatchers.match(msg)) {
-            const msgResp = isResponse(msg) ? msg : undefined;
-            const bodyType = msgResp ? msgResp.body.body.type : msg.body.type;
-            this.messageRoutes.add({
-                messageType: bodyType,
-                receiver: this.identity.name,
-                sender: msg.headers['serviceName'] ?? 'unknown',
-                subject: msg.subject,
-                subscription: msg.subscribedSubject,
-            });    
+            if (isResponseSuccess(msg)) {
+                const bodyType = msg.body.body.type;
+                this.messageRoutes.add({
+                    messageType: bodyType,
+                    receiver: this.identity.name,
+                    sender: msg.headers['serviceName'] ?? 'unknown',
+                    subject: msg.subject,
+                    subscription: msg.subscribedSubject,
+                });    
+            }
         }
     }
 }

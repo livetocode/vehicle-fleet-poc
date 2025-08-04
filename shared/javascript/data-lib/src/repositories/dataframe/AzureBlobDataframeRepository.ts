@@ -73,7 +73,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
         if (!result) {
             result = this.blobServiceClient.getContainerClient(name);
             this.containerClients.set(name, result);
-            const createContainerResponse = await result.createIfNotExists();    
+            await result.createIfNotExists();    
         }
         return result;
     }
