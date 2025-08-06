@@ -108,8 +108,6 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
         const idx_speed = colNames.indexOf('speed');
         const idx_direction = colNames.indexOf('direction');
         for (const row of df.rows()) {
-            ctx.processedRecordCount += 1;
-            vehicles_search_processed_events_total_counter.inc();
             const timestamp = row[idx_timestamp];
             const vehicleId = row[idx_vehicleId];
             const vehicleType = row[idx_vehicleType];
@@ -118,31 +116,76 @@ export class VehicleQueryPartitionHandler extends RequestHandler<VehicleQueryPar
             const gps_alt = row[idx_gps_alt];
             const geoHash = row[idx_geoHash];
             const speed = row[idx_speed];
-            const direction = row[idx_direction];
-            if (timestamp >= ctx.fromDate && timestamp <= ctx.toDate) {
-                const pos = turf.point([gps_lon, gps_lat]);
-                const isInsidePolygon = turf.pointsWithinPolygon(pos, ctx.geometry).features.length > 0;
-                const isValidVehicle = ctx.event.body.vehicleTypes.length === 0 || ctx.event.body.vehicleTypes.includes(vehicleType);
-                if (isInsidePolygon && isValidVehicle) {
-                    vehicles_search_selected_events_total_counter.inc();
-                    const ev: VehicleQueryResult = {
-                        type: 'vehicle-query-result',
-                        queryId: ctx.event.id,
-                        vehicleId,
-                        vehicleType,
-                        direction,
-                        speed,
-                        timestamp: timestamp.toISOString(),
-                        gps: {
-                            alt: gps_alt,
-                            lat: gps_lat,
-                            lon: gps_lon,
-                        },
-                        geoHash,
-                    };
-                    yield ev;    
-                }
+            const direction = row[idx_direction];            
+            const ev = tryMapToResult(ctx, {
+                timestamp,
+                vehicleId,
+                vehicleType,
+                gps_lat,
+                gps_lon,
+                gps_alt,
+                geoHash,
+                speed,
+                direction,
+            });
+            if (ev) {
+                yield ev;
             }
         }
     }    
+}
+
+export type StoredVehiclePosition = {
+    timestamp: any;
+    vehicleId: any;
+    vehicleType: any;
+    gps_lat: any;
+    gps_lon: any;
+    gps_alt: any;
+    geoHash: any;
+    speed: any;
+    direction: any;
+}
+
+export function tryMapToResult(
+    ctx: VehicleQueryContext, 
+    {
+        timestamp,
+        vehicleId,
+        vehicleType,
+        gps_lat,
+        gps_lon,
+        gps_alt,
+        geoHash,
+        speed,
+        direction,
+    }: StoredVehiclePosition,
+): VehicleQueryResult | undefined {
+    ctx.processedRecordCount += 1;
+    vehicles_search_processed_events_total_counter.inc();
+
+    if (timestamp >= ctx.fromDate && timestamp <= ctx.toDate) {
+        const pos = turf.point([gps_lon, gps_lat]);
+        const isInsidePolygon = turf.pointsWithinPolygon(pos, ctx.geometry).features.length > 0;
+        const isValidVehicle = ctx.event.body.vehicleTypes.length === 0 || ctx.event.body.vehicleTypes.includes(vehicleType);
+        if (isInsidePolygon && isValidVehicle) {
+            vehicles_search_selected_events_total_counter.inc();
+            const ev: VehicleQueryResult = {
+                type: 'vehicle-query-result',
+                queryId: ctx.event.id,
+                vehicleId,
+                vehicleType,
+                direction,
+                speed,
+                timestamp: timestamp.toISOString(),
+                gps: {
+                    alt: gps_alt,
+                    lat: gps_lat,
+                    lon: gps_lon,
+                },
+                geoHash,
+            };
+            return ev;    
+        }
+    }
 }

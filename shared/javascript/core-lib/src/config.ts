@@ -190,6 +190,24 @@ export type CollectorConfig = {
     output: OutputConfig;
 }  
 
+export type FinderFileDataSourceConfig = {
+    type: 'file';
+}
+
+export type FinderAzureSqlDataSourceConfig = {
+    type: 'azureSql';
+    connection: {
+        server: string;
+        database?: string;
+        authentication: any;
+        options: {
+            encrypt: boolean;
+        }
+    }
+}
+
+export type FinderDataSourceConfig = FinderFileDataSourceConfig | FinderAzureSqlDataSourceConfig;
+
 export type FinderConfig = {
     logging: LoggingConfig;
     instances: number;
@@ -199,6 +217,7 @@ export type FinderConfig = {
     parallelSearch: boolean;
     useChunking: boolean;
     messageChunkSize: number;
+    dataSource: FinderDataSourceConfig;
 }
 
 export type ViewerConfig = {

@@ -118,6 +118,20 @@ finder:
   parallelSearch: true
   useChunking: false
   messageChunkSize: 5000
+  dataSource:
+    type: file # will use Collector.output.storage
+    # type: azureSql
+    # connection:
+    #   server: 'redacted-ondemand.sql.azuresynapse.net'
+    #   database: 'vehicles'
+    #   authentication: 
+    #       type: 'azure-active-directory-service-principal-secret'
+    #       options: 
+    #           clientId: 'redacted'
+    #           clientSecret: 'redacted'
+    #           tenantId: 'redacted'
+    #   options: 
+    #       encrypt: true
 
 viewer:
   logging:

@@ -16,6 +16,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/latlon-geohash": "^2.0.4",
+    "@types/mssql": "^9.1.7",
     "@types/node": "^22.14.1",
     "typescript": "^5.8.3"
   },
@@ -27,6 +28,7 @@
     "data-lib": "file:../../shared/javascript/data-lib",
     "latlon-geohash": "^2.0.0",
     "messaging-lib": "file:../../shared/javascript/messaging-lib",
+    "mssql": "^11.0.1",
     "ngeohash": "^0.6.3",
     "nodejs-polars": "0.18.0",
     "yaml": "^2.7.1"

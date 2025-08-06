@@ -26,6 +26,9 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
 
     async *list(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
         const container = await this.getContainerClient(this.containerName);
+        // TODO: use Azure Blob tags to better filter the files, using a tag for their timestamp for instance.
+        // I'm not sure that we could filter on the geohash since we could have more than a dozen and it might not be efficient.
+        // Anyway, we're just listing files and not reading them, so it's not as bad.
         const prefix = findCommonRoot(options.fromPrefix, options.toPrefix);
         for await (const blob of container.listBlobsFlat({ prefix })) {
             const format = detectFormat(blob.name);

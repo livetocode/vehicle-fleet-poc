@@ -4,3 +4,7 @@ export function capitalize(value: string) {
     }
     return '';
 }
+
+export function singleQuote(value: string) {
+    return `'${value}'`;
+}

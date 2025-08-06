@@ -1,10 +1,11 @@
 import fs from 'fs';
 import YAML from 'yaml';
-import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity, services, requests } from 'core-lib';
+import { Config, ConsoleLogger, Logger, NoopLogger, LoggingConfig, ServiceIdentity, services, requests, FinderConfig, IMessageBus } from 'core-lib';
 import { createMessageBus, createWebServer } from 'messaging-lib';
 import { VehicleQueryHandler } from './handlers/VehicleQueryHandler.js';
-import { createDataFrameRepository } from 'data-lib';
+import { createDataFrameRepository, DataFrameRepository } from 'data-lib';
 import { VehicleQueryPartitionHandler } from './handlers/VehicleQueryPartitionHandler.js';
+import { VehicleQueryAzureSqlStrategy, VehicleQueryDataFrameRepositoryStrategy, VehicleQueryStrategy } from './handlers/VehicleQueryStrategy.js';
 
 function loadConfig(filename: string): Config {
     const file = fs.readFileSync(filename, 'utf8')
@@ -21,6 +22,16 @@ function createLogger(logging: LoggingConfig, name: string): Logger {
         return new NoopLogger();
     }
     return new ConsoleLogger(name, logging.level);
+}
+
+function createVehicleQueryStrategy(config: Config, logger: Logger, messageBus: IMessageBus, repo: DataFrameRepository): VehicleQueryStrategy {
+    if (config.finder.dataSource.type === 'file') {
+        return new VehicleQueryDataFrameRepositoryStrategy(config, logger, messageBus, repo);
+    }
+    if (config.finder.dataSource.type === 'azureSql') {
+        return new VehicleQueryAzureSqlStrategy(config, logger, messageBus);
+    }
+    throw new Error('Unknown finder dataSource type');
 }
 
 function getInstanceIndex(): number {
@@ -59,12 +70,15 @@ async function main() {
 
     const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);
 
+    const strategy = createVehicleQueryStrategy(config, logger, messageBus, repo);
+
     const vehicleQueryHandler = new VehicleQueryHandler(
         config,
         logger,
         messageBus,
-        repo,
+        strategy,
     );
+
     const vehicleQueryPartitionHandler = new VehicleQueryPartitionHandler(
         config,
         logger,
