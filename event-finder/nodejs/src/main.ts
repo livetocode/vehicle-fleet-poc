@@ -62,6 +62,7 @@ async function main() {
     const identity: ServiceIdentity = {
         name: 'finder',
         instance: finderIndex,
+        runtime: 'nodejs',
     }
     const logger =  createLogger(config.finder.logging, `${identity.name} #${finderIndex}`);
     

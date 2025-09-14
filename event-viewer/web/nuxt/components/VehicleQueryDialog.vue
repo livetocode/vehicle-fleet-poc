@@ -53,8 +53,8 @@ function onAcceptDialog(isActive: Ref<boolean>) {
         periodId: fldPeriodId.value,
         geometryId: fldGeometryId.value,
         vehicleTypes: fldVehicleTypes.value,
-        limit: fldLimit.value,
-        timeout: fldTimeout.value,
+        limit: parseInt(fldLimit.value.toString()),
+        timeout: parseInt(fldTimeout.value.toString()),
         parallelize: fldParallelize.value,
         useChunking: fldUseChunking.value,
     };

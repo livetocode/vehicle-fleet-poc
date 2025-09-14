@@ -271,7 +271,7 @@ export class VehicleFinderViewModel {
             const resp = await this._messageBus.request(q, {
                 path: requests.vehicles.query.publish({}),
                 id: q.id,
-                timeout,            
+                timeout,
             });
             if (isResponseSuccess(resp)) {
                 this.logger.debug('Received query response', resp.body);

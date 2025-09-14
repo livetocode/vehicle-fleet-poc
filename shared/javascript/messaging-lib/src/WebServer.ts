@@ -13,6 +13,8 @@ export function createWebServer(port: number, logger: Logger, identity: ServiceI
     prom_client.collectDefaultMetrics();
     prom_client.register.setDefaultLabels({
         app_name: identity.name,
+        app_runtime: identity.runtime,
+        app_instance: identity.instance.toString(),
     });
     
     app.get('/ping', (req, res) => {

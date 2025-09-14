@@ -60,6 +60,7 @@ async function main() {
     const identity: ServiceIdentity = {
         name: 'generator',
         instance: generatorIndex,
+        runtime: 'nodejs',
     }
     const logger =  createLogger(config.generator.logging, `${identity.name} #${generatorIndex}`);
     const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);

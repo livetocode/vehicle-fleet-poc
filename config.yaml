@@ -91,7 +91,9 @@ collector:
 
   output:
     overwriteExistingFiles: false
-    flatLayout: true
+    # flatLayout should be false for the Rust finder using local files and Datafusion lib
+    # flatLayout should be true when the finder relies on Azure Sql Server queries
+    flatLayout: false
     formats:
     - parquet
     # - csv

@@ -77,7 +77,7 @@ export class MoveCommandAccumulatorV1 extends BaseAccumulator<StoredEvent<Persis
             const sortedItems = groupItems.map(x => x.event).sort(compareVehicles);
             const watch2 = new Stopwatch();
             watch2.start();
-            const groupWriteStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
+            const groupWriteStats = await this.aggregateStore.write(partitionKey, groupKey, partialFlushSequence, sortedItems);
             watch2.stop();
             partitionStats.push(...groupWriteStats);
             subPartitionCount++;
@@ -223,7 +223,7 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
         const groupKey = objects[0].partitionKey;
         const groupItems = objects;
         const sortedItems = groupItems.map(x => x.event).sort(compareVehicles);
-        const partitionStats = await this.aggregateStore.write(partitionKey, `${groupKey}-${partialFlushSequence}`, sortedItems);
+        const partitionStats = await this.aggregateStore.write(partitionKey, groupKey, partialFlushSequence, sortedItems);
         watch.stop();
         for (const file of partitionStats) {
             formats.add(file.format);

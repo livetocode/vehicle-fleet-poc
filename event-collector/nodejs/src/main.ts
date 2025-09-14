@@ -128,6 +128,7 @@ async function main() {
     const identity: ServiceIdentity = {
         name: 'collector',
         instance: collectorIndex,
+        runtime: 'nodejs',
     }
     const logger =  createLogger(config.collector.logging, `${identity.name} #${collectorIndex}`);
         

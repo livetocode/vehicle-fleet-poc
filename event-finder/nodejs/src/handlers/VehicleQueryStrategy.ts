@@ -1,5 +1,5 @@
 import path from 'path';
-import { type Config, type Logger, dateToUtcParts, calcTimeWindow, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, MessagePath, services, singleQuote, MessageOptionsPair } from 'core-lib';
+import { type Config, type Logger, dateToUtcParts, nameDateParts, calcTimeWindow, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, MessagePath, services, singleQuote, MessageOptionsPair } from 'core-lib';
 import { DataFrameRepository, ListOptions, DataFrameDescriptor, stringToFormat } from "data-lib";
 import { tryMapToResult, VehicleQueryPartitionHandler } from './VehicleQueryPartitionHandler.js';
 import sql, { ConnectionPool } from 'mssql';
@@ -167,7 +167,8 @@ export class VehicleQueryDataFrameRepositoryStrategy implements VehicleQueryStra
         };
         if (flatLayout === false) {
             const commonRoots = findCommonAncestorDirectory(fromDate, toDate);
-            listOptions.subFolder = commonRoots.reduce((a, b) => path.join(a, b), '');
+            const namedCommonRoots = nameDateParts(commonRoots).map(x => `${x[0]}=${x[1]}`);
+            listOptions.subFolder = namedCommonRoots.reduce((a, b) => path.join(a, b), '');
         }
 
         for await (const item of this.repo.list(listOptions)) {
@@ -236,6 +237,10 @@ export class VehicleQueryAzureSqlStrategy implements VehicleQueryStrategy {
         for (const bulkPart of bulkParts) {
             if (bulkPart.value === undefined && bulkPart.differ) {
                 bulkPart.values = bulkPart.differ(ctx.fromDate, ctx.toDate);
+                if (bulkPart.values.length === 1) {
+                    bulkPart.value = bulkPart.values[0];
+                    bulkPart.values = undefined;
+                }
             }
         }
         const filters: string[] = [];
@@ -249,6 +254,8 @@ export class VehicleQueryAzureSqlStrategy implements VehicleQueryStrategy {
                 filters.push(`ev.filepath(${idx}) in (${valuesAsText})`);
             }
         }
+        filters.push('ev.filename() >= @filenameStart');
+        filters.push('ev.filename() < @filenameEnd');
         filters.push('ev.timestamp >= @fromDate');
         filters.push('ev.timestamp < @toDate');
         const bulk = bulkParts.map(x => x.value ?? '*').join('-') + '.parquet';
@@ -269,8 +276,17 @@ export class VehicleQueryAzureSqlStrategy implements VehicleQueryStrategy {
 
         const req = poolConnection.request();
         const stream = req.toReadableStream();
+
         req.input('fromDate', ctx.fromDate);
         req.input('toDate', ctx.toDate);
+
+        const fromRange = calcTimeWindow(ctx.fromDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
+        const fromPrefix = dateToUtcParts(fromRange.fromTime).join('-');
+        const toRange = calcTimeWindow(ctx.toDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
+        const toPrefix = dateToUtcParts(toRange.untilTime).join('-');
+        req.input('filenameStart', fromPrefix);
+        req.input('filenameEnd', toPrefix);
+
         req.query(query);
         for await (const row of stream) {
             const ev = tryMapToResult(ctx, row);
@@ -314,9 +330,6 @@ export function findDateTimeDiffInHours(d1: Date, d2: Date): string[] {
     }
     const last = d2.getUTCHours().toString().padStart(2, '0');
     result.add(last);
-    if (result.size === 1) {
-        return [];
-    }
     return [...result];
 }
 
@@ -342,9 +355,6 @@ export function findDateTimeDiffInDays(d1: Date, d2: Date): string[] {
     }
     const last = d2.getUTCDate().toString().padStart(2, '0');
     result.add(last);
-    if (result.size === 1) {
-        return [];
-    }
     return [...result];
 }
 
@@ -368,9 +378,6 @@ export function findDateTimeDiffInMonths(d1: Date, d2: Date): string[] {
     }
     const last = (d2.getUTCMonth() + 1).toString().padStart(2, '0');
     result.add(last);
-    if (result.size === 1) {
-        return [];
-    }
     return [...result];
 }
 

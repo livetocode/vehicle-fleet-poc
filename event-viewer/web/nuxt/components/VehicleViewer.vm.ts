@@ -178,6 +178,7 @@ export class VehicleViewerViewModel {
             return;
         }
         if (res.queryId !== this._query?.id) {
+            // console.log('Query ID mismatch', res.queryId, this._query?.id);
             return;
         }
         const cmd: MoveCommand = {
@@ -309,8 +310,10 @@ export class VehicleViewerViewModel {
             };
             this._vehicles.set(cmd.vehicleId, v);
         }
-        v.lastCommand = cmd;
-        v.isDirty = true;
+        if (cmd.timestamp >= v.lastCommand.timestamp) {
+            v.lastCommand = cmd;
+            v.isDirty = true;
+        }
     }
 
     private async preload() {

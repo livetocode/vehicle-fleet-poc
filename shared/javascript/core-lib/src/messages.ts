@@ -188,7 +188,9 @@ export type VehicleQueryStartedEvent = {
 export type VehicleQueryStoppedEvent = {
     type: 'vehicle-query-stopped';
     query: Request<VehicleQueryRequest>;
-    response: VehicleQueryResponse;
+    isSuccess: boolean;
+    response?: VehicleQueryResponse;
+    error?: string;
 }
 
 export interface VehicleQueryResult {

@@ -7,7 +7,8 @@
   const identity = {
     name: 'viewer',
     instance: 0,
-  }
+    runtime: 'browser-js',
+}
   const logger = createLogger(appConfig.viewer.logging, identity.name);
   logger.info('App is initializing...');
   const runtimeConfig = useRuntimeConfig();

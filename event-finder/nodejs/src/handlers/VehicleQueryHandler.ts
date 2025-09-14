@@ -1,4 +1,4 @@
-import { type Config, type VehicleQueryRequest, type Logger, type VehicleQueryResponse, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent, MessagePath, events } from 'core-lib';
+import { type Config, type VehicleQueryRequest, type Logger, type VehicleQueryResponse, type IMessageBus, type IncomingMessageEnvelope, RequestHandler, type Request, type VehicleQueryStartedEvent, type VehicleQueryStoppedEvent, MessagePath, events, ResponseError, randomUUID } from 'core-lib';
 import { extractPolygons, polygonsToGeohashes } from "../core/geospatial.js";
 import { Feature, GeoJsonProperties, MultiPolygon } from "geojson";
 import { VehicleQueryContext } from './VehicleQueryContext.js';
@@ -36,33 +36,48 @@ export class VehicleQueryHandler extends RequestHandler<VehicleQueryRequest, Veh
         // TODO: keep this optimization or send to subject 'events.vehicles.query.started'?
         // Warning: the viewer assumes it is the only one to receive this start event.
         await this.messageBus.publish(MessagePath.fromReplyTo(req.body.replyTo), startingEvent);
-        const ctx = new VehicleQueryContext(this.config, req.body);
-        const geohashes = this.createGeohashes(ctx.geometry);
+        try {
+            const ctx = new VehicleQueryContext(this.config, req.body);
+            const geohashes = this.createGeohashes(ctx.geometry);
+            
+            await this.strategy.execute(ctx, geohashes);
 
-        await this.strategy.execute(ctx, geohashes);
+            ctx.watch.stop();
 
-        ctx.watch.stop();
+            const response: VehicleQueryResponse = {
+                type: 'vehicle-query-response',
+                elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
+                processedFilesCount: ctx.processedFilesCount,
+                processedBytes: ctx.processedBytes,
+                processedRecordCount: ctx.processedRecordCount,
+                selectedRecordCount: ctx.selectedRecordCount,
+                distinctVehicleCount: ctx.distinctVehicles.size,
+                timeoutExpired: ctx.timeoutExpired,
+                limitReached: ctx.limitReached,
+            };
+            this.logger.debug('Stats', response);
+            const stoppedEvent: VehicleQueryStoppedEvent = {
+                type: 'vehicle-query-stopped',
+                query: req.body,
+                isSuccess: true,
+                response: response,
+            };
+            const path = events.vehicles.byTypeAndSubType.publish({ type: 'query', subType: 'stopped'});
+            await this.messageBus.publish(path, stoppedEvent);
+            return response;
+        } catch(err: any) {
+            this.logger.error('Error during query', err);
+            const stoppedEvent: VehicleQueryStoppedEvent = {
+                type: 'vehicle-query-stopped',
+                query: req.body,
+                isSuccess: false,
+                error: err.toString(),     
+            };
+            const path = events.vehicles.byTypeAndSubType.publish({ type: 'query', subType: 'stopped'});
+            await this.messageBus.publish(path, stoppedEvent);
 
-        const response: VehicleQueryResponse = {
-            type: 'vehicle-query-response',
-            elapsedTimeInMS: ctx.watch.elapsedTimeInMS(),
-            processedFilesCount: ctx.processedFilesCount,
-            processedBytes: ctx.processedBytes,
-            processedRecordCount: ctx.processedRecordCount,
-            selectedRecordCount: ctx.selectedRecordCount,
-            distinctVehicleCount: ctx.distinctVehicles.size,
-            timeoutExpired: ctx.timeoutExpired,
-            limitReached: ctx.limitReached,
-        };
-        this.logger.debug('Stats', response);
-        const stoppedEvent: VehicleQueryStoppedEvent = {
-            type: 'vehicle-query-stopped',
-            query: req.body,
-            response: response,            
-        };
-        const path = events.vehicles.byTypeAndSubType.publish({ type: 'query', subType: 'stopped'});
-        await this.messageBus.publish(path, stoppedEvent);
-        return response;
+            throw err;
+        }
     }
 
 
