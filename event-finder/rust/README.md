@@ -9,7 +9,19 @@ A query can filter the data on:
 
 # Run locally
 
+## For debugging
+
 ```shell
-npm start
+cargo run
 ```
+
+## For production
+
+Note that compiling this project for release makes it 5 times faster!
+
+```shell
+cargo run --release
+```
+
+
 

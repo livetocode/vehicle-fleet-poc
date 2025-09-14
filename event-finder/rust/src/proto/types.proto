@@ -1,0 +1,19 @@
+syntax = "proto3";
+package types.proto;
+
+message GpsCoordinates {
+  double lat = 1;
+  double lon = 2;
+  double alt = 3;
+}
+
+message VehicleQueryResult {
+    string queryId = 1; // Commencez le numéro de champ à 1
+    string timestamp = 2;
+    string vehicleId = 3;
+    string vehicleType = 4;
+    GpsCoordinates gps = 5; // Utilise le message GpsCoordinates déjà défini
+    string direction = 6;
+    double speed = 7;
+    string geoHash = 8;
+}

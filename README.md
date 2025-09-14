@@ -238,7 +238,9 @@ sequenceDiagram
 - Event Viewer: Nuxt server, Typescript, PixiJS
 - Event Collector: Typescript NodeJS, https://pola.rs/, Parquet format, S3, geohash
 - Event Store: In memory, DuckDB
-- Event finder: Typescript NodeJS, geohash, turf
+- Event finder: 
+    - Typescript NodeJS, geohash, turf
+    - Rust, datafusion, geo, geojson, geohash, nats, actix-web
 
 ## Cloud
 
@@ -528,6 +530,25 @@ npm run preview
 ### start services
 
 `.venv/bin/python3 scripts/nodejs/start.py`
+
+## Rust
+
+### Requirements
+ 
+ Latest version of Rust should be installed. See https://rustup.rs/
+
+### install
+
+`bash scripts/rust/install.sh`
+
+### Run the finder
+
+Note that you should either run the NodeJS service or the Rust one, but not both!
+
+```shell
+cd event-finder/rust
+cargo run
+```
 
 # Deployment
 
