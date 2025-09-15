@@ -210,6 +210,7 @@ export type FinderDataSourceConfig = FinderFileDataSourceConfig | FinderAzureSql
 
 export type FinderConfig = {
     logging: LoggingConfig;
+    runtime: 'nodejs' | 'rust';
     instances: number;
     httpPort: number;
     defaultTimeoutInMS: number;

@@ -113,6 +113,7 @@ finder:
   logging:
     enabled: true
     level: info
+  runtime: nodejs # nodejs, rust
   instances: 3
   httpPort: 7730
   defaultTimeoutInMS: 30000

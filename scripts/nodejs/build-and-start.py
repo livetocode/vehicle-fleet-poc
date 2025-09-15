@@ -8,12 +8,6 @@ from collections import deque
 
 next_http_port = 7700
 
-service_runtimes = {
-    "event-collector": "nodejs",
-    "event-generator": "nodejs",
-    "event-finder": "rust" # nodejs, rust
-}
-
 def read_config():
     with open('config.yaml', 'r') as file:
         return yaml.safe_load(file)
@@ -112,10 +106,11 @@ try:
     services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
 
     step("Start finders")
-    if service_runtimes.get("event-finder", "nodejs") == "rust":
-        services += start_rust_instances("event-finder/rust", config['finder']['instances'])
+    app_config = config['finder']
+    if app_config['runtime'] == "rust":
+        services += start_rust_instances("event-finder/rust", app_config['instances'])
     else:
-        services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
+        services += start_nodejs_instances("event-finder/nodejs", app_config['instances'])
 
     print("")
     print("Waiting for processes to complete...")

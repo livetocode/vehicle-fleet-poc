@@ -529,7 +529,7 @@ npm run preview
 
 ### start services
 
-`.venv/bin/python3 scripts/nodejs/start.py`
+`bash scripts/nodejs/start.sh`
 
 ## Rust
 
