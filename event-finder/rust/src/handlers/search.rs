@@ -296,19 +296,20 @@ pub async fn subscribe_to_generation_requests(mut ctx: crate::contexts::DataHand
 
 pub async fn create_session_context() -> datafusion::error::Result::<SessionContext> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("./"));
-    let default_data_dir = current_dir.join("../../output/data/parquet/");
-    let default_data_dir = default_data_dir.canonicalize().expect("Failed to canonicalize default data dir");
+    println!("Current dir: {}", current_dir.display());
+    let mut default_data_dir = current_dir.join("../../output/data/parquet/");
+    if default_data_dir.exists() {
+        default_data_dir = default_data_dir.canonicalize().expect("Failed to canonicalize default data dir");
+    }
     let data_folder = env::var("DATA_FOLDER").unwrap_or(default_data_dir.display().to_string());
-    println!("Using data folder: {}", data_folder);
+    // println!("Using data folder: {}", data_folder);
     let mut data_folder = url::Url::from_file_path(  PathBuf::from(data_folder))
         .map_err(|_| datafusion::error::DataFusionError::Internal("Failed to convert data folder path to URL".to_string()))?
         .to_string();
     if !data_folder.ends_with('/') {
         data_folder.push_str("/");
     }
-    println!("Using data folder1: {}", data_folder);
-    let data_folder2 = "file:///Users/morganmartinet/Temp/vehicle-fleet-poc/output/data/parquet/";
-    println!("Using data folder2: {}", data_folder2);
+    println!("Using data folder: {}", data_folder);
     let table_path =
         ListingTableUrl::parse(data_folder)?;
 

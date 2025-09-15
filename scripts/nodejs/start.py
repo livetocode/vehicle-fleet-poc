@@ -6,7 +6,13 @@ import requests
 import subprocess
 from collections import deque
 
-next_http_port = 7700;
+next_http_port = 7700
+
+service_runtimes = {
+    "event-collector": "nodejs",
+    "event-generator": "nodejs",
+    "event-finder": "rust" # nodejs, rust
+}
 
 def read_config():
     with open('config.yaml', 'r') as file:
@@ -24,6 +30,10 @@ def start_nodejs_app(folder: str):
 
 def start_background_nodejs_app(folder: str, env):
     result = subprocess.Popen(["npm start"], shell=True, cwd=folder, env=env)
+    return result
+
+def start_background_rust_app(folder: str, env):
+    result = subprocess.Popen(["cargo run --release"], shell=True, cwd=folder, env=env)
     return result
 
 def delete_folder(folder: str):
@@ -62,11 +72,11 @@ def wait_for_instances_to_be_ready(instances):
             time.sleep(0.2)
     print("All instances are ready")
     
-def start_nodejs_instances(folder: str, instances: int):
+def start_instances(folder: str, instances: int, process_starter):
     global next_http_port
     services = []
     for idx in range(instances):
-        process = start_background_nodejs_app(folder, env = { 
+        process = process_starter(folder, env = { 
             'INSTANCE_INDEX': str(idx),
             'PATH': os.environ['PATH'],
             'NODE_HTTP_PORT': str(next_http_port),
@@ -76,6 +86,12 @@ def start_nodejs_instances(folder: str, instances: int):
         next_http_port += 1
     wait_for_instances_to_be_ready(services)
     return services
+
+def start_nodejs_instances(folder: str, instances: int):
+    return start_instances(folder, instances, start_background_nodejs_app)
+
+def start_rust_instances(folder: str, instances: int):
+    return start_instances(folder, instances, start_background_rust_app)
 
 config = read_config()
 
@@ -96,7 +112,10 @@ try:
     services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
 
     step("Start finders")
-    services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
+    if service_runtimes.get("event-finder", "nodejs") == "rust":
+        services += start_rust_instances("event-finder/rust", config['finder']['instances'])
+    else:
+        services += start_nodejs_instances("event-finder/nodejs", config['finder']['instances'])
 
     print("")
     print("Waiting for processes to complete...")
