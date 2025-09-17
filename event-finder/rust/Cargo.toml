@@ -19,6 +19,7 @@ actix-web = "4"
 actix-web-prom = "0.10.0"
 prometheus = "=0.14.0"
 url = "2.5.7"
+anyhow = "1.0.99"
 
 [dependencies.uuid]
 version = "1.18.0"

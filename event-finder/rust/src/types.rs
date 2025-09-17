@@ -30,7 +30,6 @@ pub struct VehicleQueryResponse {
     pub limitReached: bool,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TypedMessage {
     #[serde(rename = "type")]
@@ -71,7 +70,7 @@ pub struct ResponseError {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum Response<TBody = TypedMessage>  {
+pub enum Response<TBody = TypedMessage> {
     #[serde(rename = "response-success")]
     Success {
         id: String,

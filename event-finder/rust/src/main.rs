@@ -1,29 +1,30 @@
-#![allow(non_snake_case, )]
+#![allow(non_snake_case)]
+use actix_web::{App, HttpServer};
+use actix_web_prom::PrometheusMetricsBuilder;
 use std::env;
 use std::string::ToString;
-use actix_web::{App, HttpServer};
-use actix_web_prom::{PrometheusMetricsBuilder};
-use utils::errors::{to_datafusion_error };
+mod contexts;
+mod handlers;
 mod types;
 mod utils;
-mod handlers;
-mod contexts;
 
 pub mod types_proto {
     include!(concat!(env!("OUT_DIR"), "/types.proto.rs"));
 }
 
 #[actix_web::main]
-async fn main() -> datafusion::error::Result<()> {
+async fn main() -> anyhow::Result<()> {
     let registry = prometheus::Registry::new();
     let counters = create_prometheus_counters(registry.clone());
 
     start_nats_handlers(&counters).await?;
 
-    start_web_server(&counters).await.map_err(to_datafusion_error)
+    start_web_server(&counters).await
 }
 
-fn create_prometheus_counters(prometheus_registry: prometheus::Registry) -> contexts::PrometheusCounters {
+fn create_prometheus_counters(
+    prometheus_registry: prometheus::Registry,
+) -> contexts::PrometheusCounters {
     let vehicles_search_processed_events_total_counter = prometheus::IntCounterVec::new(
         prometheus::opts!(
             "vehicles_search_processed_events_total",
@@ -33,7 +34,11 @@ fn create_prometheus_counters(prometheus_registry: prometheus::Registry) -> cont
     )
     .unwrap();
 
-    prometheus_registry.register(Box::new(vehicles_search_processed_events_total_counter.clone())).unwrap();
+    prometheus_registry
+        .register(Box::new(
+            vehicles_search_processed_events_total_counter.clone(),
+        ))
+        .unwrap();
 
     contexts::PrometheusCounters {
         prometheus_registry,
@@ -41,9 +46,11 @@ fn create_prometheus_counters(prometheus_registry: prometheus::Registry) -> cont
     }
 }
 
-async fn start_nats_handlers(prometheus_counters: &contexts::PrometheusCounters) -> datafusion::error::Result<()> {
+async fn start_nats_handlers(
+    prometheus_counters: &contexts::PrometheusCounters,
+) -> anyhow::Result<()> {
     let NATS_SERVERS = env::var("NATS_SERVERS").unwrap_or("localhost".to_string());
-    let nats_client = async_nats::connect(NATS_SERVERS).await.map_err(to_datafusion_error)?;
+    let nats_client = async_nats::connect(NATS_SERVERS).await?;
     println!("Connected to NATS");
     let identity = types::ServiceIdentity {
         name: "finder".to_string(),
@@ -61,35 +68,36 @@ async fn start_nats_handlers(prometheus_counters: &contexts::PrometheusCounters)
     tokio::task::spawn({
         let handler_ctx = data_handler_ctx.clone();
         async move {
-            handlers::search::subscribe_to_search_requests(&handler_ctx).await.map_err(to_datafusion_error)?;
+            handlers::search::subscribe_to_search_requests(&handler_ctx).await?;
 
-            Ok::<(), datafusion::error::DataFusionError>(())
+            anyhow::Ok(())
         }
     });
 
     tokio::task::spawn({
         let handler_ctx = data_handler_ctx.clone();
         async move {
-            handlers::search::subscribe_to_generation_requests(handler_ctx).await.map_err(to_datafusion_error)?;
+            handlers::search::subscribe_to_generation_requests(handler_ctx).await?;
 
-            Ok::<(), datafusion::error::DataFusionError>(())
+            anyhow::Ok(())
         }
     });
 
     tokio::task::spawn({
         let handler_ctx = base_handler_ctx.clone();
         async move {
-            handlers::ping::subscribe_to_ping_requests(&handler_ctx).await.map_err(to_datafusion_error)?;
+            handlers::ping::subscribe_to_ping_requests(&handler_ctx).await?;
 
-            Ok::<(), datafusion::error::DataFusionError>(())
+            anyhow::Ok(())
         }
     });
 
-    Ok::<(), datafusion::error::DataFusionError>(())
+    anyhow::Ok(())
 }
 
-async fn start_web_server(prometheus_counters: &contexts::PrometheusCounters) -> std::io::Result<()> {
-
+async fn start_web_server(
+    prometheus_counters: &contexts::PrometheusCounters,
+) -> anyhow::Result<()> {
     let mut labels = std::collections::HashMap::new();
     labels.insert("service".to_string(), "finder".to_string());
     labels.insert("runtime".to_string(), "rust".to_string());
@@ -113,7 +121,9 @@ async fn start_web_server(prometheus_counters: &contexts::PrometheusCounters) ->
     })
     .bind(("127.0.0.1", port))?
     .run()
-    .await
+    .await?;
+
+    anyhow::Ok(())
 }
 
 fn get_instance_index() -> usize {
