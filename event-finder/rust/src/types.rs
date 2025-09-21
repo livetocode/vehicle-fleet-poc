@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+pub trait HasMessageType: for<'de> Deserialize<'de> + Serialize + Clone + 'static {
+    fn get_msg_type(&self) -> &str;
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VehicleQueryRequest {
     #[serde(rename = "type")]
@@ -16,6 +20,12 @@ pub struct VehicleQueryRequest {
     pub useChunking: Option<bool>,
 }
 
+impl HasMessageType for VehicleQueryRequest {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct VehicleQueryResponse {
     #[serde(rename = "type")]
@@ -30,14 +40,30 @@ pub struct VehicleQueryResponse {
     pub limitReached: bool,
 }
 
+impl HasMessageType for VehicleQueryResponse {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TypedMessage {
     #[serde(rename = "type")]
     pub msg_type: String,
 }
 
+impl HasMessageType for TypedMessage {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Request<TBody = TypedMessage> {
+#[serde(bound(deserialize = "TBody: HasMessageType"))]
+pub struct Request<TBody>
+where
+    TBody: HasMessageType,
+{
     pub id: String,
     #[serde(rename = "type")]
     pub msg_type: String, // devrait valoir "request"
@@ -46,6 +72,12 @@ pub struct Request<TBody = TypedMessage> {
     pub expiresAt: Option<String>,
     pub timeout: Option<u64>,
     pub body: TBody,
+}
+
+impl<TBody: HasMessageType> HasMessageType for Request<TBody> {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -57,6 +89,12 @@ pub struct ResponseSuccess<TBody = TypedMessage> {
     pub body: TBody,
 }
 
+impl<TBody: HasMessageType> HasMessageType for ResponseSuccess<TBody> {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ResponseError {
     pub id: String,
@@ -66,6 +104,12 @@ pub struct ResponseError {
     pub code: String, // 'expired' | 'timeout' | 'cancelled' | 'exception'
     pub body: Option<serde_json::Value>,
     pub error: Option<String>,
+}
+
+impl HasMessageType for ResponseError {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -117,11 +161,23 @@ pub struct VehicleQueryResult {
     pub geoHash: String,
 }
 
+impl HasMessageType for VehicleQueryResult {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VehicleQueryStartedEvent {
     #[serde(rename = "type")]
     pub msg_type: String, // "vehicle-query-started"
     pub query: Request<VehicleQueryRequest>,
+}
+
+impl HasMessageType for VehicleQueryStartedEvent {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -132,6 +188,12 @@ pub struct VehicleQueryStoppedEvent {
     pub isSuccess: bool,
     pub response: Option<VehicleQueryResponse>,
     pub error: Option<String>,
+}
+
+impl HasMessageType for VehicleQueryStoppedEvent {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -148,6 +210,12 @@ pub struct PingRequest {
     pub serviceName: Option<String>,
 }
 
+impl HasMessageType for PingRequest {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PingResponse {
     #[serde(rename = "type")]
@@ -155,6 +223,11 @@ pub struct PingResponse {
     pub identity: ServiceIdentity,
 }
 
+impl HasMessageType for PingResponse {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
+}
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VehicleGenerationStopped {
     #[serde(rename = "type")]
@@ -162,4 +235,10 @@ pub struct VehicleGenerationStopped {
     pub success: bool,
     pub timestamp: String,
     pub elapsedTimeInMS: f64,
+}
+
+impl HasMessageType for VehicleGenerationStopped {
+    fn get_msg_type(&self) -> &str {
+        &self.msg_type
+    }
 }

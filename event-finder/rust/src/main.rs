@@ -65,32 +65,9 @@ async fn start_nats_handlers(
     let session = handlers::search::create_session_context().await?;
     let data_handler_ctx = contexts::DataHandlerContext::new(base_handler_ctx.clone(), session);
 
-    tokio::task::spawn({
-        let handler_ctx = data_handler_ctx.clone();
-        async move {
-            handlers::search::subscribe_to_search_requests(&handler_ctx).await?;
-
-            anyhow::Ok(())
-        }
-    });
-
-    tokio::task::spawn({
-        let handler_ctx = data_handler_ctx.clone();
-        async move {
-            handlers::search::subscribe_to_generation_requests(handler_ctx).await?;
-
-            anyhow::Ok(())
-        }
-    });
-
-    tokio::task::spawn({
-        let handler_ctx = base_handler_ctx.clone();
-        async move {
-            handlers::ping::subscribe_to_ping_requests(&handler_ctx).await?;
-
-            anyhow::Ok(())
-        }
-    });
+    handlers::search::subscribe_to_search_requests(data_handler_ctx.clone())?;
+    handlers::search::subscribe_to_generation_requests(data_handler_ctx.clone())?;
+    handlers::ping::subscribe_to_ping_requests(base_handler_ctx.clone())?;
 
     anyhow::Ok(())
 }
@@ -114,6 +91,7 @@ async fn start_web_server(
         .parse()
         .unwrap();
 
+    println!("Listening on: http://127.0.0.1:{}", port);
     HttpServer::new(move || {
         App::new()
             .wrap(prometheus.clone())
@@ -122,6 +100,7 @@ async fn start_web_server(
     .bind(("127.0.0.1", port))?
     .run()
     .await?;
+    println!("Web server stopped.");
 
     anyhow::Ok(())
 }

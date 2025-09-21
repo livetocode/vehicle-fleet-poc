@@ -28,16 +28,15 @@ async fn execute_vehicle_query(
     let labels: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     let query = &req.body;
     let (fromDate1, _) =
-        crate::utils::time::round_datetime_modulo_minutes(query.fromDate.parse().unwrap(), 10);
-    let (_, toDate2) =
-        crate::utils::time::round_datetime_modulo_minutes(query.toDate.parse().unwrap(), 10);
+        crate::utils::time::round_datetime_modulo_minutes(query.fromDate.parse()?, 10);
+    let (_, toDate2) = crate::utils::time::round_datetime_modulo_minutes(query.toDate.parse()?, 10);
 
     let fromDate = fromDate1.format("%Y-%m-%d-%H-%M").to_string();
     let toDate = toDate2.format("%Y-%m-%d-%H-%M").to_string();
     assert!(fromDate < toDate, "fromDate must be before toDate");
-    let limit: usize = query.limit.unwrap_or(100).try_into().unwrap();
+    let limit: usize = query.limit.unwrap_or(100).try_into()?;
 
-    let geom: Geometry = (&query.geometry).try_into().unwrap();
+    let geom: Geometry = (&query.geometry).try_into()?;
     let geohash_set = crate::utils::geo::geohash_covering(&geom, 5);
     let partitions: Vec<Expr> = geohash_set.iter().map(|h| lit(h)).collect();
     println!("Partitions: {:?}", partitions);
@@ -65,33 +64,16 @@ async fn execute_vehicle_query(
     let schema = df.schema();
     // println!("Schema: {:?}", schema);
 
-    let idxTimestamp = schema
-        .index_of_column(&Column::from_qualified_name("timestamp"))
-        .unwrap();
-    let idxLat = schema
-        .index_of_column(&Column::from_qualified_name("gps_lat"))
-        .unwrap();
-    let idxLon = schema
-        .index_of_column(&Column::from_qualified_name("gps_lon"))
-        .unwrap();
-    let idxAlt = schema
-        .index_of_column(&Column::from_qualified_name("gps_alt"))
-        .unwrap();
-    let idxVehicleId = schema
-        .index_of_column(&Column::from_qualified_name(r#""vehicleId""#))
-        .unwrap();
-    let idxVehicleType = schema
-        .index_of_column(&Column::from_qualified_name(r#""vehicleType""#))
-        .unwrap();
-    let idxDirection = schema
-        .index_of_column(&Column::from_qualified_name("direction"))
-        .unwrap();
-    let idxSpeed = schema
-        .index_of_column(&Column::from_qualified_name("speed"))
-        .unwrap();
-    let idxGeoHash = schema
-        .index_of_column(&Column::from_qualified_name(r#""geoHash""#))
-        .unwrap();
+    let idxTimestamp = schema.index_of_column(&Column::from_qualified_name("timestamp"))?;
+    let idxLat = schema.index_of_column(&Column::from_qualified_name("gps_lat"))?;
+    let idxLon = schema.index_of_column(&Column::from_qualified_name("gps_lon"))?;
+    let idxAlt = schema.index_of_column(&Column::from_qualified_name("gps_alt"))?;
+    let idxVehicleId = schema.index_of_column(&Column::from_qualified_name(r#""vehicleId""#))?;
+    let idxVehicleType =
+        schema.index_of_column(&Column::from_qualified_name(r#""vehicleType""#))?;
+    let idxDirection = schema.index_of_column(&Column::from_qualified_name("direction"))?;
+    let idxSpeed = schema.index_of_column(&Column::from_qualified_name("speed"))?;
+    let idxGeoHash = schema.index_of_column(&Column::from_qualified_name(r#""geoHash""#))?;
 
     let start_time = Instant::now();
     let mut processed_row_count: usize = 0;
@@ -203,14 +185,13 @@ async fn execute_vehicle_query(
                         geo_hash: geo_hash.to_string(),
                     };
                     let mut buf = Vec::new();
-                    result.encode(&mut buf).unwrap();
+                    result.encode(&mut buf)?;
                     let mut headers = HeaderMap::new();
                     headers.insert("proto/type", "vehicle-query-result");
                     ctx.parent
                         .nats_client
                         .publish_with_headers(req.replyTo.clone(), headers, buf.into())
-                        .await
-                        .unwrap();
+                        .await?;
                 } else {
                     let gps = crate::types::GpsCoordinates {
                         lat: vehicle_lat,
@@ -232,8 +213,7 @@ async fn execute_vehicle_query(
                     ctx.parent
                         .nats_client
                         .publish(req.replyTo.clone(), result_json.into())
-                        .await
-                        .unwrap();
+                        .await?;
                 }
             }
             if selected_row_count >= limit {
@@ -270,8 +250,8 @@ async fn execute_vehicle_query(
 }
 
 async fn process_search_request(
-    ctx: &crate::contexts::DataHandlerContext,
-    req: &crate::types::Request<crate::types::VehicleQueryRequest>,
+    ctx: crate::contexts::DataHandlerContext,
+    req: crate::types::Request<crate::types::VehicleQueryRequest>,
 ) -> anyhow::Result<()> {
     println!("Received NATS request: {:?}", req);
 
@@ -338,65 +318,36 @@ async fn process_search_request(
     Ok(())
 }
 
-pub async fn subscribe_to_search_requests(
-    ctx: &crate::contexts::DataHandlerContext,
+pub fn subscribe_to_search_requests(
+    ctx: crate::contexts::DataHandlerContext,
 ) -> anyhow::Result<()> {
-    let mut sub = ctx
-        .parent
-        .nats_client
-        .subscribe("requests.vehicles.query".to_string())
-        .await?;
-    while let Some(msg) = sub.next().await {
-        let res = match serde_json::from_slice::<
-            crate::types::Request<crate::types::VehicleQueryRequest>,
-        >(&msg.payload)
-        {
-            Ok(req) => process_search_request(&ctx, &req).await,
-            Err(e) => Err(anyhow::anyhow!(
-                "Could not deserialize message as JSON: {}",
-                e
-            )),
-        };
-        if let Err(e) = res {
-            eprintln!("Error processing NATS request: {}", e);
-        }
-    }
-    Ok(())
+    let _ = crate::utils::messaging::message_loop(
+        ctx,
+        "requests.vehicles.query".to_string(),
+        process_search_request,
+    );
+    anyhow::Ok(())
 }
 
-pub async fn subscribe_to_generation_requests(
-    mut ctx: crate::contexts::DataHandlerContext,
+pub fn subscribe_to_generation_requests(
+    ctx: crate::contexts::DataHandlerContext,
 ) -> anyhow::Result<()> {
-    let mut sub = ctx
-        .parent
-        .nats_client
-        .subscribe("events.vehicles.generation.stopped".to_string())
-        .await?;
-    while let Some(msg) = sub.next().await {
-        let res =
-            match serde_json::from_slice::<crate::types::VehicleGenerationStopped>(&msg.payload) {
-                Ok(msg) => {
-                    println!("Received NATS message: {:?}", msg);
-                    let session = create_session_context().await?;
-                    ctx.set_session(session);
-                    println!(
-                        "Created a brand new session context after the new generation completed."
-                    );
-                    Ok(())
-                }
-                Err(e) => {
-                    eprintln!("Error deserializing NATS message: {}", e);
-                    Err(anyhow::anyhow!(
-                        "Could not deserialize message as JSON: {}",
-                        e
-                    ))
-                }
-            };
-        if let Err(e) = res {
-            eprintln!("Error processing NATS request: {}", e);
-        }
-    }
-    Ok(())
+    let _ = crate::utils::messaging::message_loop(
+        ctx,
+        "events.vehicles.generation.stopped".to_string(),
+        process_generation_requests,
+    );
+    anyhow::Ok(())
+}
+
+pub async fn process_generation_requests(
+    mut ctx: crate::contexts::DataHandlerContext,
+    _req: crate::types::VehicleGenerationStopped,
+) -> anyhow::Result<()> {
+    let session = create_session_context().await?;
+    ctx.set_session(session);
+    println!("Created a brand new session context after the new generation completed.");
+    anyhow::Ok(())
 }
 
 pub async fn create_session_context() -> anyhow::Result<SessionContext> {

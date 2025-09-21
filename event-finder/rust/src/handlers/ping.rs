@@ -1,35 +1,18 @@
 use actix_web::{HttpResponse, Responder, get};
-use futures_util::StreamExt;
 use uuid::Uuid;
 
-pub async fn subscribe_to_ping_requests(
-    ctx: &crate::contexts::HandlerContext,
-) -> anyhow::Result<()> {
-    let mut sub = ctx
-        .nats_client
-        .subscribe("messaging.control".to_string())
-        .await?;
-    while let Some(msg) = sub.next().await {
-        let res: anyhow::Result<()> = match serde_json::from_slice::<
-            crate::types::Request<crate::types::PingRequest>,
-        >(&msg.payload)
-        {
-            Ok(req) => process_ping_request(&ctx, &req).await,
-            Err(e) => Err(anyhow::anyhow!(
-                "Could not deserialize message as JSON: {}",
-                e
-            )),
-        };
-        if let Err(e) = res {
-            eprintln!("Error processing NATS request: {}", e);
-        }
-    }
+pub fn subscribe_to_ping_requests(ctx: crate::contexts::HandlerContext) -> anyhow::Result<()> {
+    let _ = crate::utils::messaging::message_loop(
+        ctx,
+        "messaging.control".to_string(),
+        process_ping_request,
+    );
     anyhow::Ok(())
 }
 
-async fn process_ping_request(
-    ctx: &crate::contexts::HandlerContext,
-    req: &crate::types::Request<crate::types::PingRequest>,
+pub async fn process_ping_request(
+    ctx: crate::contexts::HandlerContext,
+    req: crate::types::Request<crate::types::PingRequest>,
 ) -> anyhow::Result<()> {
     let resp = crate::types::Response::<crate::types::PingResponse>::Success {
         id: Uuid::new_v4().to_string(),

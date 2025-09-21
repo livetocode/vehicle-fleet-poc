@@ -1718,6 +1718,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-finder"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "actix-web-prom",
+ "anyhow",
+ "async-nats",
+ "chrono",
+ "datafusion",
+ "futures-util",
+ "geo",
+ "geohash",
+ "geojson",
+ "prometheus",
+ "prost",
+ "prost-build",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3590,30 +3614,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "test-datafusion"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "actix-web-prom",
- "anyhow",
- "async-nats",
- "chrono",
- "datafusion",
- "futures-util",
- "geo",
- "geohash",
- "geojson",
- "prometheus",
- "prost",
- "prost-build",
- "serde",
- "serde_json",
- "tokio",
- "url",
- "uuid",
 ]
 
 [[package]]
