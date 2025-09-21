@@ -20,6 +20,8 @@ actix-web-prom = "0.10.0"
 prometheus = "=0.14.0"
 url = "2.5.7"
 anyhow = "1.0.99"
+log = "0.4"
+simple_logger = "5.0.0"
 
 [dependencies.uuid]
 version = "1.18.0"

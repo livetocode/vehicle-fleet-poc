@@ -8,6 +8,7 @@ use datafusion::prelude::*;
 use chrono::{prelude::*, Utc};
 use std::time::Instant; 
 use futures_util::StreamExt;
+use log;
 
 pub fn format_value_as_string(array: &ArrayRef, row_index: usize) -> String {
     if array.is_null(row_index) {
@@ -70,7 +71,7 @@ pub async fn execute_query(ctx: &SessionContext, query: &str, verbose: bool) -> 
         let batch = batch_result?;
         batch_idx += 1;
 
-        println!("\nBatch #{}", batch_idx);
+        log::debug!("\nBatch #{}", batch_idx);
         
         if verbose {
             let num_rows = batch.num_rows();
@@ -92,20 +93,21 @@ pub async fn execute_query(ctx: &SessionContext, query: &str, verbose: bool) -> 
 
             let max_row_num_width = (global_row_idx + num_rows).to_string().len();
 
-            print!("{:>width$} ", "#", width = max_row_num_width);
+            let mut header_line = format!("{:>width$} ", "#", width = max_row_num_width);
             for (i, header) in headers.iter().enumerate() {
-                print!("| {:<width$} ", header, width = max_widths[i]);
+                header_line.push_str(&format!("| {:<width$} ", header, width = max_widths[i]));
             }
-            println!("\n{:-<width$}", "", width = max_row_num_width + 2 + max_widths.iter().sum::<usize>() + max_widths.len() * 3 - 1);
+            log::debug!("{}", header_line);
+            log::debug!("\n{:-<width$}", "", width = max_row_num_width + 2 + max_widths.iter().sum::<usize>() + max_widths.len() * 3 - 1);
 
             for row in rows.iter() {
                 global_row_idx += 1;
                 if verbose {
-                    print!("{:>width$} ", global_row_idx, width = max_row_num_width);
+                    let mut row_line = format!("{:>width$} ", global_row_idx, width = max_row_num_width);
                     for j in 0..row.len() {                        
-                        print!("| {:<width$} ", row[j], width = max_widths[j]);
+                        row_line.push_str(&format!("| {:<width$} ", row[j], width = max_widths[j]));
                     }
-                    println!();
+                    log::debug!("{}", row_line);
                 }
             }
         } else {
@@ -113,16 +115,16 @@ pub async fn execute_query(ctx: &SessionContext, query: &str, verbose: bool) -> 
         }
     }
     let duration = start_time.elapsed();
-    println!("");
-    println!("{}", query);
-    println!("");
-    println!("Rows: {}", global_row_idx);
-    println!("Batches: {}", batch_idx);
+    log::info!("");
+    log::info!("{}", query);
+    log::info!("");
+    log::info!("Rows: {}", global_row_idx);
+    log::info!("Batches: {}", batch_idx);
     if batch_idx > 0 {
-        println!("Batch size: {}", global_row_idx/batch_idx);
+        log::info!("Batch size: {}", global_row_idx/batch_idx);
     }
-    println!("");
-    println!("Elapsed time: {} ms", duration.as_millis());
+    log::info!("");
+    log::info!("Elapsed time: {} ms", duration.as_millis());
 
     Ok(())
 }        

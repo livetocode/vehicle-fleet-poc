@@ -10,6 +10,7 @@ use datafusion::datasource::listing::{
 use datafusion::prelude::*;
 use futures_util::StreamExt;
 use geo::{Contains, Geometry, point};
+use log;
 use prost::Message;
 use std::collections::HashSet;
 use std::env;
@@ -39,7 +40,7 @@ async fn execute_vehicle_query(
     let geom: Geometry = (&query.geometry).try_into()?;
     let geohash_set = crate::utils::geo::geohash_covering(&geom, 5);
     let partitions: Vec<Expr> = geohash_set.iter().map(|h| lit(h)).collect();
-    println!("Partitions: {:?}", partitions);
+    log::debug!("Partitions: {:?}", partitions);
 
     // execute_query(ctx, "SELECT * FROM events where \"vehicleType\" = 'Mini_van' and partition in ('f25kv', 'f25s0') and period >= '2024-01-01-06-50' and period < '2024-01-01-07-10' limit 10").await?;
     // execute_query(&ctx, "SELECT * FROM events limit 1000").await?;
@@ -62,7 +63,6 @@ async fn execute_vehicle_query(
     }
 
     let schema = df.schema();
-    // println!("Schema: {:?}", schema);
 
     let idxTimestamp = schema.index_of_column(&Column::from_qualified_name("timestamp"))?;
     let idxLat = schema.index_of_column(&Column::from_qualified_name("gps_lat"))?;
@@ -231,8 +231,8 @@ async fn execute_vehicle_query(
         }
     }
     let duration = start_time.elapsed();
-    println!("Total rows processed: {}", processed_row_count);
-    println!("Total rows selected: {}", selected_row_count);
+    log::info!("Total rows processed: {}", processed_row_count);
+    log::info!("Total rows selected: {}", selected_row_count);
 
     let respBody = crate::types::VehicleQueryResponse {
         msg_type: "vehicle-query-response".to_string(),
@@ -253,7 +253,7 @@ async fn process_search_request(
     ctx: crate::contexts::DataHandlerContext,
     req: crate::types::Request<crate::types::VehicleQueryRequest>,
 ) -> anyhow::Result<()> {
-    println!("Received NATS request: {:?}", req);
+    log::info!("Received NATS request: {:?}", req);
 
     let start = crate::types::VehicleQueryStartedEvent {
         msg_type: "vehicle-query-started".to_string(),
@@ -268,7 +268,7 @@ async fn process_search_request(
     let resp: crate::types::Response<crate::types::VehicleQueryResponse> =
         match execute_vehicle_query(&ctx, &req).await {
             Ok(respBody) => {
-                println!("Vehicle query executed successfully");
+                log::info!("Vehicle query executed successfully");
                 crate::types::Response::Success {
                     id: Uuid::new_v4().to_string(),
                     requestId: req.id.clone(),
@@ -276,7 +276,7 @@ async fn process_search_request(
                 }
             }
             Err(e) => {
-                eprintln!("Error executing vehicle query: {}", e);
+                log::error!("Error executing vehicle query: {}", e);
                 crate::types::Response::Error {
                     id: Uuid::new_v4().to_string(),
                     requestId: req.id.clone(),
@@ -288,7 +288,7 @@ async fn process_search_request(
         };
 
     let resp_json = serde_json::to_vec(&resp)?;
-    println!("Sending NATS response: {:?}", resp);
+    log::info!("Sending NATS response: {:?}", resp);
     ctx.parent
         .nats_client
         .publish(req.replyTo.clone(), resp_json.into())
@@ -346,13 +346,13 @@ pub async fn process_generation_requests(
 ) -> anyhow::Result<()> {
     let session = create_session_context().await?;
     ctx.set_session(session);
-    println!("Created a brand new session context after the new generation completed.");
+    log::warn!("Created a brand new session context after the new generation completed.");
     anyhow::Ok(())
 }
 
 pub async fn create_session_context() -> anyhow::Result<SessionContext> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("./"));
-    println!("Current dir: {}", current_dir.display());
+    log::info!("Current dir: {}", current_dir.display());
     let mut default_data_dir = current_dir.join("../../output/data/parquet/");
     if default_data_dir.exists() {
         default_data_dir = default_data_dir
@@ -360,14 +360,13 @@ pub async fn create_session_context() -> anyhow::Result<SessionContext> {
             .expect("Failed to canonicalize default data dir");
     }
     let data_folder = env::var("DATA_FOLDER").unwrap_or(default_data_dir.display().to_string());
-    // println!("Using data folder: {}", data_folder);
     let mut data_folder = url::Url::from_file_path(PathBuf::from(data_folder))
         .map_err(|_| anyhow::anyhow!("Failed to convert data folder path to URL"))?
         .to_string();
     if !data_folder.ends_with('/') {
         data_folder.push_str("/");
     }
-    println!("Using data folder: {}", data_folder);
+    log::info!("Using data folder: {}", data_folder);
     let table_path = ListingTableUrl::parse(data_folder)?;
 
     let ctx = SessionContext::new();

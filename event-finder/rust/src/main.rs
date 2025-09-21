@@ -1,6 +1,9 @@
 #![allow(non_snake_case)]
 use actix_web::{App, HttpServer};
 use actix_web_prom::PrometheusMetricsBuilder;
+use log;
+use log::LevelFilter;
+use simple_logger::SimpleLogger;
 use std::env;
 use std::string::ToString;
 mod contexts;
@@ -14,6 +17,15 @@ pub mod types_proto {
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
+    SimpleLogger::new()
+        // Set the default log level for all crates to `warn`
+        .with_level(LevelFilter::Warn)
+        // Set the log level specifically for your crate to `info`
+        .with_module_level("event_finder", LevelFilter::Info)
+        .env()
+        .init()
+        .unwrap();
+
     let registry = prometheus::Registry::new();
     let counters = create_prometheus_counters(registry.clone());
 
@@ -51,7 +63,7 @@ async fn start_nats_handlers(
 ) -> anyhow::Result<()> {
     let NATS_SERVERS = env::var("NATS_SERVERS").unwrap_or("localhost".to_string());
     let nats_client = async_nats::connect(NATS_SERVERS).await?;
-    println!("Connected to NATS");
+    log::info!("Connected to NATS");
     let identity = types::ServiceIdentity {
         name: "finder".to_string(),
         instance: get_instance_index(),
@@ -91,7 +103,7 @@ async fn start_web_server(
         .parse()
         .unwrap();
 
-    println!("Listening on: http://127.0.0.1:{}", port);
+    log::info!("Listening on: http://127.0.0.1:{}", port);
     HttpServer::new(move || {
         App::new()
             .wrap(prometheus.clone())
@@ -100,7 +112,7 @@ async fn start_web_server(
     .bind(("127.0.0.1", port))?
     .run()
     .await?;
-    println!("Web server stopped.");
+    log::info!("Web server stopped.");
 
     anyhow::Ok(())
 }

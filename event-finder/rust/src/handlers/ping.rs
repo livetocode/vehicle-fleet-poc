@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, Responder, get};
 use uuid::Uuid;
+use log;
 
 pub fn subscribe_to_ping_requests(ctx: crate::contexts::HandlerContext) -> anyhow::Result<()> {
     let _ = crate::utils::messaging::message_loop(
@@ -23,7 +24,7 @@ pub async fn process_ping_request(
         },
     };
     let resp_json = serde_json::to_vec(&resp)?;
-    println!("Sending NATS response: {:?}", resp);
+    log::info!("Sending NATS response: {:?}", resp);
     ctx.nats_client
         .publish(req.replyTo.clone(), resp_json.into())
         .await?;

@@ -2,6 +2,7 @@ use crate::contexts::HasNatsClient;
 use futures_util::StreamExt;
 use std::future::Future;
 use tokio::task::JoinHandle;
+use log;
 
 pub fn message_loop<TContext, TMessage, F, Fut>(
     ctx: TContext,
@@ -28,7 +29,7 @@ where
             };
 
             if let Err(e) = res {
-                eprintln!("Error processing NATS request: {}", e);
+                log::error!("Error processing NATS request: {}", e);
             }
         }
         anyhow::Ok(())
