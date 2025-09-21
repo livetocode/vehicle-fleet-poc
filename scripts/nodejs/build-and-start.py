@@ -2,6 +2,7 @@ import os
 import yaml
 import time
 import shutil
+import psutil
 import requests
 import subprocess
 from collections import deque
@@ -35,10 +36,28 @@ def delete_folder(folder: str):
         print(f"deleting '{folder}'...")
         shutil.rmtree(folder)
 
+def kill_running_services_by_folder(folders: list[str]):
+    for proc in psutil.process_iter(['pid', 'name']):
+        try:
+            cmdline = proc.cmdline()
+        except Exception as e:
+            cmdline = None
+        if cmdline and len(cmdline) > 0:
+            prog = cmdline[0]
+            if prog.endswith("node") or prog.endswith("cargo") or any(f in prog for f in folders):
+                for folder in folders:
+                    if folder in proc.cwd():
+                        print(f"killing process {proc.info['pid']}, {proc.info['name']}, {proc.cwd()}")
+                        proc.kill()
+
 def kill_processes(processes):
     for process in processes:
         if process.poll() is None:
             print(f"killing process {process.pid}")
+            p = psutil.Process(process.pid)
+            for child in p.children(recursive=True):
+                print(f"  killing child process {child.pid}")
+                child.kill()
             process.kill()
 
 def wait_for_processes_to_complete(processes):
@@ -87,7 +106,20 @@ def start_nodejs_instances(folder: str, instances: int):
 def start_rust_instances(folder: str, instances: int):
     return start_instances(folder, instances, start_background_rust_app)
 
+def start_service(folder: str, app_config):
+    if app_config.get('runtime') == "rust":
+        return start_rust_instances(f"{folder}/rust", app_config['instances'])
+    else:
+        return start_nodejs_instances(f"{folder}/nodejs", app_config['instances'])
+
 config = read_config()
+
+step("Killing existing processes...")
+kill_running_services_by_folder([
+    "event-collector",
+    "event-generator",
+    "event-finder"
+])
 
 step("build shared libraries...")
 compile_nodejs_lib("shared/javascript/core-lib")
@@ -100,17 +132,13 @@ delete_folder("output")
 services = []
 try:
     step("Start collectors")
-    services += start_nodejs_instances("event-collector/nodejs", config['collector']['instances'])
+    services += start_service("event-collector", config['collector'])
 
     step("Start generators")
-    services += start_nodejs_instances("event-generator/nodejs", config['generator']['instances'])
+    services += start_service("event-generator", config['generator'])
 
     step("Start finders")
-    app_config = config['finder']
-    if app_config['runtime'] == "rust":
-        services += start_rust_instances("event-finder/rust", app_config['instances'])
-    else:
-        services += start_nodejs_instances("event-finder/nodejs", app_config['instances'])
+    services += start_service("event-finder", config['finder'])
 
     print("")
     print("Waiting for processes to complete...")
