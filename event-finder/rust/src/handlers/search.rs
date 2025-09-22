@@ -359,7 +359,14 @@ pub async fn create_session_context(
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("./"));
     log::info!("Current dir: {}", current_dir.display());
     let data_folder = get_data_folder(config)?;
-    let mut default_data_dir = current_dir.join(&data_folder).join("parquet/");
+    let default_format = "parquet".to_string();
+    let format = config
+        .collector
+        .output
+        .formats
+        .get(0)
+        .unwrap_or(&default_format);
+    let mut default_data_dir = current_dir.join(&data_folder).join(format);
     if default_data_dir.exists() {
         default_data_dir = default_data_dir
             .canonicalize()
