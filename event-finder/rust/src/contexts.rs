@@ -26,16 +26,19 @@ impl HasNatsClient for HandlerContext {
 #[derive(Clone)]
 pub struct DataHandlerContext {
     pub parent: HandlerContext,
+    pub config: Arc<crate::config::Config>,
     session: Arc<Mutex<datafusion::execution::context::SessionContext>>,
 }
 
 impl DataHandlerContext {
     pub fn new(
         parent: HandlerContext,
+        config: Arc<crate::config::Config>,
         session: datafusion::execution::context::SessionContext,
     ) -> Self {
         Self {
             parent,
+            config,
             session: Arc::new(Mutex::new(session)),
         }
     }

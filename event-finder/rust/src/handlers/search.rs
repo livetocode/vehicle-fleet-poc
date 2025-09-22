@@ -28,6 +28,10 @@ async fn execute_vehicle_query(
 ) -> anyhow::Result<crate::types::VehicleQueryResponse> {
     let labels: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
     let query = &req.body;
+    let query_timeout = match query.timeout {
+        Some(timeout) => timeout,
+        None => ctx.config.finder.defaultTimeoutInMS,
+    };
     let (fromDate1, _) =
         crate::utils::time::round_datetime_modulo_minutes(query.fromDate.parse()?, 10);
     let (_, toDate2) = crate::utils::time::round_datetime_modulo_minutes(query.toDate.parse()?, 10);
@@ -42,7 +46,7 @@ async fn execute_vehicle_query(
     let partitions: Vec<Expr> = geohash_set.iter().map(|h| lit(h)).collect();
     log::debug!("Partitions: {:?}", partitions);
 
-    // execute_query(ctx, "SELECT * FROM events where \"vehicleType\" = 'Mini_van' and partition in ('f25kv', 'f25s0') and period >= '2024-01-01-06-50' and period < '2024-01-01-07-10' limit 10").await?;
+    // execute_query(ctx, "SELECT * FROM events where \"vehicleType\" = 'Mini_van' and pk in ('f25kv', 'f25s0') and start >= '2024-01-01-06-50' and start < '2024-01-01-07-10' limit 10").await?;
     // execute_query(&ctx, "SELECT * FROM events limit 1000").await?;
     // ORDER BY
     //     period, partition
@@ -159,72 +163,71 @@ async fn execute_vehicle_query(
             }
 
             let p = point!(x: vehicle_lon, y: vehicle_lat);
-            if geom.contains(&p) {
-                selected_row_count += 1;
-                vehicleIds.insert(vehicle_id.to_string());
-                ctx.parent
-                    .prometheus_counters
-                    .vehicles_search_processed_events_total_counter
-                    .with(&labels)
-                    .inc();
-
-                if USE_PROTO_BUF {
-                    let gps = crate::types_proto::GpsCoordinates {
-                        lat: vehicle_lat,
-                        lon: vehicle_lon,
-                        alt: 0.0,
-                    };
-                    let result = crate::types_proto::VehicleQueryResult {
-                        query_id: query.id.clone(),
-                        timestamp: datetime.to_rfc3339(),
-                        vehicle_id: vehicle_id.to_string(),
-                        vehicle_type: vehicle_type.to_string(),
-                        gps: Some(gps),
-                        direction: direction.to_string(),
-                        speed,
-                        geo_hash: geo_hash.to_string(),
-                    };
-                    let mut buf = Vec::new();
-                    result.encode(&mut buf)?;
-                    let mut headers = HeaderMap::new();
-                    headers.insert("proto/type", "vehicle-query-result");
-                    ctx.parent
-                        .nats_client
-                        .publish_with_headers(req.replyTo.clone(), headers, buf.into())
-                        .await?;
-                } else {
-                    let gps = crate::types::GpsCoordinates {
-                        lat: vehicle_lat,
-                        lon: vehicle_lon,
-                        alt: 0.0,
-                    };
-                    let result = crate::types::VehicleQueryResult {
-                        msg_type: "vehicle-query-result".to_string(),
-                        queryId: query.id.clone(),
-                        timestamp: datetime.to_rfc3339(),
-                        vehicleId: vehicle_id.to_string(),
-                        vehicleType: vehicle_type.to_string(),
-                        gps,
-                        direction: direction.to_string(),
-                        speed,
-                        geoHash: geo_hash.to_string(),
-                    };
-                    let result_json = serde_json::to_vec(&result)?;
-                    ctx.parent
-                        .nats_client
-                        .publish(req.replyTo.clone(), result_json.into())
-                        .await?;
-                }
+            if !geom.contains(&p) {
+                continue;
             }
-            if selected_row_count >= limit {
-                limitReached = true;
-                break;
+            selected_row_count += 1;
+            vehicleIds.insert(vehicle_id.to_string());
+            ctx.parent
+                .prometheus_counters
+                .vehicles_search_processed_events_total_counter
+                .with(&labels)
+                .inc();
+
+            if USE_PROTO_BUF {
+                let gps = crate::types_proto::GpsCoordinates {
+                    lat: vehicle_lat,
+                    lon: vehicle_lon,
+                    alt: 0.0,
+                };
+                let result = crate::types_proto::VehicleQueryResult {
+                    query_id: query.id.clone(),
+                    timestamp: datetime.to_rfc3339(),
+                    vehicle_id: vehicle_id.to_string(),
+                    vehicle_type: vehicle_type.to_string(),
+                    gps: Some(gps),
+                    direction: direction.to_string(),
+                    speed,
+                    geo_hash: geo_hash.to_string(),
+                };
+                let mut buf = Vec::new();
+                result.encode(&mut buf)?;
+                let mut headers = HeaderMap::new();
+                headers.insert("proto/type", "vehicle-query-result");
+                ctx.parent
+                    .nats_client
+                    .publish_with_headers(req.replyTo.clone(), headers, buf.into())
+                    .await?;
+            } else {
+                let gps = crate::types::GpsCoordinates {
+                    lat: vehicle_lat,
+                    lon: vehicle_lon,
+                    alt: 0.0,
+                };
+                let result = crate::types::VehicleQueryResult {
+                    msg_type: "vehicle-query-result".to_string(),
+                    queryId: query.id.clone(),
+                    timestamp: datetime.to_rfc3339(),
+                    vehicleId: vehicle_id.to_string(),
+                    vehicleType: vehicle_type.to_string(),
+                    gps,
+                    direction: direction.to_string(),
+                    speed,
+                    geoHash: geo_hash.to_string(),
+                };
+                let result_json = serde_json::to_vec(&result)?;
+                ctx.parent
+                    .nats_client
+                    .publish(req.replyTo.clone(), result_json.into())
+                    .await?;
             }
         }
-        if let Some(timeout) = query.timeout {
-            if start_time.elapsed().as_millis() >= timeout {
-                hasTimmedout = true;
-            }
+        if selected_row_count >= limit {
+            limitReached = true;
+            break;
+        }
+        if start_time.elapsed().as_millis() >= query_timeout {
+            hasTimmedout = true;
         }
         if limitReached || hasTimmedout {
             break;
@@ -344,16 +347,19 @@ pub async fn process_generation_requests(
     mut ctx: crate::contexts::DataHandlerContext,
     _req: crate::types::VehicleGenerationStopped,
 ) -> anyhow::Result<()> {
-    let session = create_session_context().await?;
+    let session = create_session_context(&ctx.config).await?;
     ctx.set_session(session);
     log::warn!("Created a brand new session context after the new generation completed.");
     anyhow::Ok(())
 }
 
-pub async fn create_session_context() -> anyhow::Result<SessionContext> {
+pub async fn create_session_context(
+    config: &Arc<crate::config::Config>,
+) -> anyhow::Result<SessionContext> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("./"));
     log::info!("Current dir: {}", current_dir.display());
-    let mut default_data_dir = current_dir.join("../../output/data/parquet/");
+    let data_folder = get_data_folder(config)?;
+    let mut default_data_dir = current_dir.join(&data_folder).join("parquet/");
     if default_data_dir.exists() {
         default_data_dir = default_data_dir
             .canonicalize()
@@ -397,4 +403,12 @@ pub async fn create_session_context() -> anyhow::Result<SessionContext> {
     ctx.register_table("events", provider)?;
 
     Ok(ctx)
+}
+
+pub fn get_data_folder(config: &Arc<crate::config::Config>) -> anyhow::Result<&String> {
+    let storage = &config.collector.output.storage;
+    match storage {
+        crate::config::StorageConfig::FileStorageConfig { folder } => Ok(folder),
+        _ => anyhow::bail!("Expected Collector output to use file storage"),
+    }
 }
