@@ -3,6 +3,9 @@ use async_nats::HeaderMap;
 use chrono::{Utc, prelude::*};
 use datafusion::arrow::array::{Array, Float64Array, StringViewArray, TimestampMillisecondArray};
 use datafusion::arrow::datatypes::DataType;
+use datafusion::datasource::file_format::arrow::ArrowFormat;
+use datafusion::datasource::file_format::csv::CsvFormat;
+use datafusion::datasource::file_format::json::JsonFormat;
 use datafusion::datasource::file_format::parquet::ParquetFormat;
 use datafusion::datasource::listing::{
     ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl,
@@ -385,9 +388,24 @@ pub async fn create_session_context(
     let ctx = SessionContext::new();
     let session_state = ctx.state();
 
-    let file_format = ParquetFormat::new();
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(".parquet")
+    let (listing_options, file_ext) = match format.as_str() {
+        "arrow" => (
+            ListingOptions::new(Arc::new(ArrowFormat::default())),
+            ".arrow",
+        ),
+        "csv" => (ListingOptions::new(Arc::new(CsvFormat::default())), ".csv"),
+        "json" => (
+            ListingOptions::new(Arc::new(JsonFormat::default())),
+            ".json",
+        ),
+        "parquet" => (
+            ListingOptions::new(Arc::new(ParquetFormat::default())),
+            ".parquet",
+        ),
+        _ => anyhow::bail!("Unknown file format '{}'", format),
+    };
+    let listing_options = listing_options
+        .with_file_extension(file_ext)
         .with_table_partition_cols(vec![
             ("y".to_string(), DataType::Utf8),
             ("m".to_string(), DataType::Utf8),
