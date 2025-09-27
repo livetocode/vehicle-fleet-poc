@@ -162,8 +162,9 @@ pub enum StorageConfig {
     S3StorageConfig,
     #[serde(rename = "azure-blob")]
     AzureBlobStorageConfig {
-        connectionString: Option<String>,
+        accountName: String,
         containerName: String,
+        connectionString: Option<String>,
     },
 }
 

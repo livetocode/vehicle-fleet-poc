@@ -14,8 +14,10 @@ use datafusion::prelude::*;
 use futures_util::StreamExt;
 use geo::{Contains, Geometry, point};
 use log;
+use object_store::ObjectStore;
+use object_store::azure::MicrosoftAzureBuilder;
 use prost::Message;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
 use std::string::ToString;
@@ -359,34 +361,15 @@ pub async fn process_generation_requests(
 pub async fn create_session_context(
     config: &Arc<crate::config::Config>,
 ) -> anyhow::Result<SessionContext> {
-    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("./"));
-    log::info!("Current dir: {}", current_dir.display());
-    let data_folder = get_data_folder(config)?;
-    let default_format = "parquet".to_string();
-    let format = config
-        .collector
-        .output
-        .formats
-        .get(0)
-        .unwrap_or(&default_format);
-    let mut default_data_dir = current_dir.join(&data_folder).join(format);
-    if default_data_dir.exists() {
-        default_data_dir = default_data_dir
-            .canonicalize()
-            .expect("Failed to canonicalize default data dir");
-    }
-    let data_folder = env::var("DATA_FOLDER").unwrap_or(default_data_dir.display().to_string());
-    let mut data_folder = url::Url::from_file_path(PathBuf::from(data_folder))
-        .map_err(|_| anyhow::anyhow!("Failed to convert data folder path to URL"))?
-        .to_string();
-    if !data_folder.ends_with('/') {
-        data_folder.push_str("/");
-    }
-    log::info!("Using data folder: {}", data_folder);
-    let table_path = ListingTableUrl::parse(data_folder)?;
+    let prefix = url::Url::parse("events:///").unwrap();
+    let (format, store) = build_object_store(config)?;
 
     let ctx = SessionContext::new();
     let session_state = ctx.state();
+    ctx.register_object_store(&prefix, store);
+
+    log::info!("Using prefix: {}", prefix);
+    let table_path = ListingTableUrl::parse(prefix)?;
 
     let (listing_options, file_ext) = match format.as_str() {
         "arrow" => (
@@ -430,10 +413,101 @@ pub async fn create_session_context(
     Ok(ctx)
 }
 
-pub fn get_data_folder(config: &Arc<crate::config::Config>) -> anyhow::Result<&String> {
-    let storage = &config.collector.output.storage;
-    match storage {
-        crate::config::StorageConfig::FileStorageConfig { folder } => Ok(folder),
-        _ => anyhow::bail!("Expected Collector output to use file storage"),
+pub fn build_object_store(
+    config: &Arc<crate::config::Config>,
+) -> anyhow::Result<(String, Arc<dyn ObjectStore>)> {
+    let default_format = "parquet".to_string();
+    let format = config
+        .collector
+        .output
+        .formats
+        .get(0)
+        .unwrap_or(&default_format);
+
+    match &config.collector.output.storage {
+        crate::config::StorageConfig::FileStorageConfig { folder } => {
+            let mut data_folder = build_data_folder_path(&folder, "DATA_FOLDER")?;
+            data_folder = data_folder.join(format);
+
+            log::info!("Using data folder: {}", data_folder.display());
+
+            let local_store = object_store::local::LocalFileSystem::new_with_prefix(data_folder)?;
+            Ok((format.clone(), Arc::new(local_store)))
+        }
+        crate::config::StorageConfig::AzureBlobStorageConfig {
+            accountName,
+            containerName,
+            connectionString,
+        } => {
+            let connectionString = match env::var("VEHICLES_AZURE_STORAGE_CONNECTION_STRING") {
+                Ok(cs) => cs.clone(),
+                _ => match connectionString {
+                    Some(s) => s.clone(),
+                    None => {
+                        anyhow::bail!("exected to find connectionString in AzureBlobStorageConfig")
+                    }
+                },
+            };
+            let parts = parse_key_value_string(connectionString.as_str())?;
+            let sas = parts
+                .get("SharedAccessSignature")
+                .expect("expected to find SharedAccessSignature in the connectionString");
+            let account_name = accountName.clone();
+            log::info!(
+                "Using Azure storage account: name={}, container={}",
+                account_name,
+                containerName
+            );
+            let azure_store = MicrosoftAzureBuilder::new()
+                .with_account(account_name)
+                .with_container_name(containerName)
+                .with_config(object_store::azure::AzureConfigKey::SasKey, sas)
+                .build()?;
+            Ok((format.clone(), Arc::new(azure_store)))
+        }
+        _ => anyhow::bail!("Unexpected storage config {:?}", config),
     }
+}
+
+pub fn build_data_folder_path(folder: &String, env_var_name: &str) -> anyhow::Result<PathBuf> {
+    let data_folder = match env::var(env_var_name) {
+        Ok(s) => PathBuf::from(s),
+        Err(_) => {
+            let mut data_folder = PathBuf::from(folder);
+            if !data_folder.is_absolute() {
+                let current_dir = std::env::current_dir()?;
+                log::debug!("Current dir: {}", current_dir.display());
+                let mut default_data_dir = current_dir.join(&data_folder);
+                if default_data_dir.exists() {
+                    default_data_dir = default_data_dir
+                        .canonicalize()
+                        .expect("Failed to canonicalize default data dir");
+                }
+                data_folder = default_data_dir;
+            }
+            data_folder
+        }
+    };
+    Ok(data_folder)
+}
+
+pub fn parse_key_value_string(input: &str) -> anyhow::Result<HashMap<String, String>> {
+    let mut map = HashMap::new();
+
+    for pair in input.split(';') {
+        if pair.is_empty() {
+            continue;
+        }
+
+        if let Some((key, value)) = pair.split_once('=') {
+            map.insert(key.trim().to_string(), value.trim().to_string());
+        } else {
+            return Err(anyhow::format_err!(
+                "Invalid key-value pair format: '{}' (missing '=')",
+                pair
+            ));
+        }
+    }
+
+    Ok(map)
 }

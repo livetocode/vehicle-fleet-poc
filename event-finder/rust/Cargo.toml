@@ -23,6 +23,7 @@ url = "2.5.7"
 anyhow = "1.0.99"
 log = "0.4"
 simple_logger = "5.0.0"
+object_store = { version="0.12.4", features = ["azure"] }
 
 [dependencies.uuid]
 version = "1.18.0"

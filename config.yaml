@@ -103,6 +103,7 @@ collector:
       # type: s3
 
       # type: azure-blob
+      # accountName: morganvehiclessynapse
       # containerName: events
       # # connectionString: 
 

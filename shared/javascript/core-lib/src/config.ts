@@ -143,8 +143,9 @@ export type S3StorageConfig = {
 
 export type AzureBlobStorageConfig = {
     type: 'azure-blob';
-    connectionString?: string;
+    accountName: string;
     containerName: string;
+    connectionString?: string;
 }
 
 export type StorageConfig = 

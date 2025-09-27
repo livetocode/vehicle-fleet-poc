@@ -233,14 +233,20 @@ sequenceDiagram
 
 ### Technologies:
 
-- Event Hub: [NATS](https://nats.io/)
-- Event Generator: Typescript NodeJS
-- Event Viewer: Nuxt server, Typescript, PixiJS
-- Event Collector: Typescript NodeJS, https://pola.rs/, Parquet format, S3, geohash
-- Event Store: In memory, DuckDB
-- Event finder: 
-    - Typescript NodeJS, geohash, turf
-    - Rust, datafusion, geo, geojson, geohash, nats, actix-web
+- Event Hub:
+    - [NATS](https://nats.io/)
+    - Azure Service Bus
+- Event Generator:
+    - NodeJS: Typescript
+- Event Viewer:
+    - NodeJS: Nuxt server, Typescript, PixiJS, geohash
+- Event Collector:
+    - NodeJS: Typescript, https://pola.rs/, Parquet format, S3, geohash
+- Event Store:
+    - In memory
+- Event finder:
+    - NodeJS: Typescript, geohash, turf
+    - Rust: datafusion, geo, geojson, geohash, nats, actix-web, object_store
 
 ## Cloud
 
@@ -275,7 +281,7 @@ You should create a Blob storage account with the following attributes:
 
 Then you can create your new Azure Synapse Analytics resource and use the previously created Storage Account.
 
-##### Configure the external data source 
+##### Configure the external data source
 
 See also the tutorial that demonstrates all the steps: https://www.youtube.com/watch?v=WMSF_ScBKDY
 
@@ -300,10 +306,10 @@ WITH
     -- you should copy the SAS token configured for your Storage Account, in the "Shared access signature"
     SECRET = 'sv=2022-11-02&ss=b&srt=co&sp=rlf&se=2024-12-31T22:42:44Z&st=2024-12-15T14:42:44Z&spr=https&sig=<REDACTED>';
 
-create external data source VehicleDataEvents with ( 
+create external data source VehicleDataEvents with (
     -- you should replace morganvehicledata with the name of your Storage Account.
     location = 'wasbs://events@morganvehicledata.blob.core.windows.net',
-    CREDENTIAL = VehicleDataCredential  
+    CREDENTIAL = VehicleDataCredential
 );
 
 GO;
@@ -325,7 +331,7 @@ The strategy is to use the right BULK filter in order to only select the files c
 use vehicles;
 
 SELECT ev.filename() as filename, COUNT(*) as event_count
-FROM  
+FROM
     OPENROWSET(
         BULK '2024-01-01-*-*-*-*.parquet',
         DATA_SOURCE = 'VehicleDataEvents',
@@ -354,7 +360,7 @@ ORDER BY
 use vehicles;
 
 SELECT ev.*
-FROM  
+FROM
     OPENROWSET(
         BULK '2024-01-01-*-*-*-*.parquet',
         DATA_SOURCE = 'VehicleDataEvents',
@@ -395,7 +401,7 @@ Use a service principal and/or workload identities instead of SAS tokens.
 ```
                                            +-----> Event Viewer
                                            |         + NuxtJS
-Event Generator ==> Event Hub -------------+         
+Event Generator ==> Event Hub -------------+
                      + AWS Eventbridge     |
                                            +----> Event Collector -------> Event Aggregate Store <------ Event finder
                                                   + Amazon Data Firehose       + AWS S3                     + Amazon Athena
@@ -491,7 +497,7 @@ Then execute the script that generate the javascript file and its associated Typ
 bash scripts/nodejs/regen-proto.sh
 ```
 
-Note that you should make sure that the [proto file](./shared/javascript/core-lib/src/proto/messages.proto) and 
+Note that you should make sure that the [proto file](./shared/javascript/core-lib/src/proto/messages.proto) and
 the [message types](./shared/javascript/core-lib/src/messages.ts) are properly in sync, and everytime they change,
 you should regen the files.
 
@@ -534,7 +540,7 @@ npm run preview
 ## Rust
 
 ### Requirements
- 
+
  Latest version of Rust should be installed. See https://rustup.rs/
 
 ### install
@@ -559,7 +565,7 @@ cargo run
 - kubectl
 - nodejs
 
-## Docker 
+## Docker
 
 ### build
 
