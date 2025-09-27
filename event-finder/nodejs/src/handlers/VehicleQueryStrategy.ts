@@ -169,6 +169,9 @@ export class VehicleQueryDataFrameRepositoryStrategy implements VehicleQueryStra
             const commonRoots = findCommonAncestorDirectory(fromDate, toDate);
             const namedCommonRoots = nameDateParts(commonRoots).map(x => `${x[0]}=${x[1]}`);
             listOptions.subFolder = namedCommonRoots.reduce((a, b) => path.join(a, b), '');
+            if (!listOptions.subFolder.endsWith('/')) {
+                listOptions.subFolder += '/';
+            }
         }
 
         for await (const item of this.repo.list(listOptions)) {

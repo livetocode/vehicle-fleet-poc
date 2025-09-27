@@ -416,6 +416,11 @@ pub async fn create_session_context(
 pub fn build_object_store(
     config: &Arc<crate::config::Config>,
 ) -> anyhow::Result<(String, Arc<dyn ObjectStore>)> {
+    if config.collector.output.flatLayout {
+        return Err(anyhow::format_err!(
+            "This finder cannot use the flat layout, because it needs the key/value tags to help filtering the data"
+        ));
+    }
     let default_format = "parquet".to_string();
     let format = config
         .collector

@@ -5,6 +5,11 @@ import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
 import { detectFormat, dataframeToBuffer } from './DataFrameRepository.js';
 import { bufferToDataframe } from './DataFrameRepository.js';
 
+// Note that when using hierarchical listing with a nested layout, we have too many folders 
+// because we have a distinct folder for each key/value pair and it will trigger too many 
+// calls to listBlobsByHierarchy!
+const canUseHierarchicalListing = false;
+
 export class AzureBlobDataframeRepository implements DataFrameRepository {
     private blobServiceClient: BlobServiceClient;
     private containerClients = new Map<string, ContainerClient>();
@@ -26,21 +31,58 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
 
     async *list(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
         const container = await this.getContainerClient(this.containerName);
+        if (options.subFolder && canUseHierarchicalListing) {
+            yield* this.list_by_hierarchy(options, options.subFolder);
+        } else {
+            yield* this.list_flat(options);
+        }
+    }
+
+    private async *list_flat(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
+        const container = await this.getContainerClient(this.containerName);
         // TODO: use Azure Blob tags to better filter the files, using a tag for their timestamp for instance.
         // I'm not sure that we could filter on the geohash since we could have more than a dozen and it might not be efficient.
         // Anyway, we're just listing files and not reading them, so it's not as bad.
-        const prefix = findCommonRoot(options.fromPrefix, options.toPrefix);
+        const prefix = options.subFolder ?? findCommonRoot(options.fromPrefix, options.toPrefix);
         for await (const blob of container.listBlobsFlat({ prefix })) {
+            if (!blob.name.includes('.')) {
+                continue
+            }
             const format = detectFormat(blob.name);
-            if (options.format === format && blob.name >= options.fromPrefix && blob.name < options.toPrefix) {
+            const name = path.basename(blob.name);
+            if (options.format === format && name >= options.fromPrefix && name < options.toPrefix) {
+                // console.debug(`Found matching blob: ${blob.name}`);
                 yield {
                     name: blob.name,
                     size: blob.properties.contentLength ?? 0,
                     format,
                 }
             }
-        }
+        }    
     }
+
+    private async *list_by_hierarchy(options: ListOptions, currentPath: string): AsyncGenerator<DataFrameDescriptor> {
+        if (!currentPath.endsWith('/')) {
+            currentPath += '/';
+        }
+        // console.debug(`Listing blobs in hierarchy at path: ${currentPath}`);
+        const container = await this.getContainerClient(this.containerName);
+        for await (const blob of container.listBlobsByHierarchy("/", { prefix: currentPath })) {
+            if (blob.kind === 'blob') {
+                const format = detectFormat(blob.name);
+                const name = path.basename(blob.name);
+                if (options.format === format && name >= options.fromPrefix && name < options.toPrefix) {
+                    yield {
+                        name: blob.name,
+                        size: blob.properties.contentLength ?? 0,
+                        format,
+                    }
+                }
+            } else if (blob.kind === 'prefix') {
+                yield* this.list_by_hierarchy(options, blob.name);
+            }
+        }
+    }    
 
     async exists(name: string): Promise<boolean> {
         const container = await this.getContainerClient(this.containerName);
