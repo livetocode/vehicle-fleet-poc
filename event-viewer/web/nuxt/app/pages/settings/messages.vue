@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, inject } from 'vue';
-import { type MessageBus } from '../utils/messaging';
+import { type MessageBus } from '../../utils/messaging';
 import { MessagesViewModel } from './messages.vm';
 import { MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';

@@ -19,7 +19,7 @@
     "latlon-geohash": "^2.0.0",
     "md-editor-v3": "^6.0.1",
     "nats.ws": "^1.30.3",
-    "nuxt": "^3.16.2",
+    "nuxt": "^4.1.2",
     "pixi.js": "^8.13.2",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1",

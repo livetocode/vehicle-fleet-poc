@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, inject } from 'vue';
-import { type MessageBus } from '../utils/messaging';
+import { type MessageBus } from '../../utils/messaging';
 import { ServicesViewModel } from './services.vm';
 
 useHead({
