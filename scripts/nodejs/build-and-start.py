@@ -89,12 +89,15 @@ def start_instances(folder: str, instances: int, process_starter):
     global next_http_port
     services = []
     for idx in range(instances):
-        process = process_starter(folder, env = { 
+        process_env = { 
             'INSTANCE_INDEX': str(idx),
             'PATH': os.environ['PATH'],
             'NODE_HTTP_PORT': str(next_http_port),
-            'VEHICLES_AZURE_STORAGE_CONNECTION_STRING': os.environ['VEHICLES_AZURE_STORAGE_CONNECTION_STRING']
-        })
+        }
+        cs = os.environ.get('VEHICLES_AZURE_STORAGE_CONNECTION_STRING')
+        if cs:
+            process_env['VEHICLES_AZURE_STORAGE_CONNECTION_STRING'] = cs
+        process = process_starter(folder, env = process_env)
         services.append((process, next_http_port))
         next_http_port += 1
     wait_for_instances_to_be_ready(services)
