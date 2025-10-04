@@ -1,4 +1,3 @@
-#![allow(non_snake_case)]
 use async_nats::HeaderMap;
 use chrono::{Utc, prelude::*};
 use datafusion::arrow::array::{Array, Float64Array, StringViewArray, TimestampMillisecondArray};
@@ -25,8 +24,6 @@ use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 
-const USE_PROTO_BUF: bool = true;
-
 async fn execute_vehicle_query(
     ctx: &crate::contexts::DataHandlerContext,
     req: &crate::types::Request<crate::types::VehicleQueryRequest>,
@@ -38,8 +35,9 @@ async fn execute_vehicle_query(
         None => ctx.config.finder.defaultTimeoutInMS,
     };
     let (fromDate1, _) =
-        crate::utils::time::round_datetime_modulo_minutes(query.fromDate.parse()?, 10);
-    let (_, toDate2) = crate::utils::time::round_datetime_modulo_minutes(query.toDate.parse()?, 10);
+        crate::utils::time::round_datetime_modulo_minutes(query.from_date.parse()?, 10);
+    let (_, toDate2) =
+        crate::utils::time::round_datetime_modulo_minutes(query.to_date.parse()?, 10);
 
     let fromDate = fromDate1.format("%Y-%m-%d-%H-%M").to_string();
     let toDate = toDate2.format("%Y-%m-%d-%H-%M").to_string();
@@ -61,15 +59,16 @@ async fn execute_vehicle_query(
     df = df.filter(col("start").gt_eq(lit(fromDate)))?;
     df = df.filter(col("start").lt(lit(toDate)))?;
     df = df.filter(col("pk").in_list(partitions, false))?;
-    if !query.vehicleTypes.is_empty() {
+    if !query.vehicle_types.is_empty() {
         let vehicle_types = query
-            .vehicleTypes
+            .vehicle_types
             .iter()
             .map(|v| lit(v))
             .collect::<Vec<Expr>>();
 
         df = df.filter(col(r#""vehicleType""#).in_list(vehicle_types, false))?;
     }
+    // df.clone().show_limit(20).await?;
 
     let schema = df.schema();
 
@@ -104,47 +103,67 @@ async fn execute_vehicle_query(
             .column(idxTimestamp)
             .as_any()
             .downcast_ref::<TimestampMillisecondArray>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!(
+                    "Unable to cast column 'timestamp' into TimestampMillisecondArray"
+                )
+            })?;
         let colLat = batch
             .column(idxLat)
             .as_any()
             .downcast_ref::<Float64Array>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'gps_lat' into Float64Array")
+            })?;
         let colLon = batch
             .column(idxLon)
             .as_any()
             .downcast_ref::<Float64Array>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'gps_lon' into Float64Array")
+            })?;
         let colAlt = batch
             .column(idxAlt)
             .as_any()
             .downcast_ref::<Float64Array>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'gps_alt' into Float64Array")
+            })?;
         let colVehicleId = batch
             .column(idxVehicleId)
             .as_any()
             .downcast_ref::<StringViewArray>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'vehicleId' into StringViewArray")
+            })?;
         let colVehicleType = batch
             .column(idxVehicleType)
             .as_any()
             .downcast_ref::<StringViewArray>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'vehicleType' into StringViewArray")
+            })?;
         let colDirection = batch
             .column(idxDirection)
             .as_any()
             .downcast_ref::<StringViewArray>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'direction' into StringViewArray")
+            })?;
         let colSpeed = batch
             .column(idxSpeed)
             .as_any()
             .downcast_ref::<Float64Array>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'speed' into Float64Array")
+            })?;
         let colGeoHash = batch
             .column(idxGeoHash)
             .as_any()
             .downcast_ref::<StringViewArray>()
-            .unwrap();
+            .ok_or_else(|| {
+                anyhow::format_err!("Unable to cast column 'geoHash' into StringViewArray")
+            })?;
 
         for i in 0..batch.num_rows() {
             let vehicle_timestamp = colTimestamp.value(i);
@@ -179,7 +198,7 @@ async fn execute_vehicle_query(
                 .with(&labels)
                 .inc();
 
-            if USE_PROTO_BUF {
+            if ctx.parent.enable_proto_buf {
                 let gps = crate::types_proto::GpsCoordinates {
                     lat: vehicle_lat,
                     lon: vehicle_lon,
@@ -201,7 +220,7 @@ async fn execute_vehicle_query(
                 headers.insert("proto/type", "vehicle-query-result");
                 ctx.parent
                     .nats_client
-                    .publish_with_headers(req.replyTo.clone(), headers, buf.into())
+                    .publish_with_headers(req.reply_to.clone(), headers, buf.into())
                     .await?;
             } else {
                 let gps = crate::types::GpsCoordinates {
@@ -211,19 +230,19 @@ async fn execute_vehicle_query(
                 };
                 let result = crate::types::VehicleQueryResult {
                     msg_type: "vehicle-query-result".to_string(),
-                    queryId: query.id.clone(),
+                    query_id: query.id.clone(),
                     timestamp: datetime.to_rfc3339(),
-                    vehicleId: vehicle_id.to_string(),
-                    vehicleType: vehicle_type.to_string(),
+                    vehicle_id: vehicle_id.to_string(),
+                    vehicle_type: vehicle_type.to_string(),
                     gps,
                     direction: direction.to_string(),
                     speed,
-                    geoHash: geo_hash.to_string(),
+                    geo_hash: geo_hash.to_string(),
                 };
                 let result_json = serde_json::to_vec(&result)?;
                 ctx.parent
                     .nats_client
-                    .publish(req.replyTo.clone(), result_json.into())
+                    .publish(req.reply_to.clone(), result_json.into())
                     .await?;
             }
         }
@@ -244,14 +263,14 @@ async fn execute_vehicle_query(
 
     let respBody = crate::types::VehicleQueryResponse {
         msg_type: "vehicle-query-response".to_string(),
-        processedFilesCount: batch_count,
-        processedBytes: total_bytes,
-        processedRecordCount: processed_row_count,
-        selectedRecordCount: selected_row_count,
-        distinctVehicleCount: vehicleIds.len(),
-        elapsedTimeInMS: duration.as_millis(),
-        timeoutExpired: false,
-        limitReached: limitReached,
+        processed_files_count: batch_count,
+        processed_bytes: total_bytes,
+        processed_record_count: processed_row_count,
+        selected_record_count: selected_row_count,
+        distinct_vehicle_count: vehicleIds.len(),
+        elapsed_time_in_MS: duration.as_millis(),
+        timeout_expired: false,
+        limit_reached: limitReached,
     };
 
     Ok(respBody)
@@ -279,7 +298,7 @@ async fn process_search_request(
                 log::info!("Vehicle query executed successfully");
                 crate::types::Response::Success {
                     id: Uuid::new_v4().to_string(),
-                    requestId: req.id.clone(),
+                    request_id: req.id.clone(),
                     body: respBody,
                 }
             }
@@ -287,7 +306,7 @@ async fn process_search_request(
                 log::error!("Error executing vehicle query: {}", e);
                 crate::types::Response::Error {
                     id: Uuid::new_v4().to_string(),
-                    requestId: req.id.clone(),
+                    request_id: req.id.clone(),
                     code: crate::types::ResponseErrorCode::Exception,
                     body: None,
                     error: Some(e.to_string()),
@@ -299,21 +318,21 @@ async fn process_search_request(
     log::info!("Sending NATS response: {:?}", resp);
     ctx.parent
         .nats_client
-        .publish(req.replyTo.clone(), resp_json.into())
+        .publish(req.reply_to.clone(), resp_json.into())
         .await?;
 
     let stop = match resp {
         crate::types::Response::Success { body, .. } => crate::types::VehicleQueryStoppedEvent {
             msg_type: "vehicle-query-stopped".to_string(),
-            query: req.clone(),
-            isSuccess: true,
+            query: req,
+            is_success: true,
             response: Some(body),
             error: None,
         },
         crate::types::Response::Error { error, .. } => crate::types::VehicleQueryStoppedEvent {
             msg_type: "vehicle-query-stopped".to_string(),
-            query: req.clone(),
-            isSuccess: false,
+            query: req,
+            is_success: false,
             response: None,
             error,
         },

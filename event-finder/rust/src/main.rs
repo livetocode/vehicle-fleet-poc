@@ -69,7 +69,7 @@ async fn start_nats_handlers(
     config: &Arc<crate::config::Config>,
     prometheus_counters: &contexts::PrometheusCounters,
 ) -> anyhow::Result<()> {
-    let nats_server_addresses = get_nats_servers(&config)?;
+    let (nats_server_addresses, enableProtoBuf) = get_nats_servers(&config)?;
     let nats_client = async_nats::connect(nats_server_addresses).await?;
     log::info!("Connected to NATS servers");
 
@@ -82,6 +82,7 @@ async fn start_nats_handlers(
     let base_handler_ctx = contexts::HandlerContext {
         nats_client: nats_client.clone(),
         prometheus_counters: prometheus_counters.clone(),
+        enable_proto_buf: enableProtoBuf,
         identity,
     };
 
@@ -153,9 +154,13 @@ fn get_instance_index() -> usize {
     0
 }
 
-pub fn get_nats_servers(config: &crate::config::Config) -> anyhow::Result<Vec<ServerAddr>> {
-    let nats_protos = match &config.hub {
-        crate::config::HubConfig::NatsHubConfig { protocols: p, .. } => p,
+pub fn get_nats_servers(config: &crate::config::Config) -> anyhow::Result<(Vec<ServerAddr>, bool)> {
+    let (nats_protos, enableProtoBuf) = match &config.hub {
+        crate::config::HubConfig::NatsHubConfig {
+            protocols: p,
+            enableProtoBuf,
+            ..
+        } => (p, *enableProtoBuf),
         _ => anyhow::bail!("Expected the hub to be configured for NATS"),
     };
 
@@ -170,5 +175,5 @@ pub fn get_nats_servers(config: &crate::config::Config) -> anyhow::Result<Vec<Se
         .map(|s| s.parse::<ServerAddr>().unwrap())
         .collect();
     log::info!("Connecting to NATS servers: {:?}", nats_servers);
-    Ok(nats_server_addresses)
+    Ok((nats_server_addresses, enableProtoBuf))
 }

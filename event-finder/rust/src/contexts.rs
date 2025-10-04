@@ -15,6 +15,7 @@ pub struct HandlerContext {
     pub nats_client: async_nats::Client,
     pub prometheus_counters: PrometheusCounters,
     pub identity: crate::types::ServiceIdentity,
+    pub enable_proto_buf: bool,
 }
 
 impl HasNatsClient for HandlerContext {
