@@ -17,17 +17,17 @@
     "@mdi/font": "^7.4.47",
     "core-lib": "file:../../../shared/javascript/core-lib",
     "latlon-geohash": "^2.0.0",
-    "md-editor-v3": "^5.5.0",
+    "md-editor-v3": "^6.0.1",
     "nats.ws": "^1.30.3",
     "nuxt": "^3.16.2",
-    "pixi.js": "^8.9.1",
-    "vue": "^3.5.13",
-    "vue-router": "^4.5.0",
-    "yaml": "^2.7.1"
+    "pixi.js": "^8.13.2",
+    "vue": "^3.5.22",
+    "vue-router": "^4.5.1",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "vite-plugin-node-polyfills": "^0.23.0",
-    "vite-plugin-vuetify": "^2.1.1",
-    "vuetify": "^3.8.2"
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vite-plugin-vuetify": "^2.1.2",
+    "vuetify": "^3.10.4"
   }
 }

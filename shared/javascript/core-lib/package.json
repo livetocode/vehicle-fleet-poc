@@ -14,10 +14,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^22.14.1",
-    "typescript": "^5.8.3"
+    "@types/node": "^24.6.2",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "protobufjs": "^7.5.3"
+    "protobufjs": "^7.5.4"
   }
 }
