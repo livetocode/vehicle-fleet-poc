@@ -66,7 +66,7 @@ async function main() {
     }
     const logger =  createLogger(config.finder.logging, `${identity.name} #${finderIndex}`);
     
-    const repo = createDataFrameRepository(config.collector.output);
+    const repo = createDataFrameRepository(config.collector.output, logger);
     await repo.init();
 
     const messageBus = await createMessageBus(config.hub, identity, logger, config.chaosEngineering);

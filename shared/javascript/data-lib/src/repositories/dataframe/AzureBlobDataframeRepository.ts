@@ -4,6 +4,7 @@ import { DataFrameRepository, ListOptions, DataFrameDescriptor, findCommonRoot }
 import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
 import { detectFormat, dataframeToBuffer } from './DataFrameRepository.js';
 import { bufferToDataframe } from './DataFrameRepository.js';
+import { Logger, sleep } from 'core-lib';
 
 // Note that when using hierarchical listing with a nested layout, we have too many folders 
 // because we have a distinct folder for each key/value pair and it will trigger too many 
@@ -14,7 +15,7 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     private blobServiceClient: BlobServiceClient;
     private containerClients = new Map<string, ContainerClient>();
 
-    constructor(connectionString: string, private containerName: string) {      
+    constructor(private logger: Logger, connectionString: string, private containerName: string) {      
       this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);        
     }
 
@@ -23,10 +24,24 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     }
 
     async clear(): Promise<void> {
-        // const events = this.blobServiceClient.getContainerClient('events');
-        // await events.deleteIfExists();
-        // this.containerClients.clear();
-        // await this.getContainerClient('events');
+        const events = this.blobServiceClient.getContainerClient('events');
+        this.logger.debug('Delete events container...');
+        await events.deleteIfExists();
+        while (true) {
+            this.containerClients.clear();
+            try {
+                await this.getContainerClient('events');
+                this.logger.info('Events container has been recreated.');
+                break;
+            } catch(err: any) {
+                if (err.code === 'ContainerBeingDeleted' && err.statusCode === 409) {
+                    this.logger.warn('Waiting for container to be deleted...');
+                    await sleep(1000);
+                } else {
+                    throw err;
+                }
+            }
+        }
     }
 
     async *list(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
@@ -43,22 +58,25 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
         // TODO: use Azure Blob tags to better filter the files, using a tag for their timestamp for instance.
         // I'm not sure that we could filter on the geohash since we could have more than a dozen and it might not be efficient.
         // Anyway, we're just listing files and not reading them, so it's not as bad.
-        const prefix = options.subFolder ?? findCommonRoot(options.fromPrefix, options.toPrefix);
-        for await (const blob of container.listBlobsFlat({ prefix })) {
-            if (!blob.name.includes('.')) {
-                continue
-            }
-            const format = detectFormat(blob.name);
-            const name = path.basename(blob.name);
-            if (options.format === format && name >= options.fromPrefix && name < options.toPrefix) {
-                // console.debug(`Found matching blob: ${blob.name}`);
-                yield {
-                    name: blob.name,
-                    size: blob.properties.contentLength ?? 0,
-                    format,
+        const defaultPrefix = options.subFolder ?? findCommonRoot(options.fromPrefix, options.toPrefix);
+        const prefixes = options.prefixes ?? [defaultPrefix];
+        for (const prefix of prefixes) {
+            for await (const blob of container.listBlobsFlat({ prefix })) {
+                if (!blob.name.includes('.')) {
+                    continue
                 }
-            }
-        }    
+                const format = detectFormat(blob.name);
+                const name = path.basename(blob.name);
+                if (options.format === format && name >= options.fromPrefix && name < options.toPrefix) {
+                    // console.debug(`Found matching blob: ${blob.name}`);
+                    yield {
+                        name: blob.name,
+                        size: blob.properties.contentLength ?? 0,
+                        format,
+                    }
+                }
+            }    
+        }
     }
 
     private async *list_by_hierarchy(options: ListOptions, currentPath: string): AsyncGenerator<DataFrameDescriptor> {

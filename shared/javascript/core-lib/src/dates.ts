@@ -85,3 +85,107 @@ export function compareTimeRange(a: TimeRange, b: TimeRange): number {
 export function formatTimeRange(range: TimeRange): string {
     return dateToUtcParts(range.fromTime).join('-');
 }
+
+export function isBefore(a: Date, b: Date): boolean {
+    return a.getTime() < b.getTime();
+}
+
+export function isBeforeOrEqual(a: Date, b: Date): boolean {
+    return a.getTime() <= b.getTime();
+}
+
+export function addYears(dt: Date, years: number): Date {
+    const result = new Date(dt);
+    result.setUTCFullYear(result.getUTCFullYear() + years);
+    return result;
+}
+
+export function addMonths(dt: Date, months: number): Date {
+    const result = new Date(dt);
+    result.setUTCMonth(result.getUTCMonth() + months);
+    return result;
+}
+
+export function addDays(dt: Date, days: number): Date {
+    const result = new Date(dt);
+    result.setUTCDate(result.getUTCDate() + days);
+    return result;
+}
+
+export function addHours(dt: Date, hours: number): Date {
+    const result = new Date(dt);
+    result.setUTCHours(result.getUTCHours() + hours);
+    return result;
+}
+
+export function addMinutes(dt: Date, minutes: number): Date {
+    const result = new Date(dt);
+    result.setUTCMinutes(result.getUTCMinutes() + minutes);
+    return result;
+}
+
+export function isBeginningOfYear(dt: Date): boolean {
+    return dt.getUTCMonth() === 0 && dt.getUTCDate() === 1 && dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0;
+}
+
+export function isBeginningOfMonth(dt: Date): boolean {
+    return dt.getUTCDate() === 1 && dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0;
+}
+
+export function isBeginningOfDay(dt: Date): boolean {
+    return dt.getUTCHours() === 0 && dt.getUTCMinutes() === 0;
+}
+
+export function isBeginningOfHour(dt: Date): boolean {
+    return dt.getUTCMinutes() === 0;
+}
+
+export function* generateTimePrefixes(startDate: Date, endDate: Date, windowInMin: number) {
+  if (startDate.getTime() >= endDate.getTime()) {
+    throw new Error(`startDate ${startDate.toISOString()} must be before endDate ${endDate.toISOString()}`);
+  }
+  let cursor = calcTimeWindow(startDate, windowInMin).fromTime;
+
+  while (isBefore(cursor, endDate)) {
+    const parts = dateToUtcParts(cursor)
+    if (
+      isBeginningOfYear(cursor) &&
+      isBeforeOrEqual(addYears(cursor, 1), endDate)
+    ) {
+      yield parts.slice(0, 1);
+      cursor = addYears(cursor, 1);
+      continue;
+    }
+
+    if (
+      isBeginningOfMonth(cursor) &&
+      isBeforeOrEqual(addMonths(cursor, 1), endDate)
+    ) {
+      yield parts.slice(0, 2);
+      cursor = addMonths(cursor, 1);
+      continue;
+    }
+
+    if (
+      isBeginningOfDay(cursor) &&
+      isBeforeOrEqual(addDays(cursor, 1), endDate)
+    ) {
+      yield parts.slice(0, 3);
+      cursor = addDays(cursor, 1);
+      continue;
+    }
+
+    if (
+      isBeginningOfHour(cursor) &&
+      isBeforeOrEqual(addHours(cursor, 1), endDate)
+    ) {
+      yield parts.slice(0, 4);
+      cursor = addHours(cursor, 1);
+      continue;
+    }
+    
+    yield parts;
+
+    cursor = addMinutes(cursor, windowInMin);
+  }
+}

@@ -13,6 +13,7 @@ export interface ListOptions {
     toPrefix: string;
     format: DataFrameFormat;
     subFolder?: string;
+    prefixes?: string[];
 }
 
 export interface DataFrameRepository {

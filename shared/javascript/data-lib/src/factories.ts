@@ -1,8 +1,8 @@
-import { OutputConfig } from "core-lib";
+import { Logger, OutputConfig } from "core-lib";
 import { FileDataframeRepository } from "./repositories/dataframe/FileDataframeRepository.js";
 import { AzureBlobDataframeRepository } from "./repositories/dataframe/AzureBlobDataframeRepository.js";
 
-export function createDataFrameRepository(config: OutputConfig) {
+export function createDataFrameRepository(config: OutputConfig, logger: Logger) {
     if (config.storage.type === 'file') {
       return new FileDataframeRepository(config.storage.folder);
     }
@@ -12,7 +12,7 @@ export function createDataFrameRepository(config: OutputConfig) {
       if (!connectionString) {
         throw Error('Azure Storage Connection string not found: VEHICLES_AZURE_STORAGE_CONNECTION_STRING');
       }
-      return new AzureBlobDataframeRepository(connectionString, config.storage.containerName);
+      return new AzureBlobDataframeRepository(logger, connectionString, config.storage.containerName);
     }
     throw new Error(`Unknown output type "${config.storage.type}"`);
 }

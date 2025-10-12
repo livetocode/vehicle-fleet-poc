@@ -135,7 +135,7 @@ async function main() {
     const eventStore = createEventStore(config.collector.eventStore);
     await eventStore.init();
 
-    const repo = createDataFrameRepository(config.collector.output);
+    const repo = createDataFrameRepository(config.collector.output, logger);
     await repo.init();
 
     const aggregateStore = createAggregateStore(config.collector, logger, repo);

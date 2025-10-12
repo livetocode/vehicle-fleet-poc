@@ -1,5 +1,5 @@
 import path from 'path';
-import { type Config, type Logger, dateToUtcParts, nameDateParts, calcTimeWindow, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, MessagePath, services, singleQuote, MessageOptionsPair } from 'core-lib';
+import { type Config, type Logger, dateToUtcParts, nameDateParts, calcTimeWindow, type VehicleQueryPartitionRequest, asyncChunks, type IMessageBus, type IncomingMessageEnvelope, type Request, type RequestOptionsPair, RequestTimeoutError, isResponseSuccess, isVehicleQueryPartitionResponse, MessagePath, services, singleQuote, MessageOptionsPair, generateTimePrefixes } from 'core-lib';
 import { DataFrameRepository, ListOptions, DataFrameDescriptor, stringToFormat } from "data-lib";
 import { tryMapToResult, VehicleQueryPartitionHandler } from './VehicleQueryPartitionHandler.js';
 import sql, { ConnectionPool } from 'mssql';
@@ -155,30 +155,47 @@ export class VehicleQueryDataFrameRepositoryStrategy implements VehicleQueryStra
     }    
 
     private async *enumerateFiles(fromDate: Date, toDate: Date, geohashes: Set<string>) {
+        const flatLayout = this.config.collector.output.flatLayout;
+        const format = stringToFormat(this.config.finder.dataFormat);
         const periodInMin = this.config.partitioning.timePartition.aggregationPeriodInMin;
         const fromPrefix = calcTimeWindow(fromDate, periodInMin).toString();
         const toRange = calcTimeWindow(toDate, periodInMin);
         const toPrefix = dateToUtcParts(toRange.untilTime).join('-');
-        const flatLayout = this.config.collector.output.flatLayout;
         const listOptions: ListOptions = {
             fromPrefix,
             toPrefix,
-            format: stringToFormat(this.config.finder.dataFormat),
+            format,
         };
-        if (flatLayout === false) {
-            const commonRoots = findCommonAncestorDirectory(fromDate, toDate);
-            const namedCommonRoots = nameDateParts(commonRoots).map(x => `${x[0]}=${x[1]}`);
-            listOptions.subFolder = namedCommonRoots.reduce((a, b) => path.join(a, b), '');
-            if (!listOptions.subFolder.endsWith('/')) {
-                listOptions.subFolder += '/';
+        if (flatLayout) {
+            const prefixes: string[] = [];
+            for (const prefix of generateTimePrefixes(fromDate, toDate, periodInMin)) {
+                prefixes.push(prefix.join('-'));
             }
-        }
+            listOptions.prefixes = prefixes;
+            this.logger.debug(`Using prefixes: ${prefixes.join(', ')}`);
+            for await (const item of this.repo.list(listOptions)) {
+                const segments = path.basename(item.name).split('-');
+                const fileGeohash = segments[5];
+                if (geohashes.has(fileGeohash)) {
+                    yield item;
+                }
+            }
+        } else {
+            for (const prefix of generateTimePrefixes(fromDate, toDate, periodInMin)) {
+                this.logger.debug(`Processing time prefix: ${prefix.join('-')}`);
+                const namedPrefix = nameDateParts(prefix).map(x => `${x[0]}=${x[1]}`);
+                listOptions.subFolder = namedPrefix.reduce((a, b) => path.join(a, b), '');
+                if (!listOptions.subFolder.endsWith('/')) {
+                    listOptions.subFolder += '/';
+                }
 
-        for await (const item of this.repo.list(listOptions)) {
-            const segments = path.basename(item.name).split('-');
-            const fileGeohash = segments[5];
-            if (geohashes.has(fileGeohash)) {
-                yield item;
+                for await (const item of this.repo.list(listOptions)) {
+                    const segments = path.basename(item.name).split('-');
+                    const fileGeohash = segments[5];
+                    if (geohashes.has(fileGeohash)) {
+                        yield item;
+                    }
+                }
             }
         }
     }
@@ -224,177 +241,95 @@ export class VehicleQueryAzureSqlStrategy implements VehicleQueryStrategy {
     }
 
     async *searchDatabase(ctx: VehicleQueryContext, geohashes: Set<string>, poolConnection: ConnectionPool) {
-        const commonRoots = findCommonAncestorDirectory(ctx.fromDate, ctx.toDate);
-        const bulkParts: { name: string; value?: string; values?: string[]; differ?: DateTimeDiffer }[] = [
-            { name: 'year',  differ: findDateTimeDiffInYears, },
-            { name: 'month', differ: findDateTimeDiffInMonths, },
-            { name: 'day',   differ: findDateTimeDiffInDays, },
-            { name: 'hour',  differ: findDateTimeDiffInHours, },
-            { name: 'minutes' },
-            { name: 'geohash', values: [...geohashes], },
-            { name: 'sequence' },
-        ];
-        for (let i = 0; i < commonRoots.length; i++) {
-            bulkParts[i].value = commonRoots[i];
-        }
-        for (const bulkPart of bulkParts) {
-            if (bulkPart.value === undefined && bulkPart.differ) {
-                bulkPart.values = bulkPart.differ(ctx.fromDate, ctx.toDate);
-                if (bulkPart.values.length === 1) {
+        const isFlat = this.config.collector.output.flatLayout;
+        const aggregationPeriodInMin = this.config.partitioning.timePartition.aggregationPeriodInMin;
+        for (const prefix of generateTimePrefixes(ctx.fromDate, ctx.toDate, aggregationPeriodInMin)) {
+            this.logger.debug(`Using prefix: ${prefix.join('-')}`);
+            const commonRoots = prefix;
+            let bulkParts: { name: string; value?: string; values?: string[]; tagsOnly?: boolean; }[] = [
+                { name: 'y',  value: prefix[0], },
+                { name: 'm', value: prefix[1], },
+                { name: 'd',   value: prefix[2], },
+                { name: 'hh',  value: prefix[3], },
+                { name: 'mm', value: prefix[4], },
+                { name: 'start', tagsOnly: true, },
+                { name: 'int', tagsOnly: true, },
+                { name: 'pk', values: [...geohashes], },
+            ];
+            if (isFlat) {
+                bulkParts = bulkParts.filter(x => x.tagsOnly !== true );
+            }
+            for (let i = 0; i < commonRoots.length; i++) {
+                bulkParts[i].value = commonRoots[i];
+            }
+            const filters: string[] = [];
+            let idx = 0;
+            for (const bulkPart of bulkParts) {
+                if (bulkPart.values && bulkPart.values.length === 1) {
                     bulkPart.value = bulkPart.values[0];
                     bulkPart.values = undefined;
                 }
+                if (bulkPart.value === undefined) {
+                    idx++;
+                }
+                if (bulkPart.values && bulkPart.values.length > 0) {
+                    const valuesAsText = bulkPart.values.map(singleQuote).join(',');
+                    filters.push(`ev.filepath(${idx}) in (${valuesAsText})`);
+                }
             }
-        }
-        const filters: string[] = [];
-        let idx = 0;
-        for (const bulkPart of bulkParts) {
-            if (bulkPart.value === undefined) {
-                idx++;
+            if (isFlat) {
+                filters.push('ev.filename() >= @filenameStart');
+                filters.push('ev.filename() < @filenameEnd');
             }
-            if (bulkPart.values && bulkPart.values.length > 0) {
-                const valuesAsText = bulkPart.values.map(singleQuote).join(',');
-                filters.push(`ev.filepath(${idx}) in (${valuesAsText})`);
+            filters.push('ev.timestamp >= @fromDate');
+            filters.push('ev.timestamp < @toDate');
+            const bulk = isFlat ?
+                bulkParts.map(x => x.value ?? '*').join('-') + '-*.parquet' :
+                bulkParts.map(x => `${x.name}=${x.value ?? '*'}`).join('/') + '/*.parquet';
+            const query = `
+            SELECT ev.*
+            FROM
+                OPENROWSET(
+                    BULK '${bulk}',
+                    DATA_SOURCE = 'VehicleEvents',
+                    FORMAT='PARQUET'
+                ) AS ev
+            WHERE
+                ${filters.join(' AND\n')}
+            ORDER BY
+                ev.timestamp
+            `;
+            this.logger.debug('Sql query', query);
+
+            const req = poolConnection.request();
+            const stream = req.toReadableStream();
+
+            req.input('fromDate', ctx.fromDate);
+            req.input('toDate', ctx.toDate);
+            if (isFlat) {
+                const fromRange = calcTimeWindow(ctx.fromDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
+                const fromPrefix = dateToUtcParts(fromRange.fromTime).join('-');
+                const toRange = calcTimeWindow(ctx.toDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
+                const toPrefix = dateToUtcParts(toRange.untilTime).join('-');
+                req.input('filenameStart', fromPrefix);
+                req.input('filenameEnd', toPrefix);
             }
-        }
-        filters.push('ev.filename() >= @filenameStart');
-        filters.push('ev.filename() < @filenameEnd');
-        filters.push('ev.timestamp >= @fromDate');
-        filters.push('ev.timestamp < @toDate');
-        const bulk = bulkParts.map(x => x.value ?? '*').join('-') + '.parquet';
-        const query = `
-        SELECT ev.*
-        FROM
-            OPENROWSET(
-                BULK '${bulk}',
-                DATA_SOURCE = 'VehicleEvents',
-                FORMAT='PARQUET'
-            ) AS ev
-        WHERE
-            ${filters.join(' AND\n')}
-        ORDER BY
-            ev.timestamp
-        `;
-        this.logger.debug('Sql query', query);
-
-        const req = poolConnection.request();
-        const stream = req.toReadableStream();
-
-        req.input('fromDate', ctx.fromDate);
-        req.input('toDate', ctx.toDate);
-
-        const fromRange = calcTimeWindow(ctx.fromDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
-        const fromPrefix = dateToUtcParts(fromRange.fromTime).join('-');
-        const toRange = calcTimeWindow(ctx.toDate, this.config.partitioning.timePartition.aggregationPeriodInMin);
-        const toPrefix = dateToUtcParts(toRange.untilTime).join('-');
-        req.input('filenameStart', fromPrefix);
-        req.input('filenameEnd', toPrefix);
-
-        req.query(query);
-        for await (const row of stream) {
-            const ev = tryMapToResult(ctx, row);
-            if (ev) {
-                yield ev;
-            }
-        }        
-    }
-}
-
-export type DateTimeDiffer = (d1: Date, d2: Date) => string[];
-
-export function findCommonAncestorDirectory(d1: Date, d2: Date) {
-    const dp1 = dateToUtcParts(d1);
-    const dp2 = dateToUtcParts(d2);
-    const result: string[] = [];
-    for (let i = 0; i < dp1.length; i++) {
-        if (dp1[i] === dp2[i]) {
-            result.push(dp1[i]);
-        } else {
-            break;
-        }
-    }
-    return result;
-}
-
-export function findDateTimeDiffInHours(d1: Date, d2: Date): string[] {
-    const hourInMS = 60 * 60 * 1000;
-    const delta = d2.getTime() - d1.getTime();
-    if (delta < hourInMS) {
-        return [];
-    }
-    if (delta / hourInMS >= 24) {
-        return [];
-    }
-    let current = d1;
-    const result = new Set<string>();
-    while (current.getTime() < d2.getTime()) {
-        result.add(current.getUTCHours().toString().padStart(2, '0'));
-        current = new Date(current.getTime() + hourInMS);
-    }
-    const last = d2.getUTCHours().toString().padStart(2, '0');
-    result.add(last);
-    return [...result];
-}
-
-export function findDateTimeDiffInDays(d1: Date, d2: Date): string[] {
-    if (d1.getUTCFullYear() === d2.getUTCFullYear()) {
-        if (d1.getUTCMonth() === d2.getUTCMonth()) {
-            if (d1.getUTCDate() === d2.getUTCDate()) {
-                return [];
+            try {
+                req.query(query);
+                for await (const row of stream) {
+                    const ev = tryMapToResult(ctx, row);
+                    if (ev) {
+                        yield ev;
+                    }
+                }        
+            } catch(err: any) {
+                if (err.number === 13807) {
+                    // Example: Content of directory on path 'y=2024/m=01/d=01/hh=07/mm=00/start=*/int=*/pk=*/*.parquet' cannot be listed.
+                    this.logger.warn(`No files found for this bulk: ${bulk}`);
+                } else {
+                    throw err;
+                }
             }
         }
     }
-    const hourInMS = 60 * 60 * 1000;
-    const dayInMS = hourInMS * 24;
-    const delta = d2.getTime() - d1.getTime();
-    if (delta / dayInMS >= 31) {
-        return [];
-    }
-    let current = d1;
-    const result = new Set<string>();
-    while (current.getTime() < d2.getTime()) {
-        result.add(current.getUTCDate().toString().padStart(2, '0'));
-        current = new Date(current.getTime() + dayInMS);
-    }
-    const last = d2.getUTCDate().toString().padStart(2, '0');
-    result.add(last);
-    return [...result];
-}
-
-export function findDateTimeDiffInMonths(d1: Date, d2: Date): string[] {
-    if (d1.getUTCFullYear() === d2.getUTCFullYear()) {
-        if (d1.getUTCMonth() === d2.getUTCMonth()) {
-            return [];
-        }
-    }
-    const hourInMS = 60 * 60 * 1000;
-    const dayInMS = hourInMS * 24;
-    const delta = d2.getTime() - d1.getTime();
-    if (delta / dayInMS >= 365) {
-        return [];
-    }
-    let current = d1;
-    const result = new Set<string>();
-    while (current.getTime() < d2.getTime()) {
-        result.add((current.getUTCMonth() + 1).toString().padStart(2, '0'));
-        current = new Date(current.getTime() + dayInMS);
-    }
-    const last = (d2.getUTCMonth() + 1).toString().padStart(2, '0');
-    result.add(last);
-    return [...result];
-}
-
-export function findDateTimeDiffInYears(d1: Date, d2: Date): string[] {
-    if (d1.getUTCFullYear() === d2.getUTCFullYear()) {
-        return [];
-    }
-    let current = d1;
-    const result = new Set<string>();
-    while (current.getTime() < d2.getTime()) {
-        result.add(current.getUTCFullYear().toString().padStart(2, '0'));
-        current.setUTCFullYear(current.getUTCFullYear() + 1);
-    }
-    const last = d2.getUTCFullYear().toString().padStart(2, '0');
-    result.add(last);
-    return [...result];
 }
