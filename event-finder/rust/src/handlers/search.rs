@@ -34,14 +34,14 @@ async fn execute_vehicle_query(
         Some(timeout) => timeout,
         None => ctx.config.finder.defaultTimeoutInMS,
     };
-    let (fromDate1, _) =
+    let (from_date1, _) =
         crate::utils::time::round_datetime_modulo_minutes(query.from_date.parse()?, 10);
-    let (_, toDate2) =
+    let (_, to_date2) =
         crate::utils::time::round_datetime_modulo_minutes(query.to_date.parse()?, 10);
 
-    let fromDate = fromDate1.format("%Y-%m-%d-%H-%M").to_string();
-    let toDate = toDate2.format("%Y-%m-%d-%H-%M").to_string();
-    assert!(fromDate < toDate, "fromDate must be before toDate");
+    let from_date = from_date1.format("%Y-%m-%d-%H-%M").to_string();
+    let to_date = to_date2.format("%Y-%m-%d-%H-%M").to_string();
+    assert!(from_date < to_date, "fromDate must be before toDate");
     let limit: usize = query.limit.unwrap_or(100).try_into()?;
 
     let geom: Geometry = (&query.geometry).try_into()?;
@@ -56,8 +56,8 @@ async fn execute_vehicle_query(
 
     let mut df = ctx.get_session().table("events").await?;
 
-    df = df.filter(col("start").gt_eq(lit(fromDate)))?;
-    df = df.filter(col("start").lt(lit(toDate)))?;
+    df = df.filter(col("start").gt_eq(lit(from_date)))?;
+    df = df.filter(col("start").lt(lit(to_date)))?;
     df = df.filter(col("pk").in_list(partitions, false))?;
     if !query.vehicle_types.is_empty() {
         let vehicle_types = query
@@ -72,25 +72,25 @@ async fn execute_vehicle_query(
 
     let schema = df.schema();
 
-    let idxTimestamp = schema.index_of_column(&Column::from_qualified_name("timestamp"))?;
-    let idxLat = schema.index_of_column(&Column::from_qualified_name("gps_lat"))?;
-    let idxLon = schema.index_of_column(&Column::from_qualified_name("gps_lon"))?;
-    let idxAlt = schema.index_of_column(&Column::from_qualified_name("gps_alt"))?;
-    let idxVehicleId = schema.index_of_column(&Column::from_qualified_name(r#""vehicleId""#))?;
-    let idxVehicleType =
+    let idx_timestamp = schema.index_of_column(&Column::from_qualified_name("timestamp"))?;
+    let idx_lat = schema.index_of_column(&Column::from_qualified_name("gps_lat"))?;
+    let idx_lon = schema.index_of_column(&Column::from_qualified_name("gps_lon"))?;
+    let idx_alt = schema.index_of_column(&Column::from_qualified_name("gps_alt"))?;
+    let idx_vehicle_id = schema.index_of_column(&Column::from_qualified_name(r#""vehicleId""#))?;
+    let idx_vehicle_type =
         schema.index_of_column(&Column::from_qualified_name(r#""vehicleType""#))?;
-    let idxDirection = schema.index_of_column(&Column::from_qualified_name("direction"))?;
-    let idxSpeed = schema.index_of_column(&Column::from_qualified_name("speed"))?;
-    let idxGeoHash = schema.index_of_column(&Column::from_qualified_name(r#""geoHash""#))?;
+    let idx_direction = schema.index_of_column(&Column::from_qualified_name("direction"))?;
+    let idx_speed = schema.index_of_column(&Column::from_qualified_name("speed"))?;
+    let idx_geohash = schema.index_of_column(&Column::from_qualified_name(r#""geoHash""#))?;
 
     let start_time = Instant::now();
     let mut processed_row_count: usize = 0;
     let mut selected_row_count: usize = 0;
     let mut batch_count: usize = 0;
     let mut total_bytes: usize = 0;
-    let mut limitReached = false;
-    let mut hasTimmedout = false;
-    let mut vehicleIds = HashSet::new();
+    let mut limit_reached = false;
+    let mut has_timed_out = false;
+    let mut vehicle_ids = HashSet::new();
 
     let mut stream = df.execute_stream().await?;
     while let Some(batch_result) = stream.next().await {
@@ -99,8 +99,8 @@ async fn execute_vehicle_query(
         processed_row_count += batch.num_rows();
         total_bytes += batch.get_array_memory_size();
 
-        let colTimestamp = batch
-            .column(idxTimestamp)
+        let col_timestamp = batch
+            .column(idx_timestamp)
             .as_any()
             .downcast_ref::<TimestampMillisecondArray>()
             .ok_or_else(|| {
@@ -108,57 +108,57 @@ async fn execute_vehicle_query(
                     "Unable to cast column 'timestamp' into TimestampMillisecondArray"
                 )
             })?;
-        let colLat = batch
-            .column(idxLat)
+        let col_lat = batch
+            .column(idx_lat)
             .as_any()
             .downcast_ref::<Float64Array>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'gps_lat' into Float64Array")
             })?;
-        let colLon = batch
-            .column(idxLon)
+        let col_lon = batch
+            .column(idx_lon)
             .as_any()
             .downcast_ref::<Float64Array>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'gps_lon' into Float64Array")
             })?;
-        let colAlt = batch
-            .column(idxAlt)
+        let col_alt = batch
+            .column(idx_alt)
             .as_any()
             .downcast_ref::<Float64Array>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'gps_alt' into Float64Array")
             })?;
-        let colVehicleId = batch
-            .column(idxVehicleId)
+        let col_vehicle_id = batch
+            .column(idx_vehicle_id)
             .as_any()
             .downcast_ref::<StringViewArray>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'vehicleId' into StringViewArray")
             })?;
-        let colVehicleType = batch
-            .column(idxVehicleType)
+        let col_vehicle_type = batch
+            .column(idx_vehicle_type)
             .as_any()
             .downcast_ref::<StringViewArray>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'vehicleType' into StringViewArray")
             })?;
-        let colDirection = batch
-            .column(idxDirection)
+        let col_direction = batch
+            .column(idx_direction)
             .as_any()
             .downcast_ref::<StringViewArray>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'direction' into StringViewArray")
             })?;
-        let colSpeed = batch
-            .column(idxSpeed)
+        let col_speed = batch
+            .column(idx_speed)
             .as_any()
             .downcast_ref::<Float64Array>()
             .ok_or_else(|| {
                 anyhow::format_err!("Unable to cast column 'speed' into Float64Array")
             })?;
-        let colGeoHash = batch
-            .column(idxGeoHash)
+        let col_geohash = batch
+            .column(idx_geohash)
             .as_any()
             .downcast_ref::<StringViewArray>()
             .ok_or_else(|| {
@@ -166,15 +166,15 @@ async fn execute_vehicle_query(
             })?;
 
         for i in 0..batch.num_rows() {
-            let vehicle_timestamp = colTimestamp.value(i);
-            let vehicle_lat = colLat.value(i);
-            let vehicle_lon = colLon.value(i);
-            let vehicle_alt = colAlt.value(i);
-            let vehicle_id = colVehicleId.value(i);
-            let vehicle_type = colVehicleType.value(i);
-            let direction = colDirection.value(i);
-            let speed = colSpeed.value(i);
-            let geo_hash = colGeoHash.value(i);
+            let vehicle_timestamp = col_timestamp.value(i);
+            let vehicle_lat = col_lat.value(i);
+            let vehicle_lon = col_lon.value(i);
+            let vehicle_alt = col_alt.value(i);
+            let vehicle_id = col_vehicle_id.value(i);
+            let vehicle_type = col_vehicle_type.value(i);
+            let direction = col_direction.value(i);
+            let speed = col_speed.value(i);
+            let geo_hash = col_geohash.value(i);
             if vehicle_lat.is_nan() || vehicle_lon.is_nan() || vehicle_alt.is_nan() {
                 continue;
             }
@@ -182,7 +182,7 @@ async fn execute_vehicle_query(
                 .timestamp_millis_opt(vehicle_timestamp)
                 .single()
                 .unwrap();
-            if (datetime < fromDate1) || (datetime >= toDate2) {
+            if (datetime < from_date1) || (datetime >= to_date2) {
                 continue;
             }
 
@@ -191,7 +191,7 @@ async fn execute_vehicle_query(
                 continue;
             }
             selected_row_count += 1;
-            vehicleIds.insert(vehicle_id.to_string());
+            vehicle_ids.insert(vehicle_id.to_string());
             ctx.parent
                 .prometheus_counters
                 .vehicles_search_processed_events_total_counter
@@ -247,13 +247,13 @@ async fn execute_vehicle_query(
             }
         }
         if selected_row_count >= limit {
-            limitReached = true;
+            limit_reached = true;
             break;
         }
         if start_time.elapsed().as_millis() >= query_timeout {
-            hasTimmedout = true;
+            has_timed_out = true;
         }
-        if limitReached || hasTimmedout {
+        if limit_reached || has_timed_out {
             break;
         }
     }
@@ -267,10 +267,10 @@ async fn execute_vehicle_query(
         processed_bytes: total_bytes,
         processed_record_count: processed_row_count,
         selected_record_count: selected_row_count,
-        distinct_vehicle_count: vehicleIds.len(),
+        distinct_vehicle_count: vehicle_ids.len(),
         elapsed_time_in_MS: duration.as_millis(),
         timeout_expired: false,
-        limit_reached: limitReached,
+        limit_reached,
     };
 
     Ok(respBody)
