@@ -119,12 +119,13 @@ export class ArrayContainer<TItem> implements Container<TItem> {
             return;
         }
         this.manager.onFlush(this);
+        const items = this.items;
+        this.items = [];
         await this.persister({
-            items: this.items,
+            items: items,
             isPartialFlush: isPartial,
             partialFlushCounter: this.partialFlushCounter,
         });
-        this.items = [];
         if (isPartial) {
             this.partialFlushCounter += 1;
         } else {
@@ -159,11 +160,12 @@ export class MapContainer<TItem> implements Container<TItem> {
 
     async flush(isPartial: boolean): Promise<void> {
         this.manager.onFlush(this);
-        for (const item of this.items.values()) {
+        const values = [...this.items.values()];
+        this.items.clear();
+        for (const item of values) {
             await item.flush(isPartial);
             this.manager.remove(item);
         }
-        this.items.clear();
     }
 }
 
@@ -192,21 +194,25 @@ export class SortedContainer<TItem> implements Container<TItem> {
         let container = this.items.find(x => x[0] === key)?.[1];
         if (!container) {
             await this.checkCapacity(key);
-            container = this.containerFactory();
-            this.manager.add(container);
-            this.items.push([key, container]);
-            this.items.sort((a, b) => a[0].localeCompare(b[0]));
+            container = this.items.find(x => x[0] === key)?.[1];
+            if (!container) {
+                container = this.containerFactory();
+                this.manager.add(container);
+                this.items.push([key, container]);
+                this.items.sort((a, b) => a[0].localeCompare(b[0]));
+            }
         }
         await container.add(item);
     }
 
     async flush(isPartial: boolean): Promise<void> {
         this.manager.onFlush(this);
-        for (const item of this.items) {
+        const items = this.items;
+        this.items = [];
+        for (const item of items) {
             await item[1].flush(isPartial);
             this.manager.remove(item[1]);
         }
-        this.items = [];
     }
 
     private async checkCapacity(key: string) {
