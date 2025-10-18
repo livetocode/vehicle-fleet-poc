@@ -150,6 +150,7 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
     private eventCounter = 0;
     private persistCalls = 0;
     private totalRejectedMessagesInThePast = 0;
+    private isFlushing = false;
 
     constructor(
         private config: Config,
@@ -180,10 +181,15 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
     
     async init(): Promise<void> {
         this.firstEventReceivedAt = undefined;
+        this.eventCounter = 0;
+        this.persistCalls = 0;
         this.container = this.createContainer();
     }
 
     async write(obj: StoredEvent<PersistedMoveCommand>): Promise<void> {
+        if (this.isFlushing) {
+            this.logger.warn('Received event while flushing: ', obj);
+        }
         if (!this.firstEventReceivedAt) {
             this.firstEventReceivedAt = new Date();
         }
@@ -200,12 +206,23 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
     }
 
     async flush(): Promise<void> {
-        await this.container.flush(false);
-        this.logger.info('Received ', this.eventCounter, ' events');
-        this.logger.info('Invoked ', this.persistCalls, ' persistObjects');
-        this.eventCounter = 0;
-        this.persistCalls = 0;
-        this.firstEventReceivedAt = undefined;
+        if (this.isFlushing) {
+            this.logger.warn('Flush is already in progress!');
+            return;
+        }
+        this.isFlushing = true;
+        try {
+            const container = this.container;
+            this.container = this.createContainer();
+            await container.flush(false);
+            this.logger.info('Received ', this.eventCounter, ' events');
+            this.logger.info('Invoked ', this.persistCalls, ' persistObjects');
+            this.eventCounter = 0;
+            this.persistCalls = 0;
+            this.firstEventReceivedAt = undefined;
+        } finally {
+            this.isFlushing = false;
+        }
     }
 
     protected getPartitionKey(obj: StoredEvent<PersistedMoveCommand>): TimeRange {

@@ -236,6 +236,7 @@ sequenceDiagram
 - Event Hub:
     - [NATS](https://nats.io/)
     - Azure Service Bus
+    - AMQP server such as RabbitMQ
 - Event Generator:
     - NodeJS: Typescript
 - Event Viewer:

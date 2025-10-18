@@ -3,6 +3,7 @@ import type {ChaosEngineeringConfig, Deferred, IncomingMessageEnvelope, MessageB
 import { type MessageBusDriver, deferred, formatIdentity, MessageBus, MessagePath, NoopMessageBusMetrics, ProtoBufRegistry, PublicationMessagePath, randomUUID, ReplyPath, sleep, Stopwatch, SubscriptionMessagePath } from "core-lib";
 import type { Logger, ServiceIdentity } from "core-lib";
 import { ServiceBusClient, type ServiceBusSender, type ServiceBusReceiver, type ServiceBusMessage, type ServiceBusReceivedMessage, type ProcessErrorArgs, ServiceBusAdministrationClient, type ServiceBusMessageBatch } from '@azure/service-bus';
+import { AMQPChannel, AMQPMessage, AMQPWebSocketClient } from "@cloudamqp/amqp-client";
 
 const MessageTypeHeader = 'proto/type';
 
@@ -577,6 +578,232 @@ export class AzureServiceBusMessageBusDriver implements MessageBusDriver {
             subscribedSubject: subscribedSubject,
             headers: headers,
             body: body,
+            reply(replyMsg) {
+                return onReplyTo(this, replyMsg);
+            }
+        };
+    }
+}
+
+export class AmqpMessageBus extends MessageBus {
+
+    constructor(identity: ServiceIdentity, logger: Logger, chaosEngineering: ChaosEngineeringConfig) {
+        const protoBufRegistry = new ProtoBufRegistry();
+        const driver = new AmqpMessageBusDriver(
+            (msg) => this.messageDispatcher.dispatch(msg),
+            (req, res) => this.envelopeReply(req, res),
+            identity,
+            logger,
+            protoBufRegistry,
+        );
+        super(identity, logger, chaosEngineering, new NoopMessageBusMetrics(), driver, protoBufRegistry);
+    }
+
+    get features(): MessageBusFeatures {
+        return {
+            supportsAbstractSubjects: true, // AMQP allows multiple subscribers of a same subject to decide wether they will consume the messages as a queue or pub/sub
+            supportsTemporaryQueues: true, // AMQP has temporary queues by default and when a subscriber disconnects, all messages get deleted.
+        }
+    }
+
+}
+
+
+export class AmqpMessageBusDriver implements MessageBusDriver {
+    private uid = randomUUID();
+    private client?: AMQPWebSocketClient;
+    private sendChannel?: AMQPChannel;
+    private receiveChannel?: AMQPChannel;
+    private watch = new Stopwatch();
+
+    constructor(
+        public readonly onReceiveMessage: ReceiveMessageCallback,
+        public readonly onReplyTo: ReplyToCallback,
+        private identity: ServiceIdentity,
+        private logger: Logger,
+        private protoBufRegistry: ProtoBufRegistry,
+    ) { }
+
+    get privateInboxPath(): { publish: PublicationMessagePath; subscribe: SubscriptionMessagePath } {
+        const inboxPath = MessagePath.fromPath(`inbox/{name(required)}/{id(required)}`);
+        const inboxVars: Record<string, string> = {
+            name: this.identity.name,
+            id: this.uid,
+        };
+        return {
+            publish: inboxPath.publish(inboxVars),
+            subscribe: inboxPath.subscribe(inboxVars),
+        };
+    }
+
+    async start(connectionString: string): Promise<void> {
+        for (let i = 0; i < 30; i++) {
+            try {
+                this.logger.info(`AMQP connection attempt #${i} on ${connectionString}`);
+                this.client = new AMQPWebSocketClient(connectionString, "/");
+                const conn = await this.client.connect();
+                const ch = await conn.channel();
+                this.sendChannel = await conn.channel();
+                this.receiveChannel = await conn.channel();
+                this.receiveChannel.prefetch(1);
+                this.logger.info('AMQP connection is ready.');
+                this.watch.restart();
+                return;
+            } catch (err: any) {
+                this.logger.error(err);
+                this.logger.error(`Could not connect to AMQP server: ${connectionString}`);
+                await sleep(1000);
+            }
+        }
+        throw new Error('Could not connect to AMQP server after multiple attemps');
+    }
+
+    async stop(): Promise<void> {
+        if (this.client) {
+            await this.client.close();
+            this.client = undefined;
+            this.sendChannel = undefined;
+            this.receiveChannel = undefined;
+            this.watch.stop();
+            this.logger.info(`AMQP connection closed after ${this.watch.elapsedTimeAsString()}`);
+        }
+    }
+
+    async waitForClose(): Promise<void> {
+        return Promise.resolve();
+    }
+
+    subscribe(subscription: MessageSubscription): void {
+        this.doSubscribe(subscription).catch(err => {
+            this.logger.error(err);
+        });
+    }
+
+    private async doSubscribe(subscription: MessageSubscription): Promise<void> {
+        if (!this.receiveChannel) {
+            throw new Error('Expected MessageBus to be started');
+        }
+
+        const subject = this.renderPath(subscription.path);
+        const isTopic = subscription.type === 'topic';
+        const queueName = isTopic ? `events.${this.identity.name}-${this.uid}` : `queue.${subject}`;
+        const q = await this.receiveChannel.queue(queueName, { exclusive: isTopic, durable: false, autoDelete: true });
+        const exchange_name = 'vehicles';
+        await this.receiveChannel.exchangeDeclare(exchange_name, 'topic', { durable: false });
+        await q.bind(exchange_name, subject);
+
+        this.logger.info(`AMQP subscribed to ${subscription.type}: ${subject}'`);
+
+        await q.subscribe({ noAck: true}, (msg) => {
+            const msgEnv = this.createMessageEnvelope(subject, msg);
+            this.onReceiveMessage(msgEnv).catch(err => {
+                this.logger.error('onReceiveMessage failed', err);
+            });
+        });
+    }
+
+    async publish(msg: MessageEnvelope): Promise<void> {
+        if (!this.sendChannel) {
+            throw new Error('Expected to have established a connexion!');
+        }
+        let data: Buffer;
+        const codec = this.protoBufRegistry.find(msg.body.type);
+        if (codec) {
+            data = Buffer.from(codec.encode(msg.body));
+            msg.headers[MessageTypeHeader] = msg.body.type;
+        } else {
+            data = Buffer.from(JSON.stringify(msg.body));
+        }
+        
+        await this.sendChannel.basicPublish('vehicles', msg.subject, data, { headers: msg.headers });
+    }
+
+    async publishBatch(messages: MessageEnvelope[]): Promise<void> {
+        for (const msg of messages) {
+            await this.publish(msg);
+        }
+    }
+
+    renderPath(path: MessagePath): string {
+        if (path instanceof PublicationMessagePath) {
+            const segments: string[] = [];
+            for (const segment of path.segments) {
+                if (segment.type === 'string') {
+                    segments.push(segment.value);
+                } else if (segment.type === 'var') {
+                    const val = path.vars[segment.name];
+                    if (val) {
+                        segments.push(val);
+                    } else {
+                        throw new Error(`Expected to have a value for var '${segment.name}' of path '${path}' when publishing`);
+                    }
+                } else if (segment.type === 'rest') {
+                    const val = path.vars['rest'];
+                    if (val) {
+                        for (const item of val.split('/')) {
+                            segments.push(item);
+                        }
+                    }
+                }
+            }
+            return segments.join('.');
+        } else if (path instanceof SubscriptionMessagePath) {
+            const segments: string[] = [];
+            for (const segment of path.segments) {
+                if (segment.type === 'string') {
+                    segments.push(segment.value);
+                } else if (segment.type === 'var') {
+                    const val = path.vars[segment.name];
+                    if (val) {
+                        segments.push(val);
+                    } else {
+                        if (segment.isRequired) {
+                            throw new Error(`Expected to have a value for required var '${segment.name}' of path '${path}'`);
+                        } else {
+                            segments.push('*');
+                        }
+                    }
+                } else if (segment.type === 'rest') {
+                    segments.push('#');
+                }
+            }
+            return segments.join('.');
+        } else if (path instanceof ReplyPath) {
+            return path.replyTo;
+        } else {
+            throw new Error(`Unknown message path: ${path.constructor.name}`);
+        }
+    }
+
+    private createMessageEnvelope(subject: string, msg: AMQPMessage): IncomingMessageEnvelope {
+        const messageType = msg.properties.headers?.[MessageTypeHeader];
+        const body = msg.body;
+        if (!body) {
+            throw new Error(`Expected to have a body for message: ${JSON.stringify(msg)}`);
+        }
+        let data: any;
+        if (messageType) {
+            const codec = this.protoBufRegistry.get(messageType as string);
+            data = codec.decode(body);
+        } else {
+            const decoder = new TextDecoder('utf-8');
+            data = JSON.parse(decoder.decode(body));
+        }
+        // console.log(msg.exchange, msg.routingKey, msg.consumerTag, msg.properties, data);
+        const headers: MessageHeaders = {};
+        if (msg.properties.headers) {
+            for (const [key, value] of Object.entries(msg.properties.headers)) {
+                if (value) {
+                    headers[key] = value?.toString();
+                }
+            }
+        }   
+        const onReplyTo = this.onReplyTo;
+        return {
+            subject: msg.routingKey,
+            subscribedSubject: subject,
+            headers,
+            body: data,
             reply(replyMsg) {
                 return onReplyTo(this, replyMsg);
             }

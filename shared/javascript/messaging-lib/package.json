@@ -14,11 +14,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/node": "^24.6.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
+    "amqplib": "^0.10.9",
     "core-lib": "file:../../../shared/javascript/core-lib",
     "express": "^5.1.0",
     "express-prom-bundle": "^8.0.0",

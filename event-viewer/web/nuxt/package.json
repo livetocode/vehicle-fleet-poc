@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@azure/service-bus": "^7.9.5",
+    "@cloudamqp/amqp-client": "^3.3.2",
     "@mdi/font": "^7.4.47",
     "core-lib": "file:../../../shared/javascript/core-lib",
     "latlon-geohash": "^2.0.0",

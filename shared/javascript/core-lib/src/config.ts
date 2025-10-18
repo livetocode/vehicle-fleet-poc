@@ -26,13 +26,21 @@ export type AzureServiceBusHubConfig = {
     connectionString: string;
 }
 
-export type RabbitHubConfig = {
-    type: 'rabbit';
+export type AmqpHubConfig = {
+    type: 'amqp';
     enableProtoBuf: boolean;
-    // todo: define other properties
+    protocols: {
+        amqp: {
+            connectionString: string;
+        },
+        websockets: {
+            server: string;
+        }
+    }
+    connectionString: string;
 }
 
-export type HubConfig = NatsHubConfig | AzureServiceBusHubConfig | RabbitHubConfig;
+export type HubConfig = NatsHubConfig | AzureServiceBusHubConfig | AmqpHubConfig;
 
 export type NoopEventStoreConfig = {
     type: 'noop';

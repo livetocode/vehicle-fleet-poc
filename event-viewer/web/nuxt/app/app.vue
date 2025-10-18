@@ -1,7 +1,7 @@
 <script setup>
   import { onMounted, onUnmounted, provide } from 'vue';
   import { registerCodecs, commands, events } from 'core-lib';
-  import { NatsMessageBus, AzureServiceBusMessageBus } from './utils/messaging';
+  import { NatsMessageBus, AzureServiceBusMessageBus, AmqpMessageBus } from './utils/messaging';
 
   const appConfig = useAppConfig();
   const identity = {
@@ -26,6 +26,9 @@
   } else if (appConfig.hub.type === 'azureServiceBus') {
     messageBus = new AzureServiceBusMessageBus(identity, logger, appConfig.chaosEngineering);
     connectionString =  appConfig.hub.connectionString;
+  } else if (appConfig.hub.type === 'amqp') {
+    messageBus = new AmqpMessageBus(identity, logger, appConfig.chaosEngineering);
+    connectionString =  appConfig.hub.protocols.websockets.server;
   } else {
     throw new Error('Expected a valid hub');
   }

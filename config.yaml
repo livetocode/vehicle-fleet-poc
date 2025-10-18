@@ -8,9 +8,18 @@ hub:
     websockets:
       servers:
       - ws://localhost:4243
+
   # type: azureServiceBus
   # enableProtoBuf: true
   # connectionString: Endpoint=sb://foobar.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=<redacted>
+
+  # type: amqp
+  # enableProtoBuf: true
+  # protocols:
+  #   amqp:
+  #     connectionString: amqp://localhost:5672
+  #   websockets:
+  #     server: ws://localhost:15670/ws
 
 partitioning:
   timePartition:

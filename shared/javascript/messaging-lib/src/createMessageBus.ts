@@ -1,6 +1,7 @@
 import { HubConfig, MessageBus, Logger, ServiceIdentity, registerCodecs, ChaosEngineeringConfig } from "core-lib";
 import { NatsMessageBus } from "./NatsMessageBus.js";
 import { AzureServiceBusMessageBus } from "./AzureServiceBusMessageBus.js";
+import { AmqpMessageBus } from "./AmqpMessageBus.js";
 
 export async function createMessageBus(hub: HubConfig, identity: ServiceIdentity, logger: Logger, chaosEngineering: ChaosEngineeringConfig): Promise<MessageBus> {
     switch(hub.type) {
@@ -20,8 +21,17 @@ export async function createMessageBus(hub: HubConfig, identity: ServiceIdentity
             await result.start(hub.connectionString);
             return result;
         }
+        case 'amqp': {
+            const result = new AmqpMessageBus(identity, logger, chaosEngineering);
+            if (hub.enableProtoBuf) {
+                registerCodecs(result);
+            }
+            await result.start(hub.connectionString);
+            return result;
+        }
         default:
-            throw new Error(`Unknown message bus type '${hub.type}'`);
+            throw new Error(`Unknown message bus type '${(hub as any).type}'`);
     }
 }
+
 
