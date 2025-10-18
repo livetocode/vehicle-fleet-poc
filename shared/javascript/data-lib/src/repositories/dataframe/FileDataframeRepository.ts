@@ -66,7 +66,7 @@ export class FileDataframeRepository implements DataFrameRepository {
         const filename = path.join(this.folder, format, name);
         await fs.mkdir(path.dirname(filename), { recursive: true });
         if (format === 'parquet') {
-            df.writeParquet(filename, { compression: 'snappy' });
+            df.writeParquet(filename, { compression: 'zstd' });
         } else if (format === 'csv') {
             df.writeCSV(filename);
         } else if (format === 'json') {
