@@ -123,7 +123,7 @@ collector:
 
       type: file
       folder: ../../output/data
-      isFake: true # if true, the collector won't actually write files to disk, but will simulate the write delay and log the file paths that would have been written. This is useful for testing the finder component without needing to generate large amounts of data or write to disk.
+      isFake: false # if true, the collector won't actually write files to disk, but will simulate the write delay and log the file paths that would have been written. This is useful for testing the finder component without needing to generate large amounts of data or write to disk.
       writeDelayInMS: 1000 # simulate the time it takes to write a file to disk, only when isFake is true. This is for performance testing and debugging, to verify that the collector can cope with the message flow.
 
 finder:
