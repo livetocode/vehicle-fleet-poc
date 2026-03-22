@@ -20,14 +20,20 @@ export function loadConfig(filename: string): Config {
   }
   return result;
 }
+export type VehiclesChartProps = ChartProps & {
+  config: Config;
+  enableResourceQuotas?: boolean;
+}
 
 export class VehiclesChart extends Chart {
-  constructor(scope: Construct, id: string, private config: Config, props: ChartProps = { }) {
+  private config: Config;
+  constructor(scope: Construct, id: string, props: VehiclesChartProps) {
     super(scope, id, props);
+    this.config = props.config;
 
-    const hub = this.createEventHub();
+    const hub = this.createEventHub(props.enableResourceQuotas ?? false);
 
-    this.createEventViewer(hub.externalServiceName);
+    this.createEventViewer(hub.externalServiceName, props.enableResourceQuotas ?? false);
 
     const {sharedConfigVolume } = this.createSharedConfig();    
 
@@ -37,6 +43,7 @@ export class VehiclesChart extends Chart {
       image: 'livetocode/vehicle-fleet-poc-event-generator:latest',
       replicas: this.config.generator.instances,
       containerPort: this.config.generator.httpPort,
+      enableResourceQuotas: props.enableResourceQuotas,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
@@ -50,6 +57,7 @@ export class VehiclesChart extends Chart {
       image: 'livetocode/vehicle-fleet-poc-event-collector:latest',
       replicas: this.config.collector.instances,
       containerPort: this.config.collector.httpPort,
+      enableResourceQuotas: props.enableResourceQuotas,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
@@ -62,6 +70,7 @@ export class VehiclesChart extends Chart {
       image: 'livetocode/vehicle-fleet-poc-event-finder:latest',
       replicas: this.config.finder.instances,
       containerPort: this.config.finder.httpPort,
+      enableResourceQuotas: props.enableResourceQuotas,
       sharedDataPVC: claim,
       sharedConfig: sharedConfigVolume,
       envVariables: {
@@ -71,7 +80,7 @@ export class VehiclesChart extends Chart {
     });
   }
 
-  createEventHub() {
+  createEventHub(enableResourceQuotas: boolean) {
     const hubConfigMap = new ConfigMap(this, 'event-hub-config');
     hubConfigMap.addFile(`${__dirname}/../../event-hub/config.txt`);
     const hubConfigVolume = Volume.fromConfigMap(this, 'event-hub-config-vol', hubConfigMap);    
@@ -108,16 +117,16 @@ export class VehiclesChart extends Chart {
               path: '/etc/nats/nats-server.conf',
             }
           ],
-          resources: {
+          resources: enableResourceQuotas ? ({
             cpu: {
               request: Cpu.millis(100),
               limit: Cpu.millis(1000),
             },
             memory: {
-              request: Size.mebibytes(100),
-              limit: Size.gibibytes(1),
+              request: Size.mebibytes(50),
+              limit: Size.mebibytes(600),
             },
-          },
+          }) : {},
         },
         {
           name: 'prom-exporter',
@@ -142,7 +151,7 @@ export class VehiclesChart extends Chart {
     }
   }
 
-  createEventViewer(hubHost: string) {
+  createEventViewer(hubHost: string, enableResourceQuotas: boolean) {
     const viewer = new Deployment(this, 'event-viewer', {
       replicas: 1,
       // volumes: [sharedConfigVolume],
@@ -165,7 +174,7 @@ export class VehiclesChart extends Chart {
           //     path: '/apps/config.yaml',
           //   }
           // ],
-          resources: {
+          resources: enableResourceQuotas ? ({
             cpu: {
               request: Cpu.millis(100),
               limit: Cpu.millis(400),
@@ -174,7 +183,7 @@ export class VehiclesChart extends Chart {
               request: Size.mebibytes(100),
               limit: Size.mebibytes(400),
             },
-          },
+          }) : {},
         },
       ],      
     });
@@ -191,12 +200,12 @@ export class VehiclesChart extends Chart {
   }
 
   createSharedVolume() {
-    if (this.config.collector.output.storage.type === 'file') {
+    if (this.config.collector.output.storage.type === 'file' && !this.config.collector.output.storage.isFake) {
       const accessModes = [PersistentVolumeAccessMode.READ_WRITE_MANY];
       const claim = new PersistentVolumeClaim(this, 'claim', {
         storage: Size.gibibytes(15),
         accessModes,
-        // storageClassName: 'csi-rbd-sc-hdd-generic',      
+        storageClassName: process.env.K8S_STORAGE_CLASS_NAME,
       });
       return { claim };  
     }
@@ -206,9 +215,17 @@ export class VehiclesChart extends Chart {
     const result: {
       [name: string]: EnvValue;
     } = {};
+    const envVarNames: string[] = [];
     if (this.config.collector.output.storage.type === 's3') {
-      if (process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING) {
-        result['VEHICLES_AZURE_STORAGE_CONNECTION_STRING'] = EnvValue.fromValue(process.env.VEHICLES_AZURE_STORAGE_CONNECTION_STRING);
+      envVarNames.push('S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT_URL');
+    }
+    if (this.config.collector.output.storage.type === 'azure-blob') {
+      envVarNames.push('VEHICLES_AZURE_STORAGE_CONNECTION_STRING');
+    }
+    for (const envVarName of envVarNames) {
+      const val = process.env[envVarName];
+      if (val) {
+        result[envVarName] = EnvValue.fromValue(val);
       }
     }
     return result;    
@@ -228,9 +245,11 @@ const ns = new KubeNamespace(nsChart, 'namespace', {
   }
 });
 
-const appChart = new VehiclesChart(app, 'vehicles', config, {
+const appChart = new VehiclesChart(app, 'vehicles', {
   disableResourceNameHashes: true,
-  namespace: ns.name,  
+  namespace: ns.name,
+  config,
+  enableResourceQuotas: false,
 });
 appChart.addDependency(nsChart);
 app.synth();

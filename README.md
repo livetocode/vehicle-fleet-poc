@@ -502,6 +502,48 @@ Note that you should make sure that the [proto file](./shared/javascript/core-li
 the [message types](./shared/javascript/core-lib/src/messages.ts) are properly in sync, and everytime they change,
 you should regen the files.
 
+## Storage
+
+You can simply rely on the local filesystem or you can install an S3 compatible server.
+
+### Local filesystem
+
+Nothing to do. 
+
+Make sure that the `collector.output.storage.type` is set to `file`.
+
+Then a folder will be created using the property `collector.output.storage.folder` of the `config.yaml` file.
+
+### S3 local server
+
+You can use https://rustfs.com/ and run it with Docker:
+
+```shell
+mkdir -p data
+
+docker run -d \
+  --name rustfs_local \
+  -p 9000:9000 \
+  -p 9001:9001 \
+  -v `pwd`/data:/data \
+  rustfs/rustfs:latest \
+  /data
+```
+
+Make sure that the `collector.output.storage.type` is set to `s3`.
+
+The collector will create a bucket using the name specified in `collector.output.storage.bucketName` of the config,
+if it does not already exist. Of course, it should have the rights to do it otherwise you would have to create it manually.
+
+Then define the following environment variables:
+
+```shell
+export S3_ACCESS_KEY_ID=rustfsadmin
+export S3_SECRET_ACCESS_KEY=rustfsadmin
+export S3_ENDPOINT_URL=http://localhost:9000
+export S3_REGION=foobar
+```
+
 ## NodeJS
 
 ### Requirements

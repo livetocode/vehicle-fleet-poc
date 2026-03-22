@@ -94,9 +94,10 @@ def start_instances(folder: str, instances: int, process_starter):
             'PATH': os.environ['PATH'],
             'NODE_HTTP_PORT': str(next_http_port),
         }
-        cs = os.environ.get('VEHICLES_AZURE_STORAGE_CONNECTION_STRING')
-        if cs:
-            process_env['VEHICLES_AZURE_STORAGE_CONNECTION_STRING'] = cs
+        for key in ['VEHICLES_AZURE_STORAGE_CONNECTION_STRING', 'S3_REGION', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT_URL']:
+            v = os.environ.get(key)
+            if v:
+                process_env[key] = v
         process = process_starter(folder, env = process_env)
         services.append((process, next_http_port))
         next_http_port += 1

@@ -139,14 +139,19 @@ export type GeneratorConfig = {
 export type FileStorageConfig = {
     type: 'file';
     folder: string;
+    isFake?: boolean;
+    writeDelayInMS?: number;
 }
 
 export type NoOpStorageConfig = {
     type: 'noop';
+    writeDelayInMS?: number;
 }
 
 export type S3StorageConfig = {
     type: 's3';
+    bucketName: string;
+    deleteBucketContentOnClear?: boolean;
 }
 
 export type AzureBlobStorageConfig = {
@@ -194,6 +199,7 @@ export type CollectorConfig = {
     instances: number;
     httpPort: number;
     geohashLength: number;
+    concurrentFlushes: boolean;
     eventStore: EventStoreConfig;
     eventDispatcher: EventDispatcherConfig;
     output: OutputConfig;

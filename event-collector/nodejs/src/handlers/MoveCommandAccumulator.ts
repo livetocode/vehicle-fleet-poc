@@ -123,21 +123,22 @@ export type EventContainerFactoryArgs<TItem> = {
     maxCapacity: number;
     maxActivePartitions: number;
     flushThresholdRatio: number;
+    concurrentFlushes: boolean;
     timeRangeProvider: KeyProvider<TItem>;
     geohashProvider: KeyProvider<TItem>;
     persister: ContainerPersister<TItem>;
 }
 
 export function createEventPipeline<TItem>(args: EventContainerFactoryArgs<TItem>): Container<TItem> {
-    const manager = new ContainerManager<TItem>(args.logger, args.maxCapacity, args.flushThresholdRatio);
+    const manager = new ContainerManager<TItem>(args.logger, args.maxCapacity, args.flushThresholdRatio, args.concurrentFlushes);
     const eventContainerFactory = () => new ArrayContainer<TItem>(manager, args.persister);
     if (args.aggregationStrategy === 'geohashThenTime') {
-        const timeWindowContainerFactory = () => new SortedContainer<TItem>(args.maxActivePartitions, manager, args.timeRangeProvider, eventContainerFactory);
-        const geohashContainer = new MapContainer<TItem>(manager, args.geohashProvider, timeWindowContainerFactory);
+        const timeWindowContainerFactory = () => new SortedContainer<TItem>(args.maxActivePartitions, manager, args.timeRangeProvider, eventContainerFactory, args.concurrentFlushes);
+        const geohashContainer = new MapContainer<TItem>(manager, args.geohashProvider, timeWindowContainerFactory, args.concurrentFlushes);
         return geohashContainer;    
     } else if (args.aggregationStrategy === 'timeThenGeohash') {
-        const geohashContainerFactory = () => new MapContainer<TItem>(manager, args.geohashProvider, eventContainerFactory);
-        const timeWindowContainer = new SortedContainer<TItem>(args.maxActivePartitions, manager, args.timeRangeProvider, geohashContainerFactory);
+        const geohashContainerFactory = () => new MapContainer<TItem>(manager, args.geohashProvider, eventContainerFactory, args.concurrentFlushes);
+        const timeWindowContainer = new SortedContainer<TItem>(args.maxActivePartitions, manager, args.timeRangeProvider, geohashContainerFactory, args.concurrentFlushes);
         return timeWindowContainer;    
     } else {
         throw new Error(`Unknown aggregation strategy: ${args.aggregationStrategy}`);
@@ -170,6 +171,7 @@ export class MoveCommandAccumulatorV2 implements Accumulator<StoredEvent<Persist
             maxCapacity: this.config.partitioning.timePartition.maxCapacity,
             maxActivePartitions: this.config.partitioning.timePartition.maxActivePartitions,
             flushThresholdRatio: 0.24,
+            concurrentFlushes: this.config.collector.concurrentFlushes,
             geohashProvider: (item: StoredEvent<PersistedMoveCommand>) => item.partitionKey,
             timeRangeProvider: (item: StoredEvent<PersistedMoveCommand>) => this.getPartitionKey(item).toString(),
             persister: (args: ContainerPersisterArgs<StoredEvent<PersistedMoveCommand>>) => {

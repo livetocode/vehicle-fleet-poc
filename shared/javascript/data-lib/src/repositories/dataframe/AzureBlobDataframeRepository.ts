@@ -45,7 +45,6 @@ export class AzureBlobDataframeRepository implements DataFrameRepository {
     }
 
     async *list(options: ListOptions): AsyncGenerator<DataFrameDescriptor> {
-        const container = await this.getContainerClient(this.containerName);
         if (options.subFolder && canUseHierarchicalListing) {
             yield* this.list_by_hierarchy(options, options.subFolder);
         } else {

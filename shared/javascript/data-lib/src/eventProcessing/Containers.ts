@@ -26,7 +26,12 @@ export class ContainerManager<TItem> {
     private _totalItemsCount = 0;
     private isDirty = false;
 
-    constructor(private logger: Logger, private capacity: number, private flushThresholdRatio: number) {
+    constructor(
+        private logger: Logger, 
+        private capacity: number, 
+        private flushThresholdRatio: number, 
+        private concurrentFlushes: boolean,
+    ) {
         if (capacity < 1) {
             throw new Error(`Capacity must be >= 1, but received: ${capacity}`);
         }
@@ -77,8 +82,12 @@ export class ContainerManager<TItem> {
             }
         }
         this.logger.debug(`Manager will flush ${selectedContainers.length} of ${this.containers.length} containers to reclaim ${selectedSize} objects`);
-        for (const container of selectedContainers) {
-            await container.flush(true);
+        if (this.concurrentFlushes) {
+            await Promise.all(selectedContainers.map(c => c.flush(true)));
+        } else {
+            for (const container of selectedContainers) {
+                await container.flush(true);
+            }
         }
         this.isDirty = true;
     }
@@ -141,6 +150,7 @@ export class MapContainer<TItem> implements Container<TItem> {
         private manager: ContainerManager<TItem>,
         private keyProvider: KeyProvider<TItem>,
         private containerFactory: ContainerFactory<TItem>,
+        private concurrentFlushes: boolean,
     ) {}
 
     get size(): number {
@@ -163,8 +173,14 @@ export class MapContainer<TItem> implements Container<TItem> {
         const values = [...this.items.values()];
         this.items.clear();
         for (const item of values) {
-            await item.flush(isPartial);
             this.manager.remove(item);
+        }
+        if (this.concurrentFlushes) {
+            await Promise.all(values.map(c => c.flush(isPartial)));
+        } else {
+            for (const item of values) {
+                await item.flush(isPartial);
+            }
         }
     }
 }
@@ -179,6 +195,7 @@ export class SortedContainer<TItem> implements Container<TItem> {
         private manager: ContainerManager<TItem>,
         private keyProvider: KeyProvider<TItem>,
         private containerFactory: ContainerFactory<TItem>,
+        private concurrentFlushes: boolean,
     ) {
         if (capacity < 1) {
             throw new OutOfOrderError(`Capacity must be >= 1, but received: ${capacity}`);
@@ -210,13 +227,19 @@ export class SortedContainer<TItem> implements Container<TItem> {
         const items = this.items;
         this.items = [];
         for (const item of items) {
-            await item[1].flush(isPartial);
             this.manager.remove(item[1]);
+        }
+        if (this.concurrentFlushes) {
+            await Promise.all(items.map(item => item[1].flush(isPartial)));
+        } else {
+            for (const item of items) {
+                await item[1].flush(isPartial);
+            }
         }
     }
 
     private async checkCapacity(key: string) {
-        if (this.items.length === this.capacity) {
+        if (this.items.length >= this.capacity) {
             const firstKey = this.items[0][0];
             if (key < firstKey) {
                 throw new Error(`New item should always have a greater key than the current upper key: ${key} should be greater than ${firstKey}`);

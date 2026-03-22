@@ -36,10 +36,15 @@
   if (appConfig.hub.enableProtoBuf) {
     registerCodecs(messageBus);
   }
-  if (messageBus.features.supportsAbstractSubjects) {
-    messageBus.subscribe({ type: 'topic', path: commands.move.subscribe({})});
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('displayVehicles') === 'false') {
+    logger.warn('Do not subscribe to vehicle move events because displayVehicles is set to false');
   } else {
-    messageBus.subscribe({ type: 'topic', path: events.vehicles.moved.subscribe({})});
+    if (messageBus.features.supportsAbstractSubjects) {
+      messageBus.subscribe({ type: 'topic', path: commands.move.subscribe({})});
+    } else {
+      messageBus.subscribe({ type: 'topic', path: events.vehicles.moved.subscribe({})});
+    }
   }
   messageBus.subscribe({ type: 'topic', path: events.vehicles.byTypeAndSubType.subscribe({})});
   

@@ -38,6 +38,8 @@ export interface NatsServiceOptions {
    * A ConfigMap shared between services and containing the config
    */
   sharedConfig: Volume;
+
+  enableResourceQuotas?: boolean;
 }
 
 export class NatsService extends Construct {
@@ -85,7 +87,7 @@ export class NatsService extends Construct {
           securityContext: {
             ensureNonRoot: false,
           },
-          resources: {
+          resources: options.enableResourceQuotas  ? ({
             cpu: {
               request: Cpu.millis(100),
               limit: Cpu.millis(1000),
@@ -94,7 +96,7 @@ export class NatsService extends Construct {
               request: Size.mebibytes(50),
               limit: Size.mebibytes(600),
             },
-          },
+          }) : {},
           volumeMounts: [
             {
               volume: options.sharedConfig,
